@@ -70,6 +70,16 @@ public final class LearningContextRepository {
     }
 
     public synchronized void saveMemory(String id, String scope, String projectId, String content) {
+        saveMemoryInternal(id, scope, projectId, content, "manual", 1.0);
+    }
+
+    public synchronized void saveExtractedMemory(String scope, String projectId, String content, double confidence) {
+        String normalizedScope = normalizeScope(scope);
+        String existingId = findSimilarMemoryId(normalizedScope, projectId, content);
+        saveMemoryInternal(existingId, normalizedScope, projectId, content, "auto", confidence);
+    }
+
+    private void saveMemoryInternal(String id, String scope, String projectId, String content, String source, double confidence) {
         String normalizedContent = safe(content).trim();
         if (normalizedContent.length() == 0) {
             return;
@@ -86,8 +96,9 @@ public final class LearningContextRepository {
             values.put("project_id", safe(projectId));
         }
         values.put("content", normalizedContent);
-        values.put("source", existing.source.length() == 0 ? "manual" : existing.source);
-        values.put("confidence", existing.confidence <= 0 ? 1.0 : existing.confidence);
+        values.put("source", existing.source.length() == 0 ? safeSource(source) : existing.source);
+        double resolvedConfidence = confidence <= 0 ? 1.0 : confidence;
+        values.put("confidence", existing.confidence <= 0 ? resolvedConfidence : Math.max(existing.confidence, resolvedConfidence));
         values.put("created_at", existing.createdAt <= 0 ? now : existing.createdAt);
         values.put("updated_at", now);
         if (existing.lastUsedAt > 0) {
@@ -403,6 +414,41 @@ public final class LearningContextRepository {
         }
     }
 
+    private String findSimilarMemoryId(String scope, String projectId, String content) {
+        String target = normalizedMemoryKey(content);
+        if (target.length() == 0) {
+            return "";
+        }
+        Cursor cursor;
+        if (MemoryOverviewState.Memory.SCOPE_USER.equals(normalizeScope(scope))) {
+            cursor = database.getReadableDatabase().rawQuery(
+                    "SELECT id, content FROM memories WHERE scope = 'user' ORDER BY updated_at DESC LIMIT ?",
+                    new String[] {String.valueOf(OVERVIEW_LIMIT)}
+            );
+        } else {
+            cursor = database.getReadableDatabase().rawQuery(
+                    "SELECT id, content FROM memories WHERE scope = ? "
+                            + "AND (? = '' OR project_id = ? OR project_id IS NULL OR project_id = '') "
+                            + "ORDER BY updated_at DESC LIMIT ?",
+                    new String[] {normalizeScope(scope), safe(projectId), safe(projectId), String.valueOf(OVERVIEW_LIMIT)}
+            );
+        }
+        try {
+            while (cursor.moveToNext()) {
+                String existing = normalizedMemoryKey(value(cursor, "content"));
+                if (existing.length() == 0) {
+                    continue;
+                }
+                if (existing.equals(target) || existing.contains(target) || target.contains(existing)) {
+                    return value(cursor, "id");
+                }
+            }
+        } finally {
+            cursor.close();
+        }
+        return "";
+    }
+
     private void markMemoriesUsed(List<Candidate> memories) {
         if (memories == null || memories.isEmpty()) {
             return;
@@ -605,6 +651,26 @@ public final class LearningContextRepository {
             return MemoryOverviewState.Memory.SCOPE_ENVIRONMENT;
         }
         return MemoryOverviewState.Memory.SCOPE_USER;
+    }
+
+    private String safeSource(String source) {
+        String value = safe(source).trim().toLowerCase(Locale.ROOT);
+        if ("auto".equals(value) || "correction".equals(value) || "summary".equals(value)) {
+            return value;
+        }
+        return "manual";
+    }
+
+    private String normalizedMemoryKey(String content) {
+        String value = safe(content).toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if (Character.isLetterOrDigit(ch) || (ch >= '\u4e00' && ch <= '\u9fff')) {
+                builder.append(ch);
+            }
+        }
+        return builder.toString();
     }
 
     private String safe(String value) {

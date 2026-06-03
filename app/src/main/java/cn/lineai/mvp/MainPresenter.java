@@ -25,6 +25,7 @@ import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.DiffRepository;
 import cn.lineai.data.repository.FileTreeRepository;
 import cn.lineai.data.repository.LearningContextRepository;
+import cn.lineai.data.repository.MemoryExtractionService;
 import cn.lineai.data.repository.MessageRecord;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.ProjectRecord;
@@ -86,6 +87,7 @@ public final class MainPresenter implements MainContract.Presenter {
     private final ConversationRepository conversationRepository;
     private final ProjectRepository projectRepository;
     private final LearningContextRepository learningContextRepository;
+    private final MemoryExtractionService memoryExtractionService;
     private final ToolSettingsRepository toolSettingsRepository;
     private final DiffRepository diffRepository;
     private final FileTreeRepository fileTreeRepository = new FileTreeRepository();
@@ -346,6 +348,7 @@ public final class MainPresenter implements MainContract.Presenter {
         conversationRepository = new ConversationRepository(context);
         projectRepository = new ProjectRepository(context);
         learningContextRepository = new LearningContextRepository(context);
+        memoryExtractionService = new MemoryExtractionService(context, learningContextRepository);
         toolSettingsRepository = new ToolSettingsRepository(context);
         diffRepository = new DiffRepository(context);
         toolRegistry = new ToolRegistry(context);
@@ -1168,6 +1171,7 @@ public final class MainPresenter implements MainContract.Presenter {
             streaming = false;
             currentCancellationToken = null;
             persistCurrentConversation();
+            scheduleMemoryExtractionIfNeeded(selectedModel);
             render();
         });
     }
@@ -1194,6 +1198,78 @@ public final class MainPresenter implements MainContract.Presenter {
             }
         }
         return merged;
+    }
+
+    private void scheduleMemoryExtractionIfNeeded(ModelConfig selectedModel) {
+        if (!aiBehaviorSettingsRepository.get().isLearningModeEnabled() || selectedModel == null) {
+            return;
+        }
+        String userInput = recentUserInput();
+        String transcript = recentTurnTranscript();
+        if (userInput.trim().length() == 0 || transcript.trim().length() == 0) {
+            return;
+        }
+        String capturedProjectPath = projectPath;
+        new Thread(() -> memoryExtractionService.extractAndStore(
+                selectedModel,
+                capturedProjectPath,
+                userInput,
+                transcript
+        ), "linecode-memory-extract").start();
+    }
+
+    private String recentUserInput() {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage message = messages.get(i);
+            if (message.getRole() == ChatMessage.Role.USER && message.getContent().trim().length() > 0) {
+                return message.getContent();
+            }
+        }
+        return "";
+    }
+
+    private String recentTurnTranscript() {
+        int start = -1;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessage message = messages.get(i);
+            if (message.getRole() == ChatMessage.Role.USER && message.getContent().trim().length() > 0) {
+                start = i;
+                break;
+            }
+        }
+        if (start < 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = start; i < messages.size(); i++) {
+            ChatMessage message = messages.get(i);
+            if (message.isHidden() || message.isExcludeFromContext()) {
+                continue;
+            }
+            if (message.getRole() == ChatMessage.Role.USER) {
+                appendTranscriptMessage(builder, "user", message.getContent(), 1400);
+            } else if (message.getRole() == ChatMessage.Role.ASSISTANT) {
+                appendTranscriptMessage(builder, "assistant", message.getContent(), 2200);
+            }
+            if (builder.length() > 6000) {
+                return builder.substring(0, 5997) + "...";
+            }
+        }
+        return builder.toString().trim();
+    }
+
+    private void appendTranscriptMessage(StringBuilder builder, String role, String content, int maxChars) {
+        String text = content == null ? "" : content.trim();
+        if (text.length() == 0) {
+            return;
+        }
+        if (text.length() > maxChars) {
+            text = text.substring(0, Math.max(0, maxChars - 3)) + "...";
+        }
+        if (builder.length() > 0) {
+            builder.append("\n\n");
+        }
+        builder.append(role).append(": ").append(text);
     }
 
     private void executeToolsAndContinue(

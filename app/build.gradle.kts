@@ -1,7 +1,17 @@
 import java.security.SecureRandom
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+}
+
+val releaseVersionName = "0.0.2-Alpha"
+val releaseApkName = "LineCode Pro $releaseVersionName.APK"
+val releaseSigningProperties = Properties()
+val releaseSigningFile = rootProject.file("signing.properties")
+val hasReleaseSigning = releaseSigningFile.exists()
+if (hasReleaseSigning) {
+    releaseSigningFile.inputStream().use { releaseSigningProperties.load(it) }
 }
 
 val generateReleaseObfuscationDictionary by tasks.registering {
@@ -36,6 +46,13 @@ val purgeReleaseSymbolFiles by tasks.registering(Delete::class) {
     delete(layout.buildDirectory.dir("outputs/native-debug-symbols/release"))
 }
 
+val exportReleaseApk by tasks.registering(Copy::class) {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("*.apk")
+    into(layout.projectDirectory.dir("release"))
+    rename { releaseApkName }
+}
+
 android {
     namespace = "cn.lineai"
     compileSdk {
@@ -48,12 +65,32 @@ android {
         applicationId = "cn.lineai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = releaseVersionName
+    }
+
+    signingConfigs {
+        create("lineAiRelease") {
+            if (hasReleaseSigning) {
+                storeFile = file(releaseSigningProperties.getProperty("storeFile"))
+                storePassword = releaseSigningProperties.getProperty("storePassword")
+                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+            }
+            enableV1Signing = false
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("lineAiRelease")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
@@ -82,6 +119,12 @@ tasks.matching {
     it.name == "assembleRelease" || it.name == "bundleRelease"
 }.configureEach {
     finalizedBy(purgeReleaseSymbolFiles)
+}
+
+tasks.matching {
+    it.name == "assembleRelease"
+}.configureEach {
+    finalizedBy(exportReleaseApk)
 }
 
 dependencies {

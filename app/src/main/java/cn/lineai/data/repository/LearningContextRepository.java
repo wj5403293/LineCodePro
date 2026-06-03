@@ -25,6 +25,14 @@ public final class LearningContextRepository {
     private static final String TEMPLATE_PATH = "prompts/learning-context-template.txt";
     private static final int SCAN_LIMIT = 120;
     private static final int OVERVIEW_LIMIT = 200;
+    private static final double RECENCY_WEIGHT = 0.15;
+    private static final double WORKING_MEMORY_BOOST = 0.30;
+    private static final double BM25_K = 1.2;
+    private static final double BM25_B = 0.75;
+    private static final String[] STOP_WORDS = new String[] {
+            "the", "and", "for", "with", "this", "that", "from", "have", "into", "your", "you", "are", "how",
+            "一个", "这个", "那个", "怎么", "如何", "什么", "以及", "或者", "可以", "需要", "进行", "使用"
+    };
 
     private final Context context;
     private final LineCodeDatabase database;
@@ -38,7 +46,7 @@ public final class LearningContextRepository {
     }
 
     public synchronized String buildLearningContext(String projectId, String userInput, String excludeConversationId) {
-        List<Candidate> workingMemory = rank(readWorkingMemory(projectId), userInput, 5, false);
+        List<Candidate> workingMemory = rank(readWorkingMemory(projectId), userInput, 5, true, WORKING_MEMORY_BOOST);
         List<Candidate> memories = rank(readMemories(projectId), userInput, 6, false);
         List<Candidate> history = rank(readConversationIndex(projectId, excludeConversationId), userInput, 6, false);
         if (history.isEmpty()) {
@@ -473,11 +481,16 @@ public final class LearningContextRepository {
     }
 
     private List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback) {
-        ArrayList<String> terms = searchTerms(userInput);
+        return rank(candidates, userInput, limit, allowRecentFallback, 0.0);
+    }
+
+    private List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback, double boost) {
+        long now = System.currentTimeMillis();
         boolean hasMatches = false;
         for (Candidate candidate : candidates) {
-            candidate.score = score(candidate.searchText, terms);
-            hasMatches = hasMatches || candidate.score > 0;
+            candidate.relevanceScore = relevanceScore(userInput, candidate.searchText);
+            candidate.score = rankingScore(userInput, candidate.searchText, candidate.updatedAt, now, boost);
+            hasMatches = hasMatches || candidate.relevanceScore > 0;
         }
         if (!hasMatches && !allowRecentFallback) {
             return Collections.emptyList();
@@ -485,15 +498,19 @@ public final class LearningContextRepository {
         Collections.sort(candidates, new Comparator<Candidate>() {
             @Override
             public int compare(Candidate left, Candidate right) {
-                if (left.score != right.score) {
-                    return right.score - left.score;
+                int scoreCompare = Double.compare(right.score, left.score);
+                if (scoreCompare != 0) {
+                    return scoreCompare;
                 }
                 return Long.compare(right.updatedAt, left.updatedAt);
             }
         });
         ArrayList<Candidate> selected = new ArrayList<>();
         for (Candidate candidate : candidates) {
-            if (hasMatches && candidate.score <= 0) {
+            if (hasMatches && candidate.relevanceScore <= 0) {
+                continue;
+            }
+            if (!hasMatches && candidate.score <= 0) {
                 continue;
             }
             selected.add(candidate);
@@ -504,76 +521,142 @@ public final class LearningContextRepository {
         return selected;
     }
 
-    private int score(String text, List<String> terms) {
-        if (terms.isEmpty()) {
-            return 0;
-        }
-        String haystack = safe(text).toLowerCase(Locale.ROOT);
-        int total = 0;
-        for (String term : terms) {
-            if (haystack.contains(term)) {
-                total += Math.max(2, term.length());
-            }
-        }
-        return total;
+    static double rankingScore(String query, String text, long updatedAt, long now, double boost) {
+        return relevanceScore(query, text) + recencyBoost(updatedAt, now) * RECENCY_WEIGHT + Math.max(0.0, boost);
     }
 
-    private ArrayList<String> searchTerms(String input) {
-        ArrayList<String> terms = new ArrayList<>();
-        String value = safe(input).toLowerCase(Locale.ROOT);
-        StringBuilder current = new StringBuilder();
+    static double relevanceScore(String query, String text) {
+        List<String> queryKeywords = extractKeywords(query);
+        List<String> docKeywords = extractKeywords(text);
+        if (queryKeywords.isEmpty() || docKeywords.isEmpty()) {
+            return 0.0;
+        }
+        HashMap<String, Integer> queryTerms = termFrequency(queryKeywords);
+        HashMap<String, Integer> docTerms = termFrequency(docKeywords);
+        int docLength = Math.max(1, docKeywords.size());
+        String rawText = safeStatic(text).toLowerCase(Locale.ROOT);
+        double score = 0.0;
+        for (String term : queryTerms.keySet()) {
+            int docTf = docTerms.containsKey(term) ? docTerms.get(term) : rawText.contains(term) ? 1 : 0;
+            if (docTf <= 0) {
+                continue;
+            }
+            int queryTf = queryTerms.get(term);
+            double tf = docTf / (docTf + BM25_K + BM25_B * docLength / 100.0);
+            score += (1.0 + Math.log(queryTf)) * tf;
+        }
+        String queryPhrase = safeStatic(query).trim().toLowerCase(Locale.ROOT);
+        if (queryPhrase.length() >= 4 && rawText.contains(queryPhrase)) {
+            score += 2.0;
+        }
+        return score;
+    }
+
+    static double recencyBoost(long updatedAt, long now) {
+        if (updatedAt <= 0 || now <= 0) {
+            return 0.0;
+        }
+        double ageDays = Math.max(0.0, (now - updatedAt) / 86400000.0);
+        return 1.0 / (1.0 + ageDays / 30.0);
+    }
+
+    static List<String> extractKeywords(String input) {
+        ArrayList<String> keywords = new ArrayList<>();
+        String value = safeStatic(input).toLowerCase(Locale.ROOT);
+        StringBuilder latin = new StringBuilder();
         StringBuilder cjk = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
             char ch = value.charAt(i);
-            if (Character.isLetterOrDigit(ch)) {
-                current.append(ch);
-                if (isCjk(ch)) {
-                    cjk.append(ch);
-                } else {
-                    addCjkTerms(terms, cjk.toString());
-                    cjk.setLength(0);
-                }
+            if (isLatinTokenChar(ch)) {
+                latin.append(ch);
             } else {
-                addTerm(terms, current.toString());
-                current.setLength(0);
-                addCjkTerms(terms, cjk.toString());
+                addKeyword(keywords, latin.toString());
+                latin.setLength(0);
+            }
+            if (isCjk(ch)) {
+                cjk.append(ch);
+            } else {
+                addCjkKeywords(keywords, cjk.toString());
                 cjk.setLength(0);
             }
         }
-        addTerm(terms, current.toString());
-        addCjkTerms(terms, cjk.toString());
-        return terms;
+        addKeyword(keywords, latin.toString());
+        addCjkKeywords(keywords, cjk.toString());
+        return keywords;
     }
 
-    private boolean isCjk(char ch) {
+    private static HashMap<String, Integer> termFrequency(List<String> keywords) {
+        HashMap<String, Integer> counts = new HashMap<>();
+        for (String keyword : keywords) {
+            Integer count = counts.get(keyword);
+            counts.put(keyword, count == null ? 1 : count + 1);
+        }
+        return counts;
+    }
+
+    private static boolean isLatinTokenChar(char ch) {
+        return (ch >= 'a' && ch <= 'z')
+                || (ch >= '0' && ch <= '9')
+                || ch == '_'
+                || ch == '#'
+                || ch == '.'
+                || ch == '-';
+    }
+
+    private static boolean isCjk(char ch) {
         return ch >= '\u4e00' && ch <= '\u9fff';
     }
 
-    private void addCjkTerms(ArrayList<String> terms, String chunk) {
-        String value = safe(chunk).trim();
+    private static void addCjkKeywords(ArrayList<String> keywords, String chunk) {
+        String value = safeStatic(chunk).trim();
         if (value.length() < 2) {
             return;
         }
         if (value.length() <= 4) {
-            addTerm(terms, value);
+            addKeyword(keywords, value);
             return;
         }
         for (int i = 0; i < value.length() - 1; i++) {
-            addTerm(terms, value.substring(i, i + 2));
+            addKeyword(keywords, value.substring(i, i + 2));
         }
     }
 
-    private void addTerm(ArrayList<String> terms, String term) {
-        String value = safe(term).trim();
+    private static void addKeyword(ArrayList<String> keywords, String term) {
+        String value = trimToken(safeStatic(term).trim());
         if (value.length() < 2) {
             return;
         }
         if (value.length() > 32) {
             value = value.substring(0, 32);
         }
-        if (!terms.contains(value)) {
-            terms.add(value);
+        if (!isStopWord(value)) {
+            keywords.add(value);
         }
+    }
+
+    private static String trimToken(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end && isTokenTrimChar(value.charAt(start))) {
+            start++;
+        }
+        while (end > start && isTokenTrimChar(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(start, end);
+    }
+
+    private static boolean isTokenTrimChar(char ch) {
+        return ch == '.' || ch == '-' || ch == '_' || ch == '#';
+    }
+
+    private static boolean isStopWord(String term) {
+        for (String stopWord : STOP_WORDS) {
+            if (stopWord.equals(term)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String section(String title, List<Candidate> rows) {
@@ -677,6 +760,10 @@ public final class LearningContextRepository {
         return value == null ? "" : value;
     }
 
+    private static String safeStatic(String value) {
+        return value == null ? "" : value;
+    }
+
     private StringTemplate template() {
         if (cachedTemplate == null) {
             cachedTemplate = new StringTemplate(readAsset(TEMPLATE_PATH));
@@ -705,7 +792,8 @@ public final class LearningContextRepository {
         final String searchText;
         final long updatedAt;
         final String formatted;
-        int score;
+        double relevanceScore;
+        double score;
 
         Candidate(String id, String searchText, long updatedAt, String formatted) {
             this.id = id == null ? "" : id;

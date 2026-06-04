@@ -20,7 +20,7 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
         try {
             JSONObject body = new JSONObject();
             body.put("model", ModelContextParser.apiModelId(config.getModelId()));
-            body.put("input", inputJson(messages));
+            body.put("input", ResponsesInputBuilder.inputJson(messages));
 
             HashMap<String, String> headers = new HashMap<>();
             headers.put("Authorization", "Bearer " + config.getApiKey());
@@ -50,7 +50,7 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
             ModelRequestOptions requestOptions = options == null ? ModelRequestOptions.defaults() : options;
             JSONObject body = new JSONObject();
             body.put("model", ModelContextParser.apiModelId(config.getModelId()));
-            body.put("input", inputJson(messages));
+            body.put("input", ResponsesInputBuilder.inputJson(messages));
             body.put("stream", true);
             if (!AiBehaviorSettings.REASONING_OFF.equals(requestOptions.getReasoningEffort())) {
                 body.put("reasoning", new JSONObject()
@@ -117,43 +117,6 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
         } catch (Exception e) {
             throw new ModelCompletionException("Codex Responses 协议流式解析失败: " + e.getMessage(), e);
         }
-    }
-
-    private JSONArray inputJson(List<ModelMessage> messages) throws Exception {
-        JSONArray array = new JSONArray();
-        for (ModelMessage message : messages) {
-            JSONObject object = new JSONObject();
-            if ("tool".equals(message.getRole())) {
-                object.put("role", "user");
-                object.put("content", toolResultText(message));
-            } else {
-                object.put("role", message.getRole());
-                object.put("content", message.getContent());
-            }
-            array.put(object);
-        }
-        return array;
-    }
-
-    private String toolResultText(ModelMessage message) {
-        return "<tool_result tool_call_id=\"" + escapeAttribute(message.getToolCallId())
-                + "\" name=\"" + escapeAttribute(message.getToolName())
-                + "\" is_error=\"" + message.isToolError()
-                + "\"><![CDATA[" + escapeCdata(message.getContent()) + "]]></tool_result>";
-    }
-
-    private String escapeAttribute(String value) {
-        String text = value == null ? "" : value;
-        return text
-                .replace("&", "&amp;")
-                .replace("\"", "&quot;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;");
-    }
-
-    private String escapeCdata(String value) {
-        String text = value == null ? "" : value;
-        return text.replace("]]>", "]]]]><![CDATA[>");
     }
 
     private String extractOutputText(JSONArray output) {

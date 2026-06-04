@@ -101,7 +101,9 @@ public final class MessageRecord {
                 readToolCalls(rawJson), new ArrayList<>(), toolCallId, toolName, error,
                 readString(rawJson, "diff_id"),
                 readString(rawJson, "review_state"),
-                readString(rawJson, "review_message"));
+                readString(rawJson, "review_message"),
+                readString(rawJson, "compact_status"),
+                readString(rawJson, "response_input_item_json"));
     }
 
     private ArrayList<ToolCall> readToolCalls(String rawJson) {

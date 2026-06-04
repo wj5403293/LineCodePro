@@ -6,6 +6,7 @@ import org.json.JSONObject;
 public final class ModelConfig {
     public static final int DEFAULT_TOOL_CALL_LIMIT = 200;
     public static final int UNLIMITED_TOOL_CALLS = -1;
+    public static final boolean DEFAULT_COMPRESSION_MODEL_AUTO = true;
 
     private final String id;
     private final String name;
@@ -15,12 +16,31 @@ public final class ModelConfig {
     private final String apiKey;
     private final String modelId;
     private final int toolCallLimit;
+    private final boolean compressionModelEnabled;
+    private final boolean compressionModelAuto;
+    private final String compressionModelId;
 
     public ModelConfig(String id, String name, ModelProtocolType protocolType, String providerLabel, String baseUrl, String apiKey, String modelId) {
         this(id, name, protocolType, providerLabel, baseUrl, apiKey, modelId, DEFAULT_TOOL_CALL_LIMIT);
     }
 
     public ModelConfig(String id, String name, ModelProtocolType protocolType, String providerLabel, String baseUrl, String apiKey, String modelId, int toolCallLimit) {
+        this(id, name, protocolType, providerLabel, baseUrl, apiKey, modelId, toolCallLimit, false, DEFAULT_COMPRESSION_MODEL_AUTO, "");
+    }
+
+    public ModelConfig(
+            String id,
+            String name,
+            ModelProtocolType protocolType,
+            String providerLabel,
+            String baseUrl,
+            String apiKey,
+            String modelId,
+            int toolCallLimit,
+            boolean compressionModelEnabled,
+            boolean compressionModelAuto,
+            String compressionModelId
+    ) {
         this.id = id == null ? "" : id;
         this.name = name == null ? "" : name;
         this.protocolType = protocolType == null ? ModelProtocolType.OPENAI_COMPATIBLE : protocolType;
@@ -29,6 +49,9 @@ public final class ModelConfig {
         this.apiKey = apiKey == null ? "" : apiKey;
         this.modelId = modelId == null ? "" : modelId;
         this.toolCallLimit = normalizeToolCallLimit(toolCallLimit);
+        this.compressionModelEnabled = compressionModelEnabled && supportsDedicatedCompression(this.protocolType);
+        this.compressionModelAuto = compressionModelAuto;
+        this.compressionModelId = compressionModelId == null ? "" : compressionModelId.trim();
     }
 
     public String getId() {
@@ -63,8 +86,33 @@ public final class ModelConfig {
         return toolCallLimit;
     }
 
+    public boolean isCompressionModelEnabled() {
+        return compressionModelEnabled;
+    }
+
+    public boolean isCompressionModelAuto() {
+        return compressionModelAuto;
+    }
+
+    public String getCompressionModelId() {
+        return compressionModelId;
+    }
+
+    public String getEffectiveCompressionModelId() {
+        if (!compressionModelEnabled || compressionModelAuto || compressionModelId.length() == 0) {
+            return modelId;
+        }
+        return compressionModelId;
+    }
+
     public ModelConfig withId(String nextId) {
-        return new ModelConfig(nextId, name, protocolType, providerLabel, baseUrl, apiKey, modelId, toolCallLimit);
+        return new ModelConfig(nextId, name, protocolType, providerLabel, baseUrl, apiKey, modelId, toolCallLimit,
+                compressionModelEnabled, compressionModelAuto, compressionModelId);
+    }
+
+    public ModelConfig withModelId(String nextModelId) {
+        return new ModelConfig(id, name, protocolType, providerLabel, baseUrl, apiKey, nextModelId, toolCallLimit,
+                compressionModelEnabled, compressionModelAuto, compressionModelId);
     }
 
     public JSONObject toJson() throws JSONException {
@@ -77,6 +125,9 @@ public final class ModelConfig {
         object.put("apiKey", apiKey);
         object.put("modelId", modelId);
         object.put("toolCallLimit", toolCallLimit);
+        object.put("compressionModelEnabled", compressionModelEnabled);
+        object.put("compressionModelAuto", compressionModelAuto);
+        object.put("compressionModelId", compressionModelId);
         return object;
     }
 
@@ -100,6 +151,15 @@ public final class ModelConfig {
         } else if (object.has("tool_call_limit")) {
             toolCallLimit = object.optInt("tool_call_limit", DEFAULT_TOOL_CALL_LIMIT);
         }
+        boolean compressionModelEnabled = object.optBoolean(
+                "compressionModelEnabled",
+                object.optBoolean("compression_model_enabled", false)
+        );
+        boolean compressionModelAuto = object.optBoolean(
+                "compressionModelAuto",
+                object.optBoolean("compression_model_auto", DEFAULT_COMPRESSION_MODEL_AUTO)
+        );
+        String compressionModelId = object.optString("compressionModelId", object.optString("compression_model_id"));
         return new ModelConfig(
                 object.optString("id"),
                 object.optString("name"),
@@ -108,7 +168,10 @@ public final class ModelConfig {
                 object.optString("baseUrl"),
                 object.optString("apiKey"),
                 modelId,
-                toolCallLimit
+                toolCallLimit,
+                compressionModelEnabled,
+                compressionModelAuto,
+                compressionModelId
         );
     }
 
@@ -117,5 +180,9 @@ public final class ModelConfig {
             return UNLIMITED_TOOL_CALLS;
         }
         return Math.max(0, limit);
+    }
+
+    public static boolean supportsDedicatedCompression(ModelProtocolType type) {
+        return type == ModelProtocolType.OPENAI_COMPATIBLE || type == ModelProtocolType.CODEX_RESPONSES;
     }
 }

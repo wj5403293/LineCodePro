@@ -9,7 +9,9 @@ import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.model.SheetOption;
+import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
+import java.util.Map;
 import java.util.List;
 
 public interface MainContract {
@@ -33,6 +35,8 @@ public interface MainContract {
         void requestLegacyStoragePermissions();
 
         void openExternalUrl(String url);
+
+        void recreateForTheme(String screenId);
     }
 
     interface Presenter {
@@ -52,6 +56,8 @@ public interface MainContract {
 
         void onConversationDeleted(String id);
 
+        void onCurrentProjectRemoveRequested();
+
         void onFileNodeSelected(String path);
 
         void onFileTreeRefresh();
@@ -67,6 +73,8 @@ public interface MainContract {
         void onSheetOptionSelected(String id);
 
         void onScreenBack();
+
+        void onScreenBackFrom(String screenId);
 
         void onSettingsItemSelected(String id);
 
@@ -98,6 +106,12 @@ public interface MainContract {
 
         void onBrowserModeChanged(String mode);
 
+        ThemeSettingsState getThemeSettings();
+
+        void onThemeModeChanged(String mode);
+
+        void onCustomThemeColorsSaved(Map<String, String> colors);
+
         McpSettingsState getMcpSettingsState();
 
         void onMcpExecutionModeChanged(String mode);
@@ -115,6 +129,8 @@ public interface MainContract {
         String getCurrentConversationId();
 
         FileTreeNode getFileTree();
+
+        boolean canRemoveCurrentProject();
 
         String getSelectedModelId();
 

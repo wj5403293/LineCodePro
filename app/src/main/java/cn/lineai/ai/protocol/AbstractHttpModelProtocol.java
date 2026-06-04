@@ -20,11 +20,27 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
     }
 
     protected String postJson(String url, JSONObject body, Map<String, String> headers) throws ModelCompletionException {
+        return postJson(url, body, headers, null);
+    }
+
+    protected String postJson(
+            String url,
+            JSONObject body,
+            Map<String, String> headers,
+            ModelCancellationToken cancellationToken
+    ) throws ModelCompletionException {
         HttpURLConnection connection = null;
         try {
             connection = openJsonPost(url, body, headers, "application/json");
+            HttpURLConnection activeConnection = connection;
+            if (cancellationToken != null) {
+                cancellationToken.onCancel(activeConnection::disconnect);
+            }
 
             int code = connection.getResponseCode();
+            if (cancellationToken != null && cancellationToken.isCancelled()) {
+                return "";
+            }
             String response = readAll(code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream());
             if (code < 200 || code >= 300) {
                 throw new ModelCompletionException("HTTP " + code + ": " + response);
@@ -32,6 +48,11 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
             return response;
         } catch (ModelCompletionException e) {
             throw e;
+        } catch (IOException e) {
+            if (cancellationToken != null && cancellationToken.isCancelled()) {
+                return "";
+            }
+            throw new ModelCompletionException("模型通信失败: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new ModelCompletionException("模型通信失败: " + e.getMessage(), e);
         } finally {

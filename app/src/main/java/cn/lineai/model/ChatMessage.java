@@ -7,6 +7,10 @@ import java.util.Collections;
 import java.util.List;
 
 public final class ChatMessage {
+    public static final String COMPACT_STATUS_RUNNING = "running";
+    public static final String COMPACT_STATUS_DONE = "done";
+    public static final String COMPACT_STATUS_ERROR = "error";
+
     public enum Role {
         SYSTEM("system"),
         USER("user"),
@@ -39,6 +43,8 @@ public final class ChatMessage {
     private final String diffId;
     private final String reviewState;
     private final String reviewMessage;
+    private final String compactStatus;
+    private final String responseInputItemJson;
 
     public ChatMessage(String id, Role role, String content, boolean streaming) {
         this(id, role, content, "", streaming, false, false);
@@ -96,6 +102,29 @@ public final class ChatMessage {
             String reviewState,
             String reviewMessage
     ) {
+        this(id, role, content, reasoningContent, streaming, hidden, excludeFromContext,
+                toolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage, "", "");
+    }
+
+    public ChatMessage(
+            String id,
+            Role role,
+            String content,
+            String reasoningContent,
+            boolean streaming,
+            boolean hidden,
+            boolean excludeFromContext,
+            List<ToolCall> toolCalls,
+            List<ToolResult> toolResults,
+            String toolCallId,
+            String toolName,
+            boolean error,
+            String diffId,
+            String reviewState,
+            String reviewMessage,
+            String compactStatus,
+            String responseInputItemJson
+    ) {
         this.id = id;
         this.role = role == null ? Role.USER : role;
         this.content = content == null ? "" : content;
@@ -111,6 +140,8 @@ public final class ChatMessage {
         this.diffId = diffId == null ? "" : diffId;
         this.reviewState = reviewState == null ? "" : reviewState;
         this.reviewMessage = reviewMessage == null ? "" : reviewMessage;
+        this.compactStatus = normalizeCompactStatus(compactStatus);
+        this.responseInputItemJson = responseInputItemJson == null ? "" : responseInputItemJson.trim();
     }
 
     public String getId() {
@@ -189,29 +220,62 @@ public final class ChatMessage {
         return reviewMessage;
     }
 
+    public String getCompactStatus() {
+        return compactStatus;
+    }
+
+    public boolean isCompactBlock() {
+        return compactStatus.length() > 0;
+    }
+
+    public String getResponseInputItemJson() {
+        return responseInputItemJson;
+    }
+
     public String getProtocolRole() {
         return role.getProtocolName();
     }
 
     public ChatMessage withContent(String nextContent, String nextReasoningContent, boolean nextStreaming) {
         return new ChatMessage(id, role, nextContent, nextReasoningContent, nextStreaming, hidden,
-                excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage);
+                excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
+                compactStatus, responseInputItemJson);
     }
 
     public ChatMessage withToolCalls(List<ToolCall> nextToolCalls, boolean nextHidden) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, nextHidden,
-                excludeFromContext, nextToolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage);
+                excludeFromContext, nextToolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
+                compactStatus, responseInputItemJson);
     }
 
     public ChatMessage withToolResults(List<ToolResult> nextToolResults) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
-                excludeFromContext, toolCalls, nextToolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage);
+                excludeFromContext, toolCalls, nextToolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
+                compactStatus, responseInputItemJson);
     }
 
     public ChatMessage withToolReview(String nextDiffId, String nextReviewState, String nextReviewMessage) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
                 excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
-                nextDiffId, nextReviewState, nextReviewMessage);
+                nextDiffId, nextReviewState, nextReviewMessage, compactStatus, responseInputItemJson);
+    }
+
+    public ChatMessage withExcludeFromContext(boolean nextExcludeFromContext) {
+        return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
+                nextExcludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
+                diffId, reviewState, reviewMessage, compactStatus, responseInputItemJson);
+    }
+
+    public ChatMessage withCompactStatus(String nextCompactStatus, boolean nextStreaming) {
+        return new ChatMessage(id, role, content, reasoningContent, nextStreaming, hidden,
+                excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
+                diffId, reviewState, reviewMessage, nextCompactStatus, responseInputItemJson);
+    }
+
+    public ChatMessage withResponseInputItemJson(String nextResponseInputItemJson) {
+        return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
+                excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
+                diffId, reviewState, reviewMessage, compactStatus, nextResponseInputItemJson);
     }
 
     public static ChatMessage toolResult(String id, String content, String toolCallId, String toolName, boolean error) {
@@ -231,5 +295,20 @@ public final class ChatMessage {
         return new ChatMessage(id, Role.TOOL, content, "", false, true, false,
                 Collections.emptyList(), Collections.emptyList(), toolCallId, toolName, error,
                 diffId, reviewState, reviewMessage);
+    }
+
+    public static ChatMessage compactProgress(String id, String status) {
+        return new ChatMessage(id, Role.ASSISTANT, "", "", COMPACT_STATUS_RUNNING.equals(status),
+                false, true, Collections.emptyList(), Collections.emptyList(), "", "", false,
+                "", "", "", status, "");
+    }
+
+    private String normalizeCompactStatus(String value) {
+        if (COMPACT_STATUS_RUNNING.equals(value)
+                || COMPACT_STATUS_DONE.equals(value)
+                || COMPACT_STATUS_ERROR.equals(value)) {
+            return value;
+        }
+        return "";
     }
 }

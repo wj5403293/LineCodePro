@@ -83,6 +83,8 @@ public final class IconButtonView extends ImageButton {
     public static final int LOADER = 74;
     public static final int FILE_PEN_LINE = 75;
     public static final int WRENCH = 76;
+    public static final int PLAY = 77;
+    public static final int CIRCLE_ALERT = 78;
 
     private int iconType;
     private int iconColor = Color.WHITE;
@@ -286,6 +288,10 @@ public final class IconButtonView extends ImageButton {
                 return R.drawable.ic_lucide_file_pen_line;
             case WRENCH:
                 return R.drawable.ic_lucide_wrench;
+            case PLAY:
+                return R.drawable.ic_lucide_play;
+            case CIRCLE_ALERT:
+                return R.drawable.ic_lucide_circle_alert;
             default:
                 return R.drawable.ic_lucide_plus;
         }

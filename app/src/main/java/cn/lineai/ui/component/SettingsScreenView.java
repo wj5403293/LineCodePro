@@ -51,7 +51,7 @@ public final class SettingsScreenView extends LinearLayout {
         addSection(content, "数据与系统", new RowSpec[] {
                 new RowSpec("storage", "存储管理", "聊天、配置、diff 和工作区占用", IconButtonView.DATABASE),
                 new RowSpec("memory", "记忆", "查看和添加长期记忆、项目记忆、短期记忆", IconButtonView.BOOK_OPEN),
-                new RowSpec("data", "数据与更新", "热更新、完整导出和 .linecode 导入", IconButtonView.ARCHIVE),
+                new RowSpec("data", "数据管理", "完整导出、.linecode 导入和数据归档", IconButtonView.ARCHIVE),
                 new RowSpec("keepAlive", "后台保活", "Wake Lock、前台服务和电池白名单", IconButtonView.BATTERY_CHARGING),
         });
         addSection(content, "信息", new RowSpec[] {

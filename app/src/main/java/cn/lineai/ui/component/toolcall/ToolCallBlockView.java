@@ -21,8 +21,21 @@ public final class ToolCallBlockView extends LinearLayout {
             return;
         }
         lastSignature = signature;
-        removeAllViews();
         String name = toolCall == null ? "" : toolCall.getName();
+        if (ToolCallUtils.isShellTool(name)) {
+            ToolCallShellView view;
+            if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallShellView) {
+                view = (ToolCallShellView) getChildAt(0);
+            } else {
+                removeAllViews();
+                view = new ToolCallShellView(getContext());
+                view.setToolReviewListener(toolReviewListener);
+                addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            }
+            view.bind(toolCall, result);
+            return;
+        }
+        removeAllViews();
         if (ToolCallUtils.isAgentTool(name)) {
             ToolCallAgentView view = new ToolCallAgentView(getContext());
             view.setToolReviewListener(toolReviewListener);
@@ -65,12 +78,6 @@ public final class ToolCallBlockView extends LinearLayout {
             addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
-        if (ToolCallUtils.isShellTool(name)) {
-            ToolCallGenericView view = new ToolCallGenericView(getContext(), "Shell");
-            view.bind(toolCall, result);
-            addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-            return;
-        }
         ToolCallGenericView view = new ToolCallGenericView(getContext(), "MCP 调用");
         view.bind(toolCall, result);
         addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -84,6 +91,8 @@ public final class ToolCallBlockView extends LinearLayout {
             ((ToolCallDeleteView) getChildAt(0)).setToolReviewListener(listener);
         } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentView) {
             ((ToolCallAgentView) getChildAt(0)).setToolReviewListener(listener);
+        } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallShellView) {
+            ((ToolCallShellView) getChildAt(0)).setToolReviewListener(listener);
         }
     }
 

@@ -1,12 +1,12 @@
-import java.security.SecureRandom
 import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
 }
 
-val releaseVersionName = "0.0.2-Alpha"
+val releaseVersionName = "0.0.3-Alpha"
 val releaseApkName = "LineCode Pro $releaseVersionName.APK"
+val releaseIdsigName = "$releaseApkName.idsig"
 val releaseSigningProperties = Properties()
 val releaseSigningFile = rootProject.file("signing.properties")
 val hasReleaseSigning = releaseSigningFile.exists()
@@ -20,19 +20,39 @@ val generateReleaseObfuscationDictionary by tasks.registering {
     outputs.upToDateWhen { false }
 
     doLast {
-        val random = SecureRandom()
         val alphabet = "abcdefghijklmnopqrstuvwxyz"
-        val names = linkedSetOf<String>()
+        val reserved = setOf(
+            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
+            "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
+            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof",
+            "int", "interface", "long", "native", "new", "package", "private", "protected",
+            "public", "return", "short", "static", "strictfp", "super", "switch", "synchronized",
+            "this", "throw", "throws", "transient", "try", "void", "volatile", "while"
+        )
+        val names = ArrayList<String>(8192)
 
-        fun randomName(): String = buildString {
-            append('l')
-            repeat(15) {
-                append(alphabet[random.nextInt(alphabet.length)])
+        fun appendNames(prefix: String, remaining: Int) {
+            if (names.size >= 8192) {
+                return
+            }
+            if (remaining == 0) {
+                if (!reserved.contains(prefix)) {
+                    names.add(prefix)
+                }
+                return
+            }
+            for (index in alphabet.indices) {
+                appendNames(prefix + alphabet[index], remaining - 1)
+                if (names.size >= 8192) {
+                    return
+                }
             }
         }
 
+        var length = 1
         while (names.size < 8192) {
-            names += randomName()
+            appendNames("", length)
+            length++
         }
 
         val file = outputFile.get().asFile
@@ -48,9 +68,15 @@ val purgeReleaseSymbolFiles by tasks.registering(Delete::class) {
 
 val exportReleaseApk by tasks.registering(Copy::class) {
     from(layout.buildDirectory.dir("outputs/apk/release"))
-    include("*.apk")
+    include("*.apk", "*.apk.idsig", "*.idsig")
     into(layout.projectDirectory.dir("release"))
-    rename { releaseApkName }
+    rename {
+        if (it.endsWith(".idsig", ignoreCase = true)) {
+            releaseIdsigName
+        } else {
+            releaseApkName
+        }
+    }
 }
 
 android {
@@ -65,11 +91,16 @@ android {
         applicationId = "cn.lineai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
+        versionCode = 3
         versionName = releaseVersionName
     }
 
     signingConfigs {
+        getByName("debug") {
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
         create("lineAiRelease") {
             if (hasReleaseSigning) {
                 storeFile = file(releaseSigningProperties.getProperty("storeFile"))
@@ -109,6 +140,16 @@ android {
     }
 }
 
+configurations.matching {
+    it.name == "debugRuntimeClasspath" || it.name == "releaseRuntimeClasspath"
+}.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-common")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    exclude(group = "org.jetbrains", module = "annotations")
+}
+
 tasks.matching {
     it.name == "minifyReleaseWithR8" || it.name == "minifyReleaseWithProguard"
 }.configureEach {
@@ -130,6 +171,7 @@ tasks.matching {
 dependencies {
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
+    implementation(libs.jsch)
     testImplementation(libs.junit)
     testImplementation(libs.json)
 }

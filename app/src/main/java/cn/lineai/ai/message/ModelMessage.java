@@ -7,14 +7,20 @@ import java.util.List;
 public abstract class ModelMessage {
     private final String content;
     private final String reasoningContent;
+    private final String rawInputJson;
 
     protected ModelMessage(String content) {
         this(content, "");
     }
 
     protected ModelMessage(String content, String reasoningContent) {
+        this(content, reasoningContent, "");
+    }
+
+    protected ModelMessage(String content, String reasoningContent, String rawInputJson) {
         this.content = content == null ? "" : content;
         this.reasoningContent = reasoningContent == null ? "" : reasoningContent;
+        this.rawInputJson = rawInputJson == null ? "" : rawInputJson.trim();
     }
 
     public final String getContent() {
@@ -23,6 +29,10 @@ public abstract class ModelMessage {
 
     public final String getReasoningContent() {
         return reasoningContent;
+    }
+
+    public final String getRawInputJson() {
+        return rawInputJson;
     }
 
     public List<ToolCall> getToolCalls() {

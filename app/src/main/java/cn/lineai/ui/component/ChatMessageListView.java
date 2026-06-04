@@ -69,9 +69,8 @@ public final class ChatMessageListView extends FrameLayout {
         addView(listView, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         scrollToBottomButton = new IconButtonView(context, IconButtonView.CHEVRON_DOWN);
-        scrollToBottomButton.setIconColor(LineTheme.TEXT_ON_COLOR);
-        scrollToBottomButton.setIconSizeDp(44, 18);
-        scrollToBottomButton.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_ELEVATED, 22, LineTheme.BORDER_LIGHT));
+        scrollToBottomButton.setContentDescription("滚动到底部");
+        refreshScrollToBottomButtonStyle();
         scrollToBottomButton.setVisibility(GONE);
         scrollToBottomButton.setOnClickListener(v -> scrollToBottom());
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -85,6 +84,8 @@ public final class ChatMessageListView extends FrameLayout {
         buttonParams.rightMargin = LineTheme.dp(context, LineTheme.LG);
         buttonParams.bottomMargin = LineTheme.dp(context, LineTheme.LG);
         addView(scrollToBottomButton, buttonParams);
+        addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                post(this::updateScrollToBottomVisibility));
 
         listView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -104,6 +105,7 @@ public final class ChatMessageListView extends FrameLayout {
     }
 
     public void render(ChatUiState state) {
+        refreshScrollToBottomButtonStyle();
         adapter.render(state);
         if (followTailEnabled && adapter.getCount() > 0) {
             listView.post(() -> scrollToBottomInternal(false));
@@ -159,6 +161,12 @@ public final class ChatMessageListView extends FrameLayout {
         if (show) {
             scrollToBottomButton.bringToFront();
         }
+    }
+
+    private void refreshScrollToBottomButtonStyle() {
+        scrollToBottomButton.setIconColor(LineTheme.TEXT_ON_COLOR);
+        scrollToBottomButton.setIconSizeDp(44, 20);
+        scrollToBottomButton.setBackground(LineTheme.roundedStroke(getContext(), LineTheme.ACCENT, 22, LineTheme.ACCENT));
     }
 
     private boolean isAtBottom() {
@@ -438,6 +446,7 @@ public final class ChatMessageListView extends FrameLayout {
                     && stringEquals(a.getReasoningContent(), b.getReasoningContent())
                     && a.isStreaming() == b.isStreaming()
                     && a.isHidden() == b.isHidden()
+                    && stringEquals(a.getCompactStatus(), b.getCompactStatus())
                     && sameToolCalls(a, b)
                     && sameToolResults(a, b));
         }

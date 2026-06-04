@@ -13,6 +13,7 @@ import cn.lineai.ui.markdown.MarkdownLinkHandler;
 import cn.lineai.ui.markdown.MarkdownView;
 
 public final class AssistantMessageView extends LinearLayout {
+    private final ContextCompactBlockView compactBlockView;
     private final ThinkingBlockView thinkingBlockView;
     private final MarkdownView contentView;
     private final LinearLayout toolCallsContainer;
@@ -23,6 +24,7 @@ public final class AssistantMessageView extends LinearLayout {
     private boolean lastStreaming;
     private boolean lastThinkingAutoExpand;
     private boolean lastThinkingScrollable = true;
+    private String lastCompactStatus = "";
     private String lastToolSignature = "";
     private String projectPath = "";
     private MarkdownLinkHandler markdownLinkHandler;
@@ -33,6 +35,12 @@ public final class AssistantMessageView extends LinearLayout {
         setOrientation(VERTICAL);
         setGravity(Gravity.LEFT);
         LineTheme.padding(this, LineTheme.LG, 0, LineTheme.LG, LineTheme.MD);
+
+        compactBlockView = new ContextCompactBlockView(context);
+        LinearLayout.LayoutParams compactParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        compactParams.topMargin = LineTheme.dp(context, 2);
+        compactParams.bottomMargin = LineTheme.dp(context, 2);
+        addView(compactBlockView, compactParams);
 
         thinkingBlockView = new ThinkingBlockView(context);
         LinearLayout.LayoutParams thinkingParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
@@ -67,6 +75,23 @@ public final class AssistantMessageView extends LinearLayout {
         String reasoning = message.getReasoningContent();
         String safeReasoning = reasoning == null ? "" : reasoning;
         boolean hasReasoning = safeReasoning.trim().length() > 0;
+        if (message.isCompactBlock()) {
+            compactBlockView.setVisibility(VISIBLE);
+            compactBlockView.bind(message.getCompactStatus());
+            thinkingBlockView.setVisibility(GONE);
+            contentView.setVisibility(GONE);
+            toolCallsContainer.setVisibility(GONE);
+            toolCallsContainer.removeAllViews();
+            actionBar.setVisibility(GONE);
+            lastMessageId = messageId;
+            lastReasoning = safeReasoning;
+            lastContent = "";
+            lastStreaming = message.isStreaming();
+            lastCompactStatus = message.getCompactStatus();
+            lastToolSignature = "";
+            return;
+        }
+        compactBlockView.setVisibility(GONE);
         String content = message.isStreaming() && message.getContent().length() == 0 && !hasReasoning ? "..." : message.getContent();
         contentView.setCodeWrapEnabled(codeWrapEnabled);
         contentView.setLinkHandler(markdownLinkHandler);
@@ -99,6 +124,7 @@ public final class AssistantMessageView extends LinearLayout {
         lastStreaming = message.isStreaming();
         lastThinkingAutoExpand = thinkingAutoExpand;
         lastThinkingScrollable = thinkingScrollable;
+        lastCompactStatus = "";
     }
 
     public void setToolReviewListener(ToolReviewListener listener) {

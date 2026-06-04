@@ -1,7 +1,10 @@
 package cn.lineai.ui.component;
 
 import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -17,6 +20,7 @@ public final class AboutScreenView extends ScreenScaffoldView {
 
     public AboutScreenView(Context context, Listener listener) {
         super(context, "关于 LineCode", listener::onBack, null);
+        VersionInfo versionInfo = readVersionInfo(context);
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, 100);
 
@@ -34,24 +38,18 @@ public final class AboutScreenView extends ScreenScaffoldView {
         iconContainer.addView(logo, new FrameLayout.LayoutParams(LineTheme.dp(context, 88), LineTheme.dp(context, 88), Gravity.CENTER));
         header.addView(iconContainer, new LinearLayout.LayoutParams(LineTheme.dp(context, 88), LineTheme.dp(context, 88)));
 
-        TextView name = LineTheme.text(context, "LineCode", LineTheme.FONT_XL, LineTheme.TEXT, Typeface.BOLD);
+        TextView name = LineTheme.text(context, versionInfo.appLabel, LineTheme.FONT_XL, LineTheme.TEXT, Typeface.BOLD);
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         nameParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         header.addView(name, nameParams);
-        TextView version = LineTheme.text(context, "APK 1.0 (1)", LineTheme.FONT_MD, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        TextView version = LineTheme.text(context, "APK " + versionInfo.versionName + " (" + versionInfo.versionCode + ")", LineTheme.FONT_MD, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         versionParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         header.addView(version, versionParams);
-        TextView patch = LineTheme.text(context, "热补丁 内置 (1)", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams patchParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        patchParams.topMargin = LineTheme.dp(context, 3);
-        header.addView(patch, patchParams);
         content.addView(header, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         addGroupTitle(content, "版本");
-        addItem(content, IconButtonView.PACKAGE, "APK 版本", "1.0 (1)", null);
-        addItem(content, IconButtonView.DOWNLOAD, "热补丁版本", "内置 (1)", null);
-        addItem(content, IconButtonView.REFRESH_CW, "检查更新", "手动检查热更新包", null);
+        addItem(content, IconButtonView.PACKAGE, "APK 版本", versionInfo.versionName + " (" + versionInfo.versionCode + ")", null);
 
         addGroupTitle(content, "开发者");
         addItem(content, IconButtonView.USER, "作者", "LangLang03", null);
@@ -86,5 +84,43 @@ public final class AboutScreenView extends ScreenScaffoldView {
 
     private Context context() {
         return getContext();
+    }
+
+    @SuppressWarnings("deprecation")
+    private static VersionInfo readVersionInfo(Context context) {
+        String appLabel = "LineCode Pro";
+        String versionName = "";
+        long versionCode = 0L;
+        try {
+            PackageManager packageManager = context.getPackageManager();
+            CharSequence label = packageManager.getApplicationLabel(context.getApplicationInfo());
+            if (label != null && label.length() > 0) {
+                appLabel = label.toString();
+            }
+            PackageInfo packageInfo = packageManager.getPackageInfo(context.getPackageName(), 0);
+            if (packageInfo.versionName != null && packageInfo.versionName.length() > 0) {
+                versionName = packageInfo.versionName;
+            }
+            versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    ? packageInfo.getLongVersionCode()
+                    : packageInfo.versionCode;
+        } catch (PackageManager.NameNotFoundException ignored) {
+        }
+        if (versionName.length() == 0) {
+            versionName = "unknown";
+        }
+        return new VersionInfo(appLabel, versionName, versionCode);
+    }
+
+    private static final class VersionInfo {
+        final String appLabel;
+        final String versionName;
+        final long versionCode;
+
+        VersionInfo(String appLabel, String versionName, long versionCode) {
+            this.appLabel = appLabel;
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+        }
     }
 }

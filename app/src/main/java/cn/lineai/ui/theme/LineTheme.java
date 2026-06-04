@@ -7,37 +7,38 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.View;
 import android.widget.TextView;
+import cn.lineai.model.ThemePalette;
 
 public final class LineTheme {
-    public static final int BG = Color.parseColor("#000000");
-    public static final int SURFACE = Color.parseColor("#0A0A0A");
-    public static final int SURFACE_ELEVATED = Color.parseColor("#141414");
-    public static final int SURFACE_LIGHT = Color.parseColor("#1C1C1E");
-    public static final int ACCENT = Color.parseColor("#30D158");
-    public static final int ACCENT_DIM = Color.parseColor("#1A3A2A");
-    public static final int ACCENT_MUTED = Color.argb(26, 48, 209, 88);
-    public static final int ACCENT_MUTED_2 = Color.argb(38, 48, 209, 88);
-    public static final int USER_BUBBLE = Color.parseColor("#0A84FF");
-    public static final int AI_BUBBLE = Color.parseColor("#1C1C1E");
-    public static final int TEXT = Color.parseColor("#FFFFFF");
-    public static final int TEXT_SECONDARY = Color.parseColor("#8E8E93");
-    public static final int TEXT_TERTIARY = Color.parseColor("#636366");
-    public static final int TEXT_ON_COLOR = Color.parseColor("#FFFFFF");
-    public static final int BORDER = Color.parseColor("#1C1C1E");
-    public static final int BORDER_LIGHT = Color.parseColor("#2C2C2E");
-    public static final int INPUT_BG = Color.parseColor("#1C1C1E");
-    public static final int CODE_BG = Color.parseColor("#151515");
-    public static final int CODE_BORDER = Color.parseColor("#2C2C2E");
-    public static final int DANGER = Color.parseColor("#F85149");
-    public static final int DANGER_MUTED = Color.argb(28, 248, 81, 73);
-    public static final int DANGER_MUTED_2 = Color.argb(61, 248, 81, 73);
-    public static final int WARNING = Color.parseColor("#FF9F0A");
-    public static final int SUCCESS = Color.parseColor("#30D158");
-    public static final int OVERLAY = Color.argb(165, 0, 0, 0);
-    public static final int DIFF_ADD_BG = Color.argb(46, 48, 209, 88);
-    public static final int DIFF_DEL_BG = Color.argb(46, 255, 69, 58);
-    public static final int DIFF_ADD_TEXT = Color.parseColor("#30D158");
-    public static final int DIFF_DEL_TEXT = Color.parseColor("#FF453A");
+    public static int BG = Color.parseColor("#000000");
+    public static int SURFACE = Color.parseColor("#0A0A0A");
+    public static int SURFACE_ELEVATED = Color.parseColor("#141414");
+    public static int SURFACE_LIGHT = Color.parseColor("#1C1C1E");
+    public static int ACCENT = Color.parseColor("#30D158");
+    public static int ACCENT_DIM = Color.parseColor("#1A3A2A");
+    public static int ACCENT_MUTED = Color.argb(26, 48, 209, 88);
+    public static int ACCENT_MUTED_2 = Color.argb(38, 48, 209, 88);
+    public static int USER_BUBBLE = Color.parseColor("#0A84FF");
+    public static int AI_BUBBLE = Color.parseColor("#1C1C1E");
+    public static int TEXT = Color.parseColor("#FFFFFF");
+    public static int TEXT_SECONDARY = Color.parseColor("#8E8E93");
+    public static int TEXT_TERTIARY = Color.parseColor("#636366");
+    public static int TEXT_ON_COLOR = Color.parseColor("#FFFFFF");
+    public static int BORDER = Color.parseColor("#1C1C1E");
+    public static int BORDER_LIGHT = Color.parseColor("#2C2C2E");
+    public static int INPUT_BG = Color.parseColor("#1C1C1E");
+    public static int CODE_BG = Color.parseColor("#151515");
+    public static int CODE_BORDER = Color.parseColor("#2C2C2E");
+    public static int DANGER = Color.parseColor("#F85149");
+    public static int DANGER_MUTED = Color.argb(28, 248, 81, 73);
+    public static int DANGER_MUTED_2 = Color.argb(61, 248, 81, 73);
+    public static int WARNING = Color.parseColor("#FF9F0A");
+    public static int SUCCESS = Color.parseColor("#30D158");
+    public static int OVERLAY = Color.argb(165, 0, 0, 0);
+    public static int DIFF_ADD_BG = Color.argb(46, 48, 209, 88);
+    public static int DIFF_DEL_BG = Color.argb(46, 255, 69, 58);
+    public static int DIFF_ADD_TEXT = Color.parseColor("#30D158");
+    public static int DIFF_DEL_TEXT = Color.parseColor("#FF453A");
 
     public static final int XS = 4;
     public static final int SM = 8;
@@ -54,6 +55,41 @@ public final class LineTheme {
     public static final int FONT_XXL = 28;
 
     private LineTheme() {
+    }
+
+    public static void apply(ThemePalette palette) {
+        if (palette == null) {
+            return;
+        }
+        BG = palette.bg;
+        SURFACE = palette.surface;
+        SURFACE_ELEVATED = palette.surfaceElevated;
+        SURFACE_LIGHT = palette.surfaceLight;
+        ACCENT = palette.accent;
+        ACCENT_DIM = palette.accentDim;
+        ACCENT_MUTED = palette.accentMuted;
+        ACCENT_MUTED_2 = palette.accentMuted2;
+        USER_BUBBLE = palette.userBubble;
+        AI_BUBBLE = palette.aiBubble;
+        TEXT = palette.text;
+        TEXT_SECONDARY = palette.textSecondary;
+        TEXT_TERTIARY = palette.textTertiary;
+        TEXT_ON_COLOR = palette.textOnColor;
+        BORDER = palette.border;
+        BORDER_LIGHT = palette.borderLight;
+        INPUT_BG = palette.inputBg;
+        CODE_BG = palette.codeBg;
+        CODE_BORDER = palette.codeBorder;
+        DANGER = palette.danger;
+        DANGER_MUTED = palette.dangerMuted;
+        DANGER_MUTED_2 = palette.dangerMuted2;
+        WARNING = palette.warning;
+        SUCCESS = palette.success;
+        OVERLAY = palette.overlay;
+        DIFF_ADD_BG = palette.diffAddBg;
+        DIFF_DEL_BG = palette.diffDelBg;
+        DIFF_ADD_TEXT = palette.diffAddText;
+        DIFF_DEL_TEXT = palette.diffDelText;
     }
 
     public static int dp(Context context, float value) {

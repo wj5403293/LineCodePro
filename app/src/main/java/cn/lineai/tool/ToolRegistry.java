@@ -11,6 +11,7 @@ import cn.lineai.tool.builtin.FileWriteTool;
 import cn.lineai.tool.builtin.GlobTool;
 import cn.lineai.tool.builtin.HttpServerTool;
 import cn.lineai.tool.builtin.ListDirectoryTool;
+import cn.lineai.tool.builtin.ShellExecuteTool;
 import cn.lineai.tool.builtin.WebFetchTool;
 import cn.lineai.tool.builtin.WebSearchTool;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ public final class ToolRegistry {
         register(new HttpServerTool());
         register(new AgentTool());
         register(new AgentPipelineTool());
+        register(new ShellExecuteTool(context));
         register(new WebSearchTool(context == null ? null : new WebSearchConfigRepository(context)));
         register(new WebFetchTool());
     }

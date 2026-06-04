@@ -1,10 +1,17 @@
 package cn.lineai.ui.component;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -27,6 +34,8 @@ public final class DrawerView extends FrameLayout {
 
         void onConversationDeleted(String id);
 
+        void onCurrentProjectRemoveRequested();
+
         void onFileNodeSelected(String path);
 
         void onFileTreeRefresh();
@@ -45,6 +54,7 @@ public final class DrawerView extends FrameLayout {
     private String currentConversationId = "";
     private String projectLabel = "LineCode";
     private String projectPath = "";
+    private boolean projectRemovable;
     private FileTreeNode fileTree;
     private Listener listener;
     private int activeTab = TAB_CONVERSATIONS;
@@ -107,12 +117,14 @@ public final class DrawerView extends FrameLayout {
             String currentConversationId,
             String projectLabel,
             String projectPath,
+            boolean projectRemovable,
             FileTreeNode fileTree
     ) {
         this.conversations = conversations;
         this.currentConversationId = currentConversationId == null ? "" : currentConversationId;
         this.projectLabel = projectLabel == null ? "LineCode" : projectLabel;
         this.projectPath = projectPath == null ? "" : projectPath;
+        this.projectRemovable = projectRemovable;
         this.fileTree = fileTree;
         renderChrome();
         renderBody();
@@ -245,6 +257,9 @@ public final class DrawerView extends FrameLayout {
         strip.setOrientation(LinearLayout.VERTICAL);
         strip.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_LIGHT, 8, LineTheme.BORDER_LIGHT));
         LineTheme.padding(strip, LineTheme.SM, LineTheme.SM, LineTheme.SM, LineTheme.SM);
+        if (projectRemovable) {
+            strip.setClickable(true);
+        }
 
         TextView project = LineTheme.text(context, projectLabel, LineTheme.FONT_SM, LineTheme.TEXT, Typeface.BOLD);
         strip.addView(project, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -256,6 +271,9 @@ public final class DrawerView extends FrameLayout {
         LinearLayout.LayoutParams pathParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         pathParams.topMargin = LineTheme.dp(context, 2);
         strip.addView(path, pathParams);
+        if (projectRemovable) {
+            attachRemoveProjectLongPress(strip);
+        }
 
         LinearLayout.LayoutParams stripParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         stripParams.leftMargin = LineTheme.dp(context, LineTheme.LG);
@@ -279,6 +297,37 @@ public final class DrawerView extends FrameLayout {
             return;
         }
         addFileNode(tree, fileTree, 0, true);
+    }
+
+    private void showRemoveProjectDialog() {
+        AlertDialog dialog = new AlertDialog.Builder(getContext())
+                .setTitle("移除工作区")
+                .setMessage("从已打开目录中移除「" + projectLabel + "」？\n\n不会删除真实目录。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("删除", (d, which) -> {
+                    if (listener != null) {
+                        listener.onCurrentProjectRemoveRequested();
+                    }
+                })
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(LineTheme.DANGER));
+        dialog.show();
+    }
+
+    private void attachRemoveProjectLongPress(View view) {
+        LongPressTouchHandler handler = new LongPressTouchHandler(this::showRemoveProjectDialog);
+        attachRemoveProjectLongPress(view, handler);
+    }
+
+    private void attachRemoveProjectLongPress(View view, LongPressTouchHandler handler) {
+        view.setHapticFeedbackEnabled(true);
+        view.setOnTouchListener(handler);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                attachRemoveProjectLongPress(group.getChildAt(i), handler);
+            }
+        }
     }
 
     private IconButtonView headerIcon(Context context, int type, int color, int iconSizeDp) {
@@ -466,5 +515,58 @@ public final class DrawerView extends FrameLayout {
         IconButtonView icon = inlineIcon(context, type, color, iconSize);
         icon.setIconSizeDp(containerSize, iconSize);
         return icon;
+    }
+
+    private static final class LongPressTouchHandler implements View.OnTouchListener {
+        private final Handler handler = new Handler(Looper.getMainLooper());
+        private final Runnable action;
+        private float downX;
+        private float downY;
+        private int touchSlop;
+        private boolean fired;
+        private Runnable pending;
+
+        LongPressTouchHandler(Runnable action) {
+            this.action = action;
+        }
+
+        @Override
+        public boolean onTouch(View view, MotionEvent event) {
+            int eventAction = event.getActionMasked();
+            if (eventAction == MotionEvent.ACTION_DOWN) {
+                touchSlop = ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
+                downX = event.getRawX();
+                downY = event.getRawY();
+                fired = false;
+                cancel();
+                pending = () -> {
+                    fired = true;
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    action.run();
+                };
+                handler.postDelayed(pending, ViewConfiguration.getLongPressTimeout());
+                return false;
+            }
+            if (eventAction == MotionEvent.ACTION_MOVE) {
+                float dx = Math.abs(event.getRawX() - downX);
+                float dy = Math.abs(event.getRawY() - downY);
+                if (dx > touchSlop || dy > touchSlop) {
+                    cancel();
+                }
+                return fired;
+            }
+            if (eventAction == MotionEvent.ACTION_UP || eventAction == MotionEvent.ACTION_CANCEL) {
+                cancel();
+                return fired;
+            }
+            return fired;
+        }
+
+        private void cancel() {
+            if (pending != null) {
+                handler.removeCallbacks(pending);
+                pending = null;
+            }
+        }
     }
 }

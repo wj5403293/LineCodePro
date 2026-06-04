@@ -3,11 +3,15 @@ package cn.lineai;
 import android.app.Activity;
 import android.Manifest;
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
+import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.mvp.MainContract;
 import cn.lineai.mvp.MainPresenter;
 import cn.lineai.ui.MainChatView;
@@ -84,9 +88,54 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     }
 
     private void configureWindow() {
+        new ThemeSettingsRepository(this).applyCurrentTheme();
         Window window = getWindow();
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         window.setStatusBarColor(LineTheme.BG);
         window.setNavigationBarColor(LineTheme.BG);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            int flags = window.getDecorView().getSystemUiVisibility();
+            if (isLightColor(LineTheme.BG)) {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            } else {
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (isLightColor(LineTheme.BG)) {
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                } else {
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                }
+            }
+            window.getDecorView().setSystemUiVisibility(flags);
+        }
+    }
+
+    private boolean isLightColor(int color) {
+        double red = Color.red(color) / 255.0;
+        double green = Color.green(color) / 255.0;
+        double blue = Color.blue(color) / 255.0;
+        double luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+        return luminance > 0.64;
+    }
+
+    public void recreateMainView(String screenId) {
+        configureWindow();
+        if (presenter == null) {
+            return;
+        }
+        if (mainView != null) {
+            presenter.detachView();
+        }
+        mainView = new MainChatView(this, presenter);
+        setContentView(mainView);
+        presenter.attachView(mainView);
+        if (screenId != null && screenId.length() > 0) {
+            mainView.showScreen(screenId);
+        }
     }
 
     @Override

@@ -17,6 +17,8 @@ import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.ToolModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.ai.prompt.SystemPromptProvider;
+import cn.lineai.context.ContextCompactionResult;
+import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
 import cn.lineai.context.ContextSnapshot;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
@@ -30,6 +32,7 @@ import cn.lineai.data.repository.MessageRecord;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.ProjectRecord;
 import cn.lineai.data.repository.ProjectRepository;
+import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMessage;
@@ -44,6 +47,7 @@ import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelRepository;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.model.SheetOption;
+import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.PermissionResult;
@@ -64,6 +68,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -84,6 +89,7 @@ public final class MainPresenter implements MainContract.Presenter {
     private final ModelRepository modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final OutputSettingsRepository outputSettingsRepository;
+    private final ThemeSettingsRepository themeSettingsRepository;
     private final ConversationRepository conversationRepository;
     private final ProjectRepository projectRepository;
     private final LearningContextRepository learningContextRepository;
@@ -92,6 +98,7 @@ public final class MainPresenter implements MainContract.Presenter {
     private final DiffRepository diffRepository;
     private final FileTreeRepository fileTreeRepository = new FileTreeRepository();
     private final ContextManager contextManager = new ContextManager();
+    private final ContextCompactionService contextCompactionService;
     private final ModelClient modelClient = new ModelClient();
     private final ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
@@ -345,12 +352,15 @@ public final class MainPresenter implements MainContract.Presenter {
         modelRepository = new ModelRepository(context);
         aiBehaviorSettingsRepository = new AiBehaviorSettingsRepository(context);
         outputSettingsRepository = new OutputSettingsRepository(context);
+        themeSettingsRepository = new ThemeSettingsRepository(context);
+        themeSettingsRepository.applyCurrentTheme();
         conversationRepository = new ConversationRepository(context);
         projectRepository = new ProjectRepository(context);
         learningContextRepository = new LearningContextRepository(context);
         memoryExtractionService = new MemoryExtractionService(context, learningContextRepository);
         toolSettingsRepository = new ToolSettingsRepository(context);
         diffRepository = new DiffRepository(context);
+        contextCompactionService = new ContextCompactionService(context);
         toolRegistry = new ToolRegistry(context);
         toolExecutor = new ToolExecutor(toolRegistry, toolSettingsRepository, diffRepository);
         systemPromptProvider = new SystemPromptProvider(context);
@@ -392,7 +402,9 @@ public final class MainPresenter implements MainContract.Presenter {
                     "project:select:" + project.getId(),
                     project.getLabel(),
                     project.getDescription().length() > 0 ? project.getDescription() : WorkspacePaths.displayPath(project.getPath()),
-                    project.getId().equals(selected.getId())
+                    project.getId().equals(selected.getId()),
+                    projectDeleteActionId(project),
+                    "删除"
             ));
         }
         options.add(new SheetOption("project:open", "打开外部工作区", "通过 SAF 选择外部目录，并使用真实 /storage 路径", false));
@@ -467,6 +479,19 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    public void onCurrentProjectRemoveRequested() {
+        ProjectRecord selected = projectRepository.getSelectedProject();
+        if (selected == null || WorkspacePaths.DEFAULT_PROJECT_ID.equals(selected.getId())) {
+            return;
+        }
+        boolean deleted = projectRepository.deleteProject(selected.getId());
+        if (deleted) {
+            applyProject(projectRepository.ensureSelectedProjectPath());
+            render();
+        }
+    }
+
+    @Override
     public void onFileNodeSelected(String path) {
         if (path == null || path.length() == 0) {
             return;
@@ -520,13 +545,46 @@ public final class MainPresenter implements MainContract.Presenter {
         }
 
         int generationId = generationSequence++;
-        ArrayList<ModelMessage> requestMessages = buildModelMessages(trimmed);
-        String assistantId = nextId();
         ModelCancellationToken cancellationToken = new ModelCancellationToken();
         currentCancellationToken = cancellationToken;
         streaming = true;
+        render();
+
+        String activeUserMessageId = messages.get(messages.size() - 1).getId();
+        if (shouldAutoCompactBeforeRequest(selectedModel, activeUserMessageId)) {
+            startContextCompaction(generationId, selectedModel, cancellationToken, true, activeUserMessageId, trimmed);
+            return;
+        }
+        startInitialModelRequest(generationId, selectedModel, cancellationToken, trimmed);
+    }
+
+    @Override
+    public void onStopGeneration() {
+        flushPendingAssistantDelta();
+        cancelActiveGeneration();
+        streaming = false;
+        generationSequence++;
+        streamingRawTextByMessageId.clear();
+        markStreamingMessagesStopped();
+        markRunningAgentProgressStopped();
+        persistCurrentConversation();
+        render();
+    }
+
+    private void startInitialModelRequest(
+            int generationId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            String userInput
+    ) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return;
+        }
+        ArrayList<ModelMessage> requestMessages = buildModelMessages(userInput);
+        String assistantId = nextId();
         streamingRawTextByMessageId.put(assistantId, new StringBuilder());
         messages.add(new ChatMessage(assistantId, ChatMessage.Role.ASSISTANT, "", true));
+        persistCurrentConversation();
         render();
 
         new Thread(() -> {
@@ -551,17 +609,272 @@ public final class MainPresenter implements MainContract.Presenter {
         }, "linecode-model-stream").start();
     }
 
-    @Override
-    public void onStopGeneration() {
-        flushPendingAssistantDelta();
-        cancelActiveGeneration();
-        streaming = false;
-        generationSequence++;
-        streamingRawTextByMessageId.clear();
-        markStreamingMessagesStopped();
-        markRunningAgentProgressStopped();
+    private boolean shouldAutoCompactBeforeRequest(ModelConfig selectedModel, String activeUserMessageId) {
+        if (selectedModel == null) {
+            return false;
+        }
+        AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
+        int contextTokens = ModelContextParser.parse(selectedModel.getModelId()).getContextTokens();
+        if (!contextCompactionService.shouldCompact(messages, contextTokens, contextManager, aiSettings.isPreserveReasoningEnabled())) {
+            return false;
+        }
+        ArrayList<ChatMessage> preservedTail = getAutoCompactPreservedTail(activeUserMessageId);
+        HashSet<String> preservedIds = messageIdSet(preservedTail);
+        for (ChatMessage message : messages) {
+            if (preservedIds.contains(message.getId()) || message.isExcludeFromContext()) {
+                continue;
+            }
+            if (message.getContent().trim().length() > 0 || message.getReasoningContent().trim().length() > 0 || message.hasToolCalls()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void showCompactConfirmation() {
+        if (view == null) {
+            return;
+        }
+        ArrayList<SheetOption> options = new ArrayList<>();
+        options.add(new SheetOption("compact:confirm", "确认压缩",
+                "把早期上下文总结成隐藏摘要，旧消息仍保留在历史中。", false));
+        options.add(new SheetOption("compact:cancel", "取消", "返回当前对话", false));
+        view.showSheet("压缩上下文", options);
+    }
+
+    private void startManualContextCompaction() {
+        if (streaming) {
+            return;
+        }
+        ModelConfig selectedModel = modelRepository.getSelectedModel();
+        if (selectedModel == null) {
+            showNotice("还没有可用模型。请先配置模型，再压缩上下文。");
+            return;
+        }
+        if (messages.size() < 4) {
+            showNotice("当前上下文不足，无需压缩。");
+            return;
+        }
+        ensureCurrentConversation();
+        int generationId = generationSequence++;
+        ModelCancellationToken cancellationToken = new ModelCancellationToken();
+        currentCancellationToken = cancellationToken;
+        streaming = true;
+        startContextCompaction(generationId, selectedModel, cancellationToken, false, "", "");
+    }
+
+    private void startContextCompaction(
+            int generationId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            boolean continueAfterCompaction,
+            String activeUserMessageId,
+            String userInput
+    ) {
+        ArrayList<ChatMessage> preservedTail = continueAfterCompaction
+                ? getAutoCompactPreservedTail(activeUserMessageId)
+                : new ArrayList<>();
+        HashSet<String> preservedIds = messageIdSet(preservedTail);
+        ArrayList<ChatMessage> baseMessages = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            if (!preservedIds.contains(message.getId())) {
+                baseMessages.add(message);
+            }
+        }
+        if (!hasCompactableBaseMessages(baseMessages)) {
+            if (continueAfterCompaction) {
+                startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
+            } else {
+                streaming = false;
+                currentCancellationToken = null;
+                render();
+            }
+            return;
+        }
+        String progressId = nextId();
+        messages.add(ChatMessage.compactProgress(progressId, ChatMessage.COMPACT_STATUS_RUNNING));
         persistCurrentConversation();
         render();
+
+        ArrayList<ChatMessage> baseSnapshot = new ArrayList<>(baseMessages);
+        new Thread(() -> {
+            try {
+                ContextCompactionResult result = contextCompactionService.compact(selectedModel, baseSnapshot, cancellationToken);
+                mainHandler.post(() -> finishContextCompaction(
+                        generationId,
+                        selectedModel,
+                        cancellationToken,
+                        continueAfterCompaction,
+                        userInput,
+                        baseSnapshot,
+                        preservedIds,
+                        progressId,
+                        result
+                ));
+            } catch (ModelCompletionException e) {
+                mainHandler.post(() -> failContextCompaction(
+                        generationId,
+                        selectedModel,
+                        cancellationToken,
+                        continueAfterCompaction,
+                        userInput,
+                        progressId,
+                        "上下文压缩失败：" + e.getMessage()
+                ));
+            }
+        }, "linecode-context-compact").start();
+    }
+
+    private void finishContextCompaction(
+            int generationId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            boolean continueAfterCompaction,
+            String userInput,
+            ArrayList<ChatMessage> baseSnapshot,
+            HashSet<String> preservedIds,
+            String progressId,
+            ContextCompactionResult result
+    ) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            markCompactProgress(progressId, ChatMessage.COMPACT_STATUS_ERROR, false);
+            persistCurrentConversation();
+            render();
+            return;
+        }
+        if (generationId != generationSequence - 1 || !streaming) {
+            return;
+        }
+        if (result == null || result.getSummaryContent().trim().length() == 0) {
+            failContextCompaction(generationId, selectedModel, cancellationToken, continueAfterCompaction, userInput,
+                    progressId, "上下文压缩失败：模型没有返回摘要。");
+            return;
+        }
+        HashSet<String> baseIds = messageIdSet(baseSnapshot);
+        ArrayList<ChatMessage> compacted = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            if (progressId.equals(message.getId()) || preservedIds.contains(message.getId())) {
+                continue;
+            }
+            compacted.add(baseIds.contains(message.getId()) ? message.withExcludeFromContext(true) : message);
+        }
+        ChatMessage summaryMessage = new ChatMessage(nextId(), ChatMessage.Role.USER,
+                result.getSummaryContent(), "", false, true, false)
+                .withResponseInputItemJson(result.getResponseInputItemJson());
+        compacted.add(summaryMessage);
+        for (ChatMessage message : messages) {
+            if (preservedIds.contains(message.getId())) {
+                compacted.add(message);
+            }
+        }
+        compacted.add(ChatMessage.compactProgress(progressId, ChatMessage.COMPACT_STATUS_DONE)
+                .withCompactStatus(ChatMessage.COMPACT_STATUS_DONE, false));
+        messages.clear();
+        messages.addAll(compacted);
+        persistCurrentConversation();
+        render();
+        if (continueAfterCompaction) {
+            startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
+            return;
+        }
+        streaming = false;
+        currentCancellationToken = null;
+        render();
+    }
+
+    private void failContextCompaction(
+            int generationId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            boolean continueAfterCompaction,
+            String userInput,
+            String progressId,
+            String message
+    ) {
+        if (generationId != generationSequence - 1 || !streaming) {
+            return;
+        }
+        markCompactProgress(progressId, ChatMessage.COMPACT_STATUS_ERROR, false);
+        if (message != null && message.trim().length() > 0) {
+            messages.add(new ChatMessage(nextId(), ChatMessage.Role.ASSISTANT, message, false)
+                    .withExcludeFromContext(true));
+        }
+        persistCurrentConversation();
+        render();
+        if (continueAfterCompaction && (cancellationToken == null || !cancellationToken.isCancelled())) {
+            startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
+            return;
+        }
+        streaming = false;
+        currentCancellationToken = null;
+        render();
+    }
+
+    private ArrayList<ChatMessage> getAutoCompactPreservedTail(String activeUserMessageId) {
+        ArrayList<ChatMessage> contextMessages = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            if (!message.isExcludeFromContext()) {
+                contextMessages.add(message);
+            }
+        }
+        if (contextMessages.isEmpty()) {
+            return new ArrayList<>();
+        }
+        ChatMessage last = contextMessages.get(contextMessages.size() - 1);
+        if (last.getRole() == ChatMessage.Role.USER
+                && (activeUserMessageId == null || activeUserMessageId.length() == 0 || activeUserMessageId.equals(last.getId()))) {
+            ArrayList<ChatMessage> tail = new ArrayList<>();
+            tail.add(last);
+            return tail;
+        }
+        if (last.getRole() == ChatMessage.Role.TOOL) {
+            for (int i = contextMessages.size() - 1; i >= 0; i--) {
+                ChatMessage message = contextMessages.get(i);
+                if (message.getRole() == ChatMessage.Role.ASSISTANT && message.hasToolCalls()) {
+                    return new ArrayList<>(contextMessages.subList(i, contextMessages.size()));
+                }
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    private HashSet<String> messageIdSet(List<ChatMessage> source) {
+        HashSet<String> ids = new HashSet<>();
+        if (source == null) {
+            return ids;
+        }
+        for (ChatMessage message : source) {
+            if (message != null) {
+                ids.add(message.getId());
+            }
+        }
+        return ids;
+    }
+
+    private boolean hasCompactableBaseMessages(List<ChatMessage> source) {
+        if (source == null) {
+            return false;
+        }
+        for (ChatMessage message : source) {
+            if (message == null || message.isExcludeFromContext()) {
+                continue;
+            }
+            if (message.getContent().trim().length() > 0
+                    || message.getReasoningContent().trim().length() > 0
+                    || message.hasToolCalls()
+                    || message.getResponseInputItemJson().length() > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void markCompactProgress(String progressId, String status, boolean nextStreaming) {
+        int index = findMessageIndex(progressId);
+        if (index < 0) {
+            return;
+        }
+        messages.set(index, messages.get(index).withCompactStatus(status, nextStreaming));
     }
 
     @Override
@@ -601,6 +914,9 @@ public final class MainPresenter implements MainContract.Presenter {
     public void onSheetOptionSelected(String id) {
         if (id != null && id.startsWith("project:select:")) {
             selectProject(id.substring("project:select:".length()));
+        } else if (id != null && id.startsWith("project:delete:")) {
+            deleteProjectFromPicker(id.substring("project:delete:".length()));
+            return;
         } else if ("project:open".equals(id)) {
             requestOpenExternalProject();
         } else if ("project:create".equals(id)) {
@@ -615,6 +931,13 @@ public final class MainPresenter implements MainContract.Presenter {
             showScreen("settings");
         } else if ("tutorial".equals(id)) {
             showScreen("tutorial");
+        } else if ("compact".equals(id)) {
+            showCompactConfirmation();
+            return;
+        } else if ("compact:confirm".equals(id)) {
+            startManualContextCompaction();
+        } else if ("compact:cancel".equals(id)) {
+            // The bottom sheet is closed below.
         } else if ("clear".equals(id)) {
             messages.clear();
             persistCurrentConversation();
@@ -636,17 +959,46 @@ public final class MainPresenter implements MainContract.Presenter {
 
     @Override
     public void onScreenBack() {
+        navigateScreenBack("");
+    }
+
+    @Override
+    public void onScreenBackFrom(String screenId) {
+        navigateScreenBack(screenId);
+    }
+
+    private void navigateScreenBack(String visibleScreenId) {
+        String currentScreenId = normalizeScreenId(visibleScreenId);
         if (screenStack.isEmpty()) {
-            return;
+            if (currentScreenId.length() == 0) {
+                return;
+            }
+            screenStack.add(currentScreenId);
+        } else if (currentScreenId.length() > 0
+                && !currentScreenId.equals(screenStack.get(screenStack.size() - 1))) {
+            int visibleIndex = screenStack.lastIndexOf(currentScreenId);
+            if (visibleIndex >= 0) {
+                while (screenStack.size() > visibleIndex + 1) {
+                    screenStack.remove(screenStack.size() - 1);
+                }
+            } else {
+                screenStack.add(currentScreenId);
+            }
         }
-        screenStack.remove(screenStack.size() - 1);
+        currentScreenId = screenStack.remove(screenStack.size() - 1);
         if (view == null) {
             return;
         }
-        if (screenStack.isEmpty()) {
+        String previousScreenId = screenStack.isEmpty()
+                ? parentScreenFor(currentScreenId)
+                : screenStack.get(screenStack.size() - 1);
+        if (previousScreenId.length() == 0) {
             view.showChatScreen();
         } else {
-            view.showScreen(screenStack.get(screenStack.size() - 1));
+            if (screenStack.isEmpty()) {
+                screenStack.add(previousScreenId);
+            }
+            showVisibleScreen(previousScreenId);
         }
     }
 
@@ -743,6 +1095,27 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    public ThemeSettingsState getThemeSettings() {
+        return themeSettingsRepository.getState();
+    }
+
+    @Override
+    public void onThemeModeChanged(String mode) {
+        themeSettingsRepository.applyThemeMode(mode);
+        if (view != null) {
+            view.recreateForTheme("theme");
+        }
+    }
+
+    @Override
+    public void onCustomThemeColorsSaved(Map<String, String> colors) {
+        themeSettingsRepository.saveCustomThemeColors(colors);
+        if (view != null) {
+            view.recreateForTheme("theme");
+        }
+    }
+
+    @Override
     public McpSettingsState getMcpSettingsState() {
         return toolSettingsRepository.getMcpSettingsState();
     }
@@ -750,18 +1123,14 @@ public final class MainPresenter implements MainContract.Presenter {
     @Override
     public void onMcpExecutionModeChanged(String mode) {
         toolSettingsRepository.setExecutionMode(mode);
-        if (view != null) {
-            view.showScreen("mcp");
-        }
+        refreshVisibleScreen("mcp");
         render();
     }
 
     @Override
     public void onMcpToolGroupChanged(String id, boolean enabled) {
         toolSettingsRepository.setMcpEnabled(id, enabled);
-        if (view != null) {
-            view.showScreen("mcp");
-        }
+        refreshVisibleScreen("mcp");
         render();
     }
 
@@ -796,6 +1165,12 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    public boolean canRemoveCurrentProject() {
+        ProjectRecord selected = projectRepository.getSelectedProject();
+        return selected != null && !WorkspacePaths.DEFAULT_PROJECT_ID.equals(selected.getId());
+    }
+
+    @Override
     public String getSelectedModelId() {
         return modelRepository.getSelectedModelId();
     }
@@ -803,9 +1178,7 @@ public final class MainPresenter implements MainContract.Presenter {
     @Override
     public void onModelSelected(String id) {
         modelRepository.setSelectedModelId(id);
-        if (view != null) {
-            view.showScreen("models");
-        }
+        refreshVisibleScreen("models");
         render();
     }
 
@@ -813,24 +1186,14 @@ public final class MainPresenter implements MainContract.Presenter {
     public void onModelSaved(ModelConfig model) {
         ModelConfig saved = modelRepository.save(model);
         modelRepository.setSelectedModelId(saved.getId());
-        while (!screenStack.isEmpty() && !"models".equals(screenStack.get(screenStack.size() - 1))) {
-            screenStack.remove(screenStack.size() - 1);
-        }
-        if (screenStack.isEmpty()) {
-            screenStack.add("models");
-        }
-        if (view != null) {
-            view.showScreen("models");
-        }
+        returnToScreen("models");
         render();
     }
 
     @Override
     public void onModelsDeleted(List<String> ids) {
         modelRepository.deleteModels(ids);
-        if (view != null) {
-            view.showScreen("models");
-        }
+        refreshVisibleScreen("models");
         render();
     }
 
@@ -870,11 +1233,103 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void showScreen(String screenId) {
-        screenStack.add(screenId);
+        String safeScreenId = normalizeScreenId(screenId);
+        if (safeScreenId.length() == 0) {
+            return;
+        }
+        if (screenStack.isEmpty() || !safeScreenId.equals(screenStack.get(screenStack.size() - 1))) {
+            screenStack.add(safeScreenId);
+        }
+        showVisibleScreen(safeScreenId);
+    }
+
+    private void refreshVisibleScreen(String screenId) {
+        String safeScreenId = normalizeScreenId(screenId);
+        if (safeScreenId.length() == 0) {
+            return;
+        }
+        if (screenStack.isEmpty()) {
+            screenStack.add(safeScreenId);
+        } else if (!safeScreenId.equals(screenStack.get(screenStack.size() - 1))) {
+            int existingIndex = screenStack.lastIndexOf(safeScreenId);
+            if (existingIndex >= 0) {
+                while (screenStack.size() > existingIndex + 1) {
+                    screenStack.remove(screenStack.size() - 1);
+                }
+            } else {
+                screenStack.add(safeScreenId);
+            }
+        }
+        showVisibleScreen(safeScreenId);
+    }
+
+    private void returnToScreen(String screenId) {
+        String safeScreenId = normalizeScreenId(screenId);
+        if (safeScreenId.length() == 0) {
+            return;
+        }
+        int existingIndex = screenStack.lastIndexOf(safeScreenId);
+        if (existingIndex >= 0) {
+            while (screenStack.size() > existingIndex + 1) {
+                screenStack.remove(screenStack.size() - 1);
+            }
+        } else {
+            screenStack.clear();
+            screenStack.add(safeScreenId);
+        }
+        showVisibleScreen(safeScreenId);
+    }
+
+    private void showVisibleScreen(String screenId) {
         if (view != null) {
             view.hideOverlays();
             view.showScreen(screenId);
         }
+    }
+
+    private String normalizeScreenId(String screenId) {
+        return screenId == null ? "" : screenId.trim();
+    }
+
+    private String parentScreenFor(String screenId) {
+        String safeScreenId = normalizeScreenId(screenId);
+        if (safeScreenId.length() == 0 || "settings".equals(safeScreenId)) {
+            return "";
+        }
+        if ("llm".equals(safeScreenId)
+                || "models".equals(safeScreenId)
+                || "extensions".equals(safeScreenId)
+                || "mcp".equals(safeScreenId)
+                || "output".equals(safeScreenId)
+                || "theme".equals(safeScreenId)
+                || "experimental".equals(safeScreenId)
+                || "data".equals(safeScreenId)
+                || "storage".equals(safeScreenId)
+                || "memory".equals(safeScreenId)
+                || "keepAlive".equals(safeScreenId)
+                || "about".equals(safeScreenId)) {
+            return "settings";
+        }
+        if ("sshSettings".equals(safeScreenId) || "termuxIntegration".equals(safeScreenId)) {
+            return "mcp";
+        }
+        if ("licenses".equals(safeScreenId)) {
+            return "about";
+        }
+        if ("modelAddOptions".equals(safeScreenId) || safeScreenId.startsWith("modelEdit:")) {
+            return "models";
+        }
+        if ("modelAdd".equals(safeScreenId)
+                || "modelAdd:local".equals(safeScreenId)
+                || safeScreenId.startsWith("modelAdd:preset:")) {
+            return "modelAddOptions";
+        }
+        if (safeScreenId.startsWith("extension:")
+                || "agentEdit".equals(safeScreenId)
+                || "mcpEdit".equals(safeScreenId)) {
+            return "extensions";
+        }
+        return "";
     }
 
     private void selectProject(String id) {
@@ -895,6 +1350,24 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         applyProject(project);
+    }
+
+    private void deleteProjectFromPicker(String id) {
+        boolean deleted = projectRepository.deleteProject(id);
+        if (deleted) {
+            applyProject(projectRepository.ensureSelectedProjectPath());
+        }
+        render();
+        if (view != null) {
+            onProjectClick();
+        }
+    }
+
+    private String projectDeleteActionId(ProjectRecord project) {
+        if (project == null || WorkspacePaths.DEFAULT_PROJECT_ID.equals(project.getId())) {
+            return "";
+        }
+        return "project:delete:" + project.getId();
     }
 
     private void applyProject(ProjectRecord project) {
@@ -989,7 +1462,10 @@ public final class MainPresenter implements MainContract.Presenter {
                 ? learningContextRepository.buildLearningContext(projectPath, userInput, currentConversationId)
                 : "";
         ModelConfig selectedModel = modelRepository.getSelectedModel();
-        String systemPrompt = systemPromptProvider.build(projectPath, aiSettings.getToneMode(), learningContext, buildToolPrompt(selectedModel, usedToolCallCount));
+        String promptHomePath = ToolSettingsRepository.EXECUTION_SSH.equals(toolSettingsRepository.getExecutionMode())
+                ? ""
+                : projectPath;
+        String systemPrompt = systemPromptProvider.build(promptHomePath, aiSettings.getToneMode(), learningContext, buildToolPrompt(selectedModel, usedToolCallCount));
         modelMessages.add(new SystemModelMessage(systemPrompt));
         int contextTokens = selectedModel == null
                 ? ModelContextParser.parse("").getContextTokens()
@@ -1016,7 +1492,7 @@ public final class MainPresenter implements MainContract.Presenter {
             );
         }
         if (message.getRole() == ChatMessage.Role.USER) {
-            return new UserModelMessage(message.getContent());
+            return new UserModelMessage(message.getContent(), message.getResponseInputItemJson());
         }
         return new AssistantModelMessage(message.getContent(),
                 includeReasoning ? message.getReasoningContent() : "",
@@ -1476,6 +1952,38 @@ public final class MainPresenter implements MainContract.Presenter {
             public ToolResult runAgentPipeline(JSONObject input, ToolContext context) {
                 return runAgentPipelineTool(input, context, selectedModel, cancellationToken, generationId);
             }
+        }, "", (toolCallId, toolName, content, error) ->
+                postToolProgress(generationId, cancellationToken, toolCallId, toolName, content, error));
+    }
+
+    private void postToolProgress(
+            int generationId,
+            ModelCancellationToken cancellationToken,
+            String toolCallId,
+            String toolName,
+            String content,
+            boolean error
+    ) {
+        mainHandler.post(() -> {
+            if (generationId != generationSequence - 1 || !streaming) {
+                return;
+            }
+            if (cancellationToken != null && cancellationToken.isCancelled()) {
+                return;
+            }
+            if (toolCallId == null || toolCallId.length() == 0) {
+                return;
+            }
+            addOrReplaceToolResult(new ToolResult(
+                    toolCallId,
+                    toolName,
+                    content,
+                    error,
+                    "",
+                    "running",
+                    ""
+            ));
+            render();
         });
     }
 
@@ -2172,7 +2680,11 @@ public final class MainPresenter implements MainContract.Presenter {
         for (int i = 0; i < messages.size(); i++) {
             ChatMessage message = messages.get(i);
             if (message.isStreaming()) {
-                messages.set(i, message.withContent(message.getContent(), message.getReasoningContent(), false));
+                if (message.isCompactBlock()) {
+                    messages.set(i, message.withCompactStatus(ChatMessage.COMPACT_STATUS_ERROR, false));
+                } else {
+                    messages.set(i, message.withContent(message.getContent(), message.getReasoningContent(), false));
+                }
             }
         }
     }
@@ -2372,29 +2884,33 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private String messageRawJson(ChatMessage message) {
-        if (message != null && message.getRole() == ChatMessage.Role.TOOL) {
-            try {
-                return new JSONObject()
-                        .put("diff_id", message.getDiffId())
-                        .put("review_state", message.getReviewState())
-                        .put("review_message", message.getReviewMessage())
-                        .toString();
-            } catch (Exception ignored) {
-                return "";
-            }
-        }
-        if (message == null || !message.hasToolCalls()) {
+        if (message == null) {
             return "";
         }
         try {
-            JSONArray array = new JSONArray();
-            for (ToolCall call : message.getToolCalls()) {
-                array.put(new JSONObject()
-                        .put("id", call.getId())
-                        .put("name", call.getName())
-                        .put("arguments", call.getArguments()));
+            JSONObject object = new JSONObject();
+            if (message.getRole() == ChatMessage.Role.TOOL) {
+                object.put("diff_id", message.getDiffId());
+                object.put("review_state", message.getReviewState());
+                object.put("review_message", message.getReviewMessage());
             }
-            return new JSONObject().put("tool_calls", array).toString();
+            if (message.hasToolCalls()) {
+                JSONArray array = new JSONArray();
+                for (ToolCall call : message.getToolCalls()) {
+                    array.put(new JSONObject()
+                            .put("id", call.getId())
+                            .put("name", call.getName())
+                            .put("arguments", call.getArguments()));
+                }
+                object.put("tool_calls", array);
+            }
+            if (message.isCompactBlock()) {
+                object.put("compact_status", message.getCompactStatus());
+            }
+            if (message.getResponseInputItemJson().length() > 0) {
+                object.put("response_input_item_json", message.getResponseInputItemJson());
+            }
+            return object.length() == 0 ? "" : object.toString();
         } catch (Exception ignored) {
             return "";
         }

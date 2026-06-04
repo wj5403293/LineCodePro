@@ -222,6 +222,9 @@ public final class ModelRepository {
         values.put("api_key", model.getApiKey());
         values.put("model_id", model.getModelId());
         values.put("tool_call_limit", model.getToolCallLimit());
+        values.put("compression_model_enabled", model.isCompressionModelEnabled() ? 1 : 0);
+        values.put("compression_model_auto", model.isCompressionModelAuto() ? 1 : 0);
+        values.put("compression_model_id", model.getCompressionModelId());
         values.put("selected", selected ? 1 : 0);
         try {
             values.put("raw_json", model.toJson().toString());
@@ -247,7 +250,10 @@ public final class ModelRepository {
                 cursor.getString(cursor.getColumnIndexOrThrow("base_url")),
                 cursor.getString(cursor.getColumnIndexOrThrow("api_key")),
                 cursor.getString(cursor.getColumnIndexOrThrow("model_id")),
-                cursor.getInt(cursor.getColumnIndexOrThrow("tool_call_limit"))
+                cursor.getInt(cursor.getColumnIndexOrThrow("tool_call_limit")),
+                cursor.getInt(cursor.getColumnIndexOrThrow("compression_model_enabled")) == 1,
+                cursor.getInt(cursor.getColumnIndexOrThrow("compression_model_auto")) == 1,
+                cursor.getString(cursor.getColumnIndexOrThrow("compression_model_id"))
         );
     }
 
@@ -257,6 +263,15 @@ public final class ModelRepository {
         if (!columns.contains("tool_call_limit")) {
             db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN tool_call_limit INTEGER NOT NULL DEFAULT "
                     + ModelConfig.DEFAULT_TOOL_CALL_LIMIT);
+        }
+        if (!columns.contains("compression_model_enabled")) {
+            db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN compression_model_enabled INTEGER NOT NULL DEFAULT 0");
+        }
+        if (!columns.contains("compression_model_auto")) {
+            db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN compression_model_auto INTEGER NOT NULL DEFAULT 1");
+        }
+        if (!columns.contains("compression_model_id")) {
+            db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN compression_model_id TEXT");
         }
     }
 

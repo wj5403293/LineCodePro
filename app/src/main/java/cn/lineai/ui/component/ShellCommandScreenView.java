@@ -63,6 +63,7 @@ public final class ShellCommandScreenView extends LinearLayout {
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
         TextView commandBox = LineTheme.text(context, command == null || command.length() == 0 ? "(空命令)" : command, LineTheme.FONT_SM, LineTheme.TEXT, Typeface.NORMAL);
         commandBox.setTypeface(Typeface.MONOSPACE);
+        commandBox.setTextIsSelectable(true);
         commandBox.setLineSpacing(LineTheme.dp(context, 4), 1f);
         commandBox.setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 12, LineTheme.CODE_BORDER));
         LineTheme.padding(commandBox, LineTheme.MD, LineTheme.MD, LineTheme.MD, LineTheme.MD);

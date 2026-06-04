@@ -1,9 +1,16 @@
 package cn.lineai.ui.component;
 
+import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -89,6 +96,14 @@ public final class BottomSheetView extends FrameLayout {
     }
 
     private View createOptionRow(SheetOption option) {
+        View row = createOptionContentRow(option);
+        if (option.hasDeleteAction()) {
+            attachDeleteLongPress(row, () -> showDeleteConfirmation(option));
+        }
+        return row;
+    }
+
+    private View createOptionContentRow(SheetOption option) {
         Context context = getContext();
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -123,5 +138,89 @@ public final class BottomSheetView extends FrameLayout {
             row.addView(check, new LinearLayout.LayoutParams(LineTheme.dp(context, 18), LineTheme.dp(context, 18)));
         }
         return row;
+    }
+
+    private void showDeleteConfirmation(SheetOption option) {
+        AlertDialog dialog = new AlertDialog.Builder(getContext())
+                .setTitle("移除工作区")
+                .setMessage("从已打开目录中移除「" + option.getLabel() + "」？\n\n不会删除真实目录。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton(option.getDeleteActionLabel(), (d, which) -> {
+                    if (listener != null) {
+                        listener.onSheetOptionSelected(option.getDeleteActionId());
+                    }
+                })
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(LineTheme.DANGER));
+        dialog.show();
+    }
+
+    private void attachDeleteLongPress(View view, Runnable action) {
+        LongPressTouchHandler handler = new LongPressTouchHandler(action);
+        attachDeleteLongPress(view, handler);
+    }
+
+    private void attachDeleteLongPress(View view, LongPressTouchHandler handler) {
+        view.setHapticFeedbackEnabled(true);
+        view.setOnTouchListener(handler);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                attachDeleteLongPress(group.getChildAt(i), handler);
+            }
+        }
+    }
+
+    private static final class LongPressTouchHandler implements View.OnTouchListener {
+        private final Handler handler = new Handler(Looper.getMainLooper());
+        private final Runnable action;
+        private float downX;
+        private float downY;
+        private int touchSlop;
+        private boolean fired;
+        private Runnable pending;
+
+        LongPressTouchHandler(Runnable action) {
+            this.action = action;
+        }
+
+        @Override
+        public boolean onTouch(View view, MotionEvent event) {
+            int eventAction = event.getActionMasked();
+            if (eventAction == MotionEvent.ACTION_DOWN) {
+                touchSlop = ViewConfiguration.get(view.getContext()).getScaledTouchSlop();
+                downX = event.getRawX();
+                downY = event.getRawY();
+                fired = false;
+                cancel();
+                pending = () -> {
+                    fired = true;
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+                    action.run();
+                };
+                handler.postDelayed(pending, ViewConfiguration.getLongPressTimeout());
+                return false;
+            }
+            if (eventAction == MotionEvent.ACTION_MOVE) {
+                float dx = Math.abs(event.getRawX() - downX);
+                float dy = Math.abs(event.getRawY() - downY);
+                if (dx > touchSlop || dy > touchSlop) {
+                    cancel();
+                }
+                return fired;
+            }
+            if (eventAction == MotionEvent.ACTION_UP || eventAction == MotionEvent.ACTION_CANCEL) {
+                cancel();
+                return fired;
+            }
+            return fired;
+        }
+
+        private void cancel() {
+            if (pending != null) {
+                handler.removeCallbacks(pending);
+                pending = null;
+            }
+        }
     }
 }

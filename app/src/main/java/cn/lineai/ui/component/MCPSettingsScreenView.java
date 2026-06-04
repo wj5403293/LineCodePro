@@ -27,6 +27,10 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
         void onToolGroupChanged(String id, boolean enabled);
 
         void onWebSearchConfigChanged(WebSearchConfig config);
+
+        void onOpenSshSettings();
+
+        void onOpenTermuxIntegration();
     }
 
     private final Listener listener;
@@ -74,10 +78,22 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
         Context context = content.getContext();
         LinearLayout card = card(context);
         card.addView(title(context, "SSH 连接"));
-        TextView desc = desc(context, "Termux 默认 host 为 127.0.0.1，端口为 8022；远程主机填写对应 IP 和端口。连接和自动配置会在 Shell 工具接入后启用。");
+        TextView desc = desc(context, "SSH Shell 可以连接远程 Linux 服务器、桌面开发机、NAS，也可以连接手机本机 Termux。Termux 是一个单独选项，不等于只能连接手机。");
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
         card.addView(desc, descParams);
+
+        LinearLayout actions = new LinearLayout(context);
+        actions.setOrientation(HORIZONTAL);
+        LinearLayout ssh = actionButton(context, "SSH 连接设置", IconButtonView.SERVER, true, v -> listener.onOpenSshSettings());
+        LinearLayout termux = actionButton(context, "Termux 对接", IconButtonView.SMARTPHONE, false, v -> listener.onOpenTermuxIntegration());
+        LinearLayout.LayoutParams sshParams = new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f);
+        sshParams.rightMargin = LineTheme.dp(context, LineTheme.SM);
+        actions.addView(ssh, sshParams);
+        actions.addView(termux, new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f));
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        actionsParams.topMargin = LineTheme.dp(context, LineTheme.MD);
+        card.addView(actions, actionsParams);
         addCard(content, card);
     }
 
@@ -335,6 +351,27 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
         card.setBackground(LineTheme.rounded(context, LineTheme.SURFACE_ELEVATED, 12));
         LineTheme.padding(card, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
         return card;
+    }
+
+    private LinearLayout actionButton(Context context, String label, int iconType, boolean primary, View.OnClickListener listener) {
+        LinearLayout button = new LinearLayout(context);
+        button.setOrientation(HORIZONTAL);
+        button.setGravity(Gravity.CENTER);
+        button.setClickable(true);
+        button.setBackground(LineTheme.roundedStroke(context, primary ? LineTheme.ACCENT : LineTheme.SURFACE_LIGHT, 8, primary ? LineTheme.ACCENT : LineTheme.BORDER_LIGHT));
+        button.setOnClickListener(listener);
+        LineTheme.padding(button, LineTheme.SM, 0, LineTheme.SM, 0);
+        IconButtonView icon = new IconButtonView(context, iconType);
+        icon.setIconColor(primary ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT_SECONDARY);
+        icon.setIconSizeDp(15, 15);
+        icon.setClickable(false);
+        button.addView(icon, new LinearLayout.LayoutParams(LineTheme.dp(context, 15), LineTheme.dp(context, 15)));
+        TextView text = LineTheme.text(context, label, LineTheme.FONT_XS, primary ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT_SECONDARY, Typeface.BOLD);
+        text.setSingleLine(true);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        textParams.leftMargin = LineTheme.dp(context, 6);
+        button.addView(text, textParams);
+        return button;
     }
 
     private TextView title(Context context, String text) {

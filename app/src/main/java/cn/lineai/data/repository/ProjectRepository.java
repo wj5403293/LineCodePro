@@ -84,18 +84,32 @@ public final class ProjectRepository {
         SQLiteDatabase db = database.getWritableDatabase();
         db.beginTransaction();
         try {
-            ContentValues clear = new ContentValues();
-            clear.put("selected", 0);
-            db.update("projects", clear, null, null);
+            selectProjectInTransaction(db, id);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
 
-            ContentValues select = new ContentValues();
-            select.put("selected", 1);
-            select.put("updated_at", System.currentTimeMillis());
-            int updated = db.update("projects", select, "id = ?", new String[] {id});
-            if (updated == 0) {
-                db.update("projects", select, "id = ?", new String[] {WorkspacePaths.DEFAULT_PROJECT_ID});
+    public synchronized boolean deleteProject(String id) {
+        String safeId = id == null ? "" : id.trim();
+        if (safeId.length() == 0 || WorkspacePaths.DEFAULT_PROJECT_ID.equals(safeId)) {
+            return false;
+        }
+        ensureDefaultProject();
+        ProjectRecord project = findProject(safeId);
+        if (project == null) {
+            return false;
+        }
+        SQLiteDatabase db = database.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            int deleted = db.delete("projects", "id = ?", new String[] {safeId});
+            if (deleted > 0 && project.isSelected()) {
+                selectProjectInTransaction(db, WorkspacePaths.DEFAULT_PROJECT_ID);
             }
             db.setTransactionSuccessful();
+            return deleted > 0;
         } finally {
             db.endTransaction();
         }
@@ -161,6 +175,27 @@ public final class ProjectRepository {
 
     public String getDefaultHomePath() {
         return workspacePaths.getHomeRoot().getAbsolutePath();
+    }
+
+    private ProjectRecord findProject(String id) {
+        Cursor cursor = database.getReadableDatabase().query(
+                "projects",
+                null,
+                "id = ?",
+                new String[] {id},
+                null,
+                null,
+                null,
+                "1"
+        );
+        try {
+            if (cursor.moveToFirst()) {
+                return readProject(cursor);
+            }
+            return null;
+        } finally {
+            cursor.close();
+        }
     }
 
     private void ensureDefaultProject() {
@@ -233,6 +268,20 @@ public final class ProjectRepository {
             value = value.substring(0, 60);
         }
         return value;
+    }
+
+    private void selectProjectInTransaction(SQLiteDatabase db, String id) {
+        ContentValues clear = new ContentValues();
+        clear.put("selected", 0);
+        db.update("projects", clear, null, null);
+
+        ContentValues select = new ContentValues();
+        select.put("selected", 1);
+        select.put("updated_at", System.currentTimeMillis());
+        int updated = db.update("projects", select, "id = ?", new String[] {id});
+        if (updated == 0) {
+            db.update("projects", select, "id = ?", new String[] {WorkspacePaths.DEFAULT_PROJECT_ID});
+        }
     }
 
     private ContentValues valuesFor(ProjectRecord project) {

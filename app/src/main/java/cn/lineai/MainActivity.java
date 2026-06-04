@@ -14,8 +14,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import cn.lineai.data.repository.ThemeSettingsRepository;
-import cn.lineai.mvp.MainContract;
-import cn.lineai.mvp.MainPresenter;
+import cn.lineai.mvp.MainCoordinator;
 import cn.lineai.ui.MainChatView;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -25,7 +24,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     private static final int REQUEST_LEGACY_STORAGE = 7002;
     private static final int REQUEST_OPEN_DOCUMENT = 7003;
 
-    private MainContract.Presenter presenter;
+    private MainCoordinator presenter;
     private MainChatView mainView;
     private MainChatView.DocumentPickCallback documentPickCallback;
 
@@ -34,7 +33,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
         super.onCreate(savedInstanceState);
         configureWindow();
 
-        presenter = new MainPresenter(this);
+        presenter = new MainCoordinator(this);
         mainView = new MainChatView(this, presenter);
         setContentView(mainView);
         presenter.attachView(mainView);
@@ -42,7 +41,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
 
     @Override
     protected void onDestroy() {
-        presenter.detachView();
+        presenter.destroy();
         super.onDestroy();
     }
 

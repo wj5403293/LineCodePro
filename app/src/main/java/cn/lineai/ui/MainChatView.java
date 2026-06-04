@@ -28,6 +28,7 @@ import cn.lineai.model.ModelProviderPreset;
 import cn.lineai.model.ModelProviderPresets;
 import cn.lineai.model.SheetOption;
 import cn.lineai.mvp.MainContract;
+import cn.lineai.mvp.MainUiController;
 import cn.lineai.ui.component.BottomSheetView;
 import cn.lineai.ui.component.ChatMessageListView;
 import cn.lineai.ui.component.ComposerView;
@@ -83,7 +84,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         void onDocumentPickCancelled();
     }
 
-    private final MainContract.Presenter presenter;
+    private final MainUiController presenter;
     private final HeaderView headerView;
     private final LinearLayout contentView;
     private final ChatMessageListView messageListView;
@@ -96,7 +97,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private String shellCommandText = "";
     private String currentScreenId = "";
 
-    public MainChatView(Context context, MainContract.Presenter presenter) {
+    public MainChatView(Context context, MainUiController presenter) {
         super(context);
         this.presenter = presenter;
         setBackgroundColor(LineTheme.BG);

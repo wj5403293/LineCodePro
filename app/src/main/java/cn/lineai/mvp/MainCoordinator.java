@@ -1,8 +1,6 @@
 package cn.lineai.mvp;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.ai.ModelClient;
@@ -20,7 +18,6 @@ import cn.lineai.ai.prompt.SystemPromptProvider;
 import cn.lineai.context.ContextCompactionResult;
 import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
-import cn.lineai.context.ContextSnapshot;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ConversationRecord;
@@ -40,7 +37,6 @@ import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.ChatMode;
-import cn.lineai.model.ChatUiState;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
@@ -51,7 +47,6 @@ import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.McpToolConfig;
 import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.ModelConfig;
-import cn.lineai.model.ModelContextInfo;
 import cn.lineai.model.ModelContextParser;
 import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelRepository;
@@ -63,7 +58,6 @@ import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
 import cn.lineai.ssh.SshService;
 import cn.lineai.tool.BaseTool;
-import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolExecutor;
@@ -92,7 +86,7 @@ import java.util.concurrent.Future;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class MainPresenter implements MainContract.Presenter {
+public final class MainCoordinator implements MainUiController {
     private static final long STREAM_RENDER_INTERVAL_MS = 80L;
     private static final long AGENT_PROGRESS_RENDER_INTERVAL_MS = 100L;
     private static final int AGENT_MAX_TURNS = 8;
@@ -101,10 +95,15 @@ public final class MainPresenter implements MainContract.Presenter {
     private static final String DIRECTORY_PICKER_MODE_SSH_REMOTE = "ssh_remote";
     private static final String AGENT_TERMINATED_MESSAGE = "Agent 已终止。";
 
-    private final ArrayList<ChatMessage> messages = new ArrayList<>();
-    private final ArrayList<String> screenStack = new ArrayList<>();
+    private final ChatSessionStore chatSessionStore = new ChatSessionStore();
+    private final ArrayList<ChatMessage> messages = chatSessionStore.mutableMessages();
+    private final ScreenNavigationController screenNavigationController = new ScreenNavigationController();
     private final Set<String> expandedFilePaths = new HashSet<>();
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final MainThreadDispatcher mainThread;
+    private final BackgroundTaskRunner backgroundTasks;
+    private final ChatUiStateAssembler chatUiStateAssembler;
+    private final ToolRunController toolRunController;
+    private final GenerationController generationController = new GenerationController();
     private final ModelRepository modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final ChatModeRepository chatModeRepository;
@@ -117,22 +116,42 @@ public final class MainPresenter implements MainContract.Presenter {
     private final ToolSettingsRepository toolSettingsRepository;
     private final ExtensionRepository extensionRepository;
     private final DiffRepository diffRepository;
-    private final FileTreeRepository fileTreeRepository = new FileTreeRepository();
+    private final FileTreeRepository fileTreeRepository;
     private final SshService sshService;
     private final SshFileTreeRepository sshFileTreeRepository;
-    private final ContextManager contextManager = new ContextManager();
+    private final ContextManager contextManager;
     private final ContextCompactionService contextCompactionService;
-    private final ModelClient modelClient = new ModelClient();
+    private final ModelClient modelClient;
     private final ToolRegistry toolRegistry;
     private final ToolExecutor toolExecutor;
-    private final ToolExecutionCoordinator toolExecutionCoordinator = new ToolExecutionCoordinator();
+    private final ToolExecutionCoordinator toolExecutionCoordinator;
     private final SystemPromptProvider systemPromptProvider;
     private final StoragePermissionManager storagePermissionManager;
-    private final SafPathResolver safPathResolver = new SafPathResolver();
+    private final SafPathResolver safPathResolver;
     private MainContract.View view;
+    private final ScreenNavigationController.Host navigationHost = new ScreenNavigationController.Host() {
+        @Override
+        public void hideOverlays() {
+            if (view != null) {
+                view.hideOverlays();
+            }
+        }
+
+        @Override
+        public void showScreen(String screenId) {
+            if (view != null) {
+                view.showScreen(screenId);
+            }
+        }
+
+        @Override
+        public void showChatScreen() {
+            if (view != null) {
+                view.showChatScreen();
+            }
+        }
+    };
     private ModelCancellationToken currentCancellationToken;
-    private int messageSequence = 1;
-    private int generationSequence = 1;
     private final StringBuilder pendingStreamTextDelta = new StringBuilder();
     private final StringBuilder pendingStreamReasoningDelta = new StringBuilder();
     private final HashMap<String, StringBuilder> streamingRawTextByMessageId = new HashMap<>();
@@ -140,9 +159,6 @@ public final class MainPresenter implements MainContract.Presenter {
     private int pendingStreamGenerationId = -1;
     private boolean streamRenderScheduled;
     private long lastStreamRenderAt;
-    private boolean streaming;
-    private String currentConversationId = "";
-    private long currentConversationCreatedAt;
     private String projectLabel = "LineCode";
     private String projectPath = "";
     private String projectSource = WorkspacePaths.SOURCE_DEFAULT;
@@ -585,28 +601,44 @@ public final class MainPresenter implements MainContract.Presenter {
         }
     }
 
-    public MainPresenter(Context context) {
-        modelRepository = new ModelRepository(context);
-        aiBehaviorSettingsRepository = new AiBehaviorSettingsRepository(context);
-        chatModeRepository = new ChatModeRepository(context);
-        outputSettingsRepository = new OutputSettingsRepository(context);
-        themeSettingsRepository = new ThemeSettingsRepository(context);
-        themeSettingsRepository.applyCurrentTheme();
-        conversationRepository = new ConversationRepository(context);
-        projectRepository = new ProjectRepository(context);
-        sshService = new SshService(context);
-        sshFileTreeRepository = new SshFileTreeRepository(sshService);
-        learningContextRepository = new LearningContextRepository(context);
-        memoryExtractionService = new MemoryExtractionService(context, learningContextRepository);
-        toolSettingsRepository = new ToolSettingsRepository(context);
-        extensionRepository = new ExtensionRepository(context);
-        diffRepository = new DiffRepository(context);
-        contextCompactionService = new ContextCompactionService(context);
-        toolRegistry = new ToolRegistry(context);
-        toolExecutor = new ToolExecutor(toolRegistry, toolSettingsRepository, diffRepository);
-        systemPromptProvider = new SystemPromptProvider(context);
-        storagePermissionManager = new StoragePermissionManager(context);
-        chatModeRepository.initialize(toolSettingsRepository);
+    public MainCoordinator(Context context) {
+        this(new MainDependencies(context));
+    }
+
+    MainCoordinator(MainDependencies dependencies) {
+        modelRepository = dependencies.modelRepository;
+        aiBehaviorSettingsRepository = dependencies.aiBehaviorSettingsRepository;
+        chatModeRepository = dependencies.chatModeRepository;
+        outputSettingsRepository = dependencies.outputSettingsRepository;
+        themeSettingsRepository = dependencies.themeSettingsRepository;
+        conversationRepository = dependencies.conversationRepository;
+        projectRepository = dependencies.projectRepository;
+        learningContextRepository = dependencies.learningContextRepository;
+        memoryExtractionService = dependencies.memoryExtractionService;
+        toolSettingsRepository = dependencies.toolSettingsRepository;
+        extensionRepository = dependencies.extensionRepository;
+        diffRepository = dependencies.diffRepository;
+        fileTreeRepository = dependencies.fileTreeRepository;
+        sshService = dependencies.sshService;
+        sshFileTreeRepository = dependencies.sshFileTreeRepository;
+        contextManager = dependencies.contextManager;
+        contextCompactionService = dependencies.contextCompactionService;
+        modelClient = dependencies.modelClient;
+        toolRegistry = dependencies.toolRegistry;
+        toolExecutor = dependencies.toolExecutor;
+        toolExecutionCoordinator = dependencies.toolExecutionCoordinator;
+        systemPromptProvider = dependencies.systemPromptProvider;
+        storagePermissionManager = dependencies.storagePermissionManager;
+        safPathResolver = dependencies.safPathResolver;
+        mainThread = dependencies.mainThreadDispatcher;
+        backgroundTasks = dependencies.backgroundTaskRunner;
+        chatUiStateAssembler = new ChatUiStateAssembler(
+                modelRepository,
+                aiBehaviorSettingsRepository,
+                outputSettingsRepository,
+                contextManager
+        );
+        toolRunController = new ToolRunController(toolExecutionCoordinator, toolRegistry, toolSettingsRepository);
         permissionMode = toolSettingsRepository.getPermissionMode();
         applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
         expandedFilePaths.add(projectPath);
@@ -624,6 +656,13 @@ public final class MainPresenter implements MainContract.Presenter {
     @Override
     public void detachView() {
         view = null;
+    }
+
+    @Override
+    public void destroy() {
+        detachView();
+        cancelActiveGeneration();
+        backgroundTasks.shutdownNow();
     }
 
     @Override
@@ -693,24 +732,22 @@ public final class MainPresenter implements MainContract.Presenter {
     @Override
     public void onNewConversation() {
         cancelActiveGeneration();
-        streaming = false;
-        messages.clear();
-        currentConversationId = String.valueOf(System.currentTimeMillis());
-        currentConversationCreatedAt = System.currentTimeMillis();
+        chatSessionStore.setStreaming(false);
+        chatSessionStore.startNewConversation(System.currentTimeMillis());
         persistCurrentConversation();
         render();
     }
 
     @Override
     public void onConversationSelected(String id) {
-        if (id == null || id.length() == 0 || id.equals(currentConversationId)) {
+        if (id == null || id.length() == 0 || id.equals(chatSessionStore.getCurrentConversationId())) {
             if (view != null) {
                 view.hideOverlays();
             }
             return;
         }
         cancelActiveGeneration();
-        streaming = false;
+        chatSessionStore.setStreaming(false);
         loadConversation(id);
         if (view != null) {
             view.hideOverlays();
@@ -724,12 +761,10 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         conversationRepository.deleteConversation(id);
-        if (id.equals(currentConversationId)) {
+        if (id.equals(chatSessionStore.getCurrentConversationId())) {
             cancelActiveGeneration();
-            streaming = false;
-            messages.clear();
-            currentConversationId = "";
-            currentConversationCreatedAt = 0;
+            chatSessionStore.setStreaming(false);
+            chatSessionStore.clearCurrentConversation();
         }
         render();
     }
@@ -904,7 +939,7 @@ public final class MainPresenter implements MainContract.Presenter {
     @Override
     public void onSendMessage(String text) {
         String trimmed = text == null ? "" : text.trim();
-        if (trimmed.isEmpty() || streaming) {
+        if (trimmed.isEmpty() || chatSessionStore.isStreaming()) {
             return;
         }
         ensureCurrentConversation();
@@ -920,10 +955,10 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
 
-        int generationId = generationSequence++;
+        int generationId = chatSessionStore.nextGenerationId();
         ModelCancellationToken cancellationToken = new ModelCancellationToken();
         currentCancellationToken = cancellationToken;
-        streaming = true;
+        chatSessionStore.setStreaming(true);
         render();
 
         String activeUserMessageId = messages.get(messages.size() - 1).getId();
@@ -936,7 +971,7 @@ public final class MainPresenter implements MainContract.Presenter {
 
     @Override
     public void onChatModeChanged(String mode) {
-        if (streaming) {
+        if (chatSessionStore.isStreaming()) {
             return;
         }
         chatModeRepository.applyMode(mode, toolSettingsRepository);
@@ -948,8 +983,8 @@ public final class MainPresenter implements MainContract.Presenter {
     public void onStopGeneration() {
         flushPendingAssistantDelta();
         cancelActiveGeneration();
-        streaming = false;
-        generationSequence++;
+        chatSessionStore.setStreaming(false);
+        chatSessionStore.invalidateActiveGeneration();
         streamingRawTextByMessageId.clear();
         markStreamingMessagesStopped();
         markRunningAgentProgressStopped();
@@ -973,7 +1008,7 @@ public final class MainPresenter implements MainContract.Presenter {
         persistCurrentConversation();
         render();
 
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-model-stream", () -> {
             try {
                 AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
                 ModelRequestOptions requestOptions = requestOptions(aiSettings, selectedModel, 0);
@@ -992,7 +1027,7 @@ public final class MainPresenter implements MainContract.Presenter {
             } catch (ModelCompletionException e) {
                 failGeneration(generationId, assistantId, "模型通信失败：\n" + e.getMessage());
             }
-        }, "linecode-model-stream").start();
+        });
     }
 
     private boolean shouldAutoCompactBeforeRequest(ModelConfig selectedModel, String activeUserMessageId) {
@@ -1029,7 +1064,7 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void startManualContextCompaction() {
-        if (streaming) {
+        if (chatSessionStore.isStreaming()) {
             return;
         }
         ModelConfig selectedModel = modelRepository.getSelectedModel();
@@ -1042,10 +1077,10 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         ensureCurrentConversation();
-        int generationId = generationSequence++;
+        int generationId = chatSessionStore.nextGenerationId();
         ModelCancellationToken cancellationToken = new ModelCancellationToken();
         currentCancellationToken = cancellationToken;
-        streaming = true;
+        chatSessionStore.setStreaming(true);
         startContextCompaction(generationId, selectedModel, cancellationToken, false, "", "");
     }
 
@@ -1071,7 +1106,7 @@ public final class MainPresenter implements MainContract.Presenter {
             if (continueAfterCompaction) {
                 startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
             } else {
-                streaming = false;
+                chatSessionStore.setStreaming(false);
                 currentCancellationToken = null;
                 render();
             }
@@ -1083,10 +1118,10 @@ public final class MainPresenter implements MainContract.Presenter {
         render();
 
         ArrayList<ChatMessage> baseSnapshot = new ArrayList<>(baseMessages);
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-context-compact", () -> {
             try {
                 ContextCompactionResult result = contextCompactionService.compact(selectedModel, baseSnapshot, cancellationToken);
-                mainHandler.post(() -> finishContextCompaction(
+                mainThread.post(() -> finishContextCompaction(
                         generationId,
                         selectedModel,
                         cancellationToken,
@@ -1098,7 +1133,7 @@ public final class MainPresenter implements MainContract.Presenter {
                         result
                 ));
             } catch (ModelCompletionException e) {
-                mainHandler.post(() -> failContextCompaction(
+                mainThread.post(() -> failContextCompaction(
                         generationId,
                         selectedModel,
                         cancellationToken,
@@ -1108,7 +1143,7 @@ public final class MainPresenter implements MainContract.Presenter {
                         "上下文压缩失败：" + e.getMessage()
                 ));
             }
-        }, "linecode-context-compact").start();
+        });
     }
 
     private void finishContextCompaction(
@@ -1128,7 +1163,7 @@ public final class MainPresenter implements MainContract.Presenter {
             render();
             return;
         }
-        if (generationId != generationSequence - 1 || !streaming) {
+        if (!chatSessionStore.isActiveGeneration(generationId)) {
             return;
         }
         if (result == null || result.getSummaryContent().trim().length() == 0) {
@@ -1163,7 +1198,7 @@ public final class MainPresenter implements MainContract.Presenter {
             startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
             return;
         }
-        streaming = false;
+        chatSessionStore.setStreaming(false);
         currentCancellationToken = null;
         render();
     }
@@ -1177,7 +1212,7 @@ public final class MainPresenter implements MainContract.Presenter {
             String progressId,
             String message
     ) {
-        if (generationId != generationSequence - 1 || !streaming) {
+        if (!chatSessionStore.isActiveGeneration(generationId)) {
             return;
         }
         markCompactProgress(progressId, ChatMessage.COMPACT_STATUS_ERROR, false);
@@ -1191,7 +1226,7 @@ public final class MainPresenter implements MainContract.Presenter {
             startInitialModelRequest(generationId, selectedModel, cancellationToken, userInput);
             return;
         }
-        streaming = false;
+        chatSessionStore.setStreaming(false);
         currentCancellationToken = null;
         render();
     }
@@ -1280,14 +1315,14 @@ public final class MainPresenter implements MainContract.Presenter {
             }
             if (resolvedDiffId.length() > 0) {
                 String targetDiffId = resolvedDiffId;
-                new Thread(() -> {
+                backgroundTasks.execute("linecode-diff-revert", () -> {
                     DiffRepository.RevertResult result = diffRepository.revertDiff(targetDiffId);
-                    mainHandler.post(() -> {
+                    mainThread.post(() -> {
                         updateToolReview(toolCallId, targetDiffId, result.isSuccess() ? "rejected" : "", result.getMessage());
                         persistCurrentConversation();
                         render();
                     });
-                }, "linecode-diff-revert").start();
+                });
                 return;
             }
         }
@@ -1382,38 +1417,7 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void navigateScreenBack(String visibleScreenId) {
-        String currentScreenId = normalizeScreenId(visibleScreenId);
-        if (screenStack.isEmpty()) {
-            if (currentScreenId.length() == 0) {
-                return;
-            }
-            screenStack.add(currentScreenId);
-        } else if (currentScreenId.length() > 0
-                && !currentScreenId.equals(screenStack.get(screenStack.size() - 1))) {
-            int visibleIndex = screenStack.lastIndexOf(currentScreenId);
-            if (visibleIndex >= 0) {
-                while (screenStack.size() > visibleIndex + 1) {
-                    screenStack.remove(screenStack.size() - 1);
-                }
-            } else {
-                screenStack.add(currentScreenId);
-            }
-        }
-        currentScreenId = screenStack.remove(screenStack.size() - 1);
-        if (view == null) {
-            return;
-        }
-        String previousScreenId = screenStack.isEmpty()
-                ? parentScreenFor(currentScreenId)
-                : screenStack.get(screenStack.size() - 1);
-        if (previousScreenId.length() == 0) {
-            view.showChatScreen();
-        } else {
-            if (screenStack.isEmpty()) {
-                screenStack.add(previousScreenId);
-            }
-            showVisibleScreen(previousScreenId);
-        }
+        screenNavigationController.backFrom(visibleScreenId, navigationHost);
     }
 
     @Override
@@ -1841,7 +1845,7 @@ public final class MainPresenter implements MainContract.Presenter {
 
     @Override
     public String getCurrentConversationId() {
-        return currentConversationId;
+        return chatSessionStore.getCurrentConversationId();
     }
 
     @Override
@@ -1921,105 +1925,15 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void showScreen(String screenId) {
-        String safeScreenId = normalizeScreenId(screenId);
-        if (safeScreenId.length() == 0) {
-            return;
-        }
-        if (screenStack.isEmpty() || !safeScreenId.equals(screenStack.get(screenStack.size() - 1))) {
-            screenStack.add(safeScreenId);
-        }
-        showVisibleScreen(safeScreenId);
+        screenNavigationController.showScreen(screenId, navigationHost);
     }
 
     private void refreshVisibleScreen(String screenId) {
-        String safeScreenId = normalizeScreenId(screenId);
-        if (safeScreenId.length() == 0) {
-            return;
-        }
-        if (screenStack.isEmpty()) {
-            screenStack.add(safeScreenId);
-        } else if (!safeScreenId.equals(screenStack.get(screenStack.size() - 1))) {
-            int existingIndex = screenStack.lastIndexOf(safeScreenId);
-            if (existingIndex >= 0) {
-                while (screenStack.size() > existingIndex + 1) {
-                    screenStack.remove(screenStack.size() - 1);
-                }
-            } else {
-                screenStack.add(safeScreenId);
-            }
-        }
-        showVisibleScreen(safeScreenId);
+        screenNavigationController.refreshVisibleScreen(screenId, navigationHost);
     }
 
     private void returnToScreen(String screenId) {
-        String safeScreenId = normalizeScreenId(screenId);
-        if (safeScreenId.length() == 0) {
-            return;
-        }
-        int existingIndex = screenStack.lastIndexOf(safeScreenId);
-        if (existingIndex >= 0) {
-            while (screenStack.size() > existingIndex + 1) {
-                screenStack.remove(screenStack.size() - 1);
-            }
-        } else {
-            screenStack.clear();
-            screenStack.add(safeScreenId);
-        }
-        showVisibleScreen(safeScreenId);
-    }
-
-    private void showVisibleScreen(String screenId) {
-        if (view != null) {
-            view.hideOverlays();
-            view.showScreen(screenId);
-        }
-    }
-
-    private String normalizeScreenId(String screenId) {
-        return screenId == null ? "" : screenId.trim();
-    }
-
-    private String parentScreenFor(String screenId) {
-        String safeScreenId = normalizeScreenId(screenId);
-        if (safeScreenId.length() == 0 || "settings".equals(safeScreenId)) {
-            return "";
-        }
-        if ("llm".equals(safeScreenId)
-                || "models".equals(safeScreenId)
-                || "extensions".equals(safeScreenId)
-                || "mcp".equals(safeScreenId)
-                || "output".equals(safeScreenId)
-                || "theme".equals(safeScreenId)
-                || "experimental".equals(safeScreenId)
-                || "data".equals(safeScreenId)
-                || "storage".equals(safeScreenId)
-                || "memory".equals(safeScreenId)
-                || "keepAlive".equals(safeScreenId)
-                || "about".equals(safeScreenId)) {
-            return "settings";
-        }
-        if ("sshSettings".equals(safeScreenId) || "termuxIntegration".equals(safeScreenId)) {
-            return "mcp";
-        }
-        if ("licenses".equals(safeScreenId)) {
-            return "about";
-        }
-        if ("modelAddOptions".equals(safeScreenId) || safeScreenId.startsWith("modelEdit:")) {
-            return "models";
-        }
-        if ("modelAdd".equals(safeScreenId)
-                || "modelAdd:local".equals(safeScreenId)
-                || safeScreenId.startsWith("modelAdd:preset:")) {
-            return "modelAddOptions";
-        }
-        if (safeScreenId.startsWith("extension:")
-                || "agentEdit".equals(safeScreenId)
-                || safeScreenId.startsWith("agentEdit:")
-                || "mcpEdit".equals(safeScreenId)
-                || safeScreenId.startsWith("mcpEdit:")) {
-            return "extensions";
-        }
-        return "";
+        screenNavigationController.returnToScreen(screenId, navigationHost);
     }
 
     private void selectProject(String id) {
@@ -2225,19 +2139,19 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         if (ToolSettingsRepository.EXECUTION_SSH.equals(ToolSettingsRepository.normalizeExecutionMode(executionMode))) {
-            new Thread(() -> {
+            backgroundTasks.execute("linecode-ssh-project-create", () -> {
                 try {
                     String path = sshFileTreeRepository.createManagedProject(cleanName);
                     ProjectRecord project = projectRepository.saveSshProject(path, cleanName);
-                    mainHandler.post(() -> {
+                    mainThread.post(() -> {
                         applyProject(project);
                         requestSshFileTreeLoad(true);
                         render();
                     });
                 } catch (Exception e) {
-                    mainHandler.post(() -> showNotice("创建 SSH 工作区失败: " + e.getMessage()));
+                    mainThread.post(() -> showNotice("创建 SSH 工作区失败: " + e.getMessage()));
                 }
-            }, "linecode-ssh-project-create").start();
+            });
             return;
         }
         try {
@@ -2250,10 +2164,10 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void runFileOperation(String expandedPath, FileOperation operation) {
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-file-operation", () -> {
             try {
                 operation.run();
-                mainHandler.post(() -> {
+                mainThread.post(() -> {
                     if (expandedPath != null && expandedPath.length() > 0) {
                         expandedFilePaths.add(expandedPath);
                     }
@@ -2263,9 +2177,9 @@ public final class MainPresenter implements MainContract.Presenter {
                     render();
                 });
             } catch (Exception e) {
-                mainHandler.post(() -> showNotice("文件操作失败: " + e.getMessage()));
+                mainThread.post(() -> showNotice("文件操作失败: " + e.getMessage()));
             }
-        }, "linecode-file-operation").start();
+        });
     }
 
     private void refreshSshDirectoryAfterFileOperation(String expandedPath) {
@@ -2321,10 +2235,10 @@ public final class MainPresenter implements MainContract.Presenter {
         renderDirectoryPicker();
         String root = directoryPickerRootPath;
         HashSet<String> expanded = new HashSet<>(directoryPickerExpandedPaths);
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-ssh-directory-picker", () -> {
             try {
                 FileTreeNode tree = sshFileTreeRepository.buildTree(root, expanded);
-                mainHandler.post(() -> {
+                mainThread.post(() -> {
                     directoryPickerTree = tree;
                     String previousRoot = directoryPickerRootPath;
                     String previousSelected = directoryPickerSelectedPath;
@@ -2344,13 +2258,13 @@ public final class MainPresenter implements MainContract.Presenter {
                     renderDirectoryPicker();
                 });
             } catch (Exception e) {
-                mainHandler.post(() -> {
+                mainThread.post(() -> {
                     directoryPickerLoading = false;
                     directoryPickerMessage = e.getMessage();
                     renderDirectoryPicker();
                 });
             }
-        }, "linecode-ssh-directory-picker").start();
+        });
     }
 
     private FileTreeNode rebuildDirectoryPickerTree(FileTreeNode node) {
@@ -2460,10 +2374,10 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void startSshDirectoryLoad(String path, boolean root, int generation) {
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-ssh-directory-index", () -> {
             try {
                 FileTreeNode listing = sshFileTreeRepository.listDirectory(path);
-                mainHandler.post(() -> {
+                mainThread.post(() -> {
                     if (generation != sshFileTreeLoadGeneration) {
                         return;
                     }
@@ -2485,7 +2399,7 @@ public final class MainPresenter implements MainContract.Presenter {
                     }
                 });
             } catch (Exception e) {
-                mainHandler.post(() -> {
+                mainThread.post(() -> {
                     if (generation != sshFileTreeLoadGeneration) {
                         return;
                     }
@@ -2496,7 +2410,7 @@ public final class MainPresenter implements MainContract.Presenter {
                     render();
                 });
             }
-        }, "linecode-ssh-directory-index").start();
+        });
     }
 
     private void startSshIndexPrefetch(List<FileTreeNode> rootChildren, int generation) {
@@ -2523,17 +2437,17 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         updateSshLoadingState();
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-ssh-index-prefetch", () -> {
             for (String path : paths) {
                 try {
                     FileTreeNode listing = sshFileTreeRepository.listDirectory(path);
-                    mainHandler.post(() -> applySshPrefetchListing(path, listing, generation, false, ""));
+                    mainThread.post(() -> applySshPrefetchListing(path, listing, generation, false, ""));
                 } catch (Exception e) {
                     String message = e.getMessage();
-                    mainHandler.post(() -> applySshPrefetchListing(path, null, generation, true, message));
+                    mainThread.post(() -> applySshPrefetchListing(path, null, generation, true, message));
                 }
             }
-        }, "linecode-ssh-index-prefetch").start();
+        });
     }
 
     private void applySshPrefetchListing(String path, FileTreeNode listing, int generation, boolean error, String message) {
@@ -2693,24 +2607,24 @@ public final class MainPresenter implements MainContract.Presenter {
         if (path.length() == 0) {
             return;
         }
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-project-startup-check", () -> {
             try {
                 boolean exists = sshFileTreeRepository.directoryExists(path);
                 if (!exists) {
-                    mainHandler.post(() -> switchToDefaultProjectWithDialog(
+                    mainThread.post(() -> switchToDefaultProjectWithDialog(
                             ToolSettingsRepository.EXECUTION_SSH,
                             "SSH 工作区不可访问",
                             "已保存的 SSH 工作区不存在：\n" + path + "\n\n已自动切换到 ~。"
                     ));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> switchToDefaultProjectWithDialog(
+                mainThread.post(() -> switchToDefaultProjectWithDialog(
                         ToolSettingsRepository.EXECUTION_SSH,
                         "SSH 工作区不可访问",
                         "无法访问已保存的 SSH 工作区：\n" + path + "\n\n" + e.getMessage() + "\n\n已自动切换到 ~。"
                 ));
             }
-        }, "linecode-project-startup-check").start();
+        });
     }
 
     private void switchToDefaultProjectWithDialog(String executionMode, String title, String message) {
@@ -2766,33 +2680,12 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         String activeChatMode = syncModePermission();
-        ModelConfig selectedModel = modelRepository.getSelectedModel();
-        boolean hasConfiguredModel = selectedModel != null;
-        ModelContextInfo contextInfo = selectedModel == null
-                ? ModelContextParser.parse("")
-                : ModelContextParser.parse(selectedModel.getModelId());
-        AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
-        OutputSettings outputSettings = outputSettingsRepository.get();
-        ContextSnapshot contextSnapshot = contextManager.snapshot(messages, contextInfo.getContextTokens(), aiSettings.isPreserveReasoningEnabled());
-        String modelLabel = selectedModel == null
-                ? "未选择模型"
-                : contextInfo.getApiModelId();
-        String uiProjectPath = WorkspacePaths.SOURCE_SSH.equals(projectSource) && projectPath.length() == 0
-                ? "SSH 登录目录"
-                : projectPath;
-        view.render(new ChatUiState(
+        view.render(chatUiStateAssembler.assemble(
                 projectLabel,
-                uiProjectPath,
-                modelLabel,
-                contextSnapshot.getPercent() + "% / " + contextInfo.getContextLabel(),
-                contextSnapshot.getPercent(),
-                streaming,
-                hasConfiguredModel,
-                aiSettings.isThinkingScrollEnabled(),
-                aiSettings.isThinkingAutoExpandEnabled(),
-                outputSettings.isCodeWrapEnabled(),
-                outputSettings.getBrowserMode(),
+                projectSource,
+                projectPath,
                 activeChatMode,
+                chatSessionStore.isStreaming(),
                 messages
         ));
     }
@@ -2806,7 +2699,7 @@ public final class MainPresenter implements MainContract.Presenter {
         String activeChatMode = syncModePermission();
         AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
         String learningContext = aiSettings.isLearningModeEnabled()
-                ? learningContextRepository.buildLearningContext(projectPath, userInput, currentConversationId)
+                ? learningContextRepository.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
                 : "";
         ModelConfig selectedModel = modelRepository.getSelectedModel();
         String promptHomePath = promptHomePath();
@@ -2896,8 +2789,8 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void appendAssistantDelta(int generationId, String assistantId, String textDelta, String reasoningDelta) {
-        mainHandler.post(() -> {
-            if (generationId != generationSequence - 1 || !streaming) {
+        mainThread.post(() -> {
+            if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
             if (pendingStreamGenerationId != generationId || !pendingStreamAssistantId.equals(assistantId)) {
@@ -2919,12 +2812,12 @@ public final class MainPresenter implements MainContract.Presenter {
         if (session == null || !session.shouldScheduleRender()) {
             return;
         }
-        mainHandler.postDelayed(() -> flushAgentProgress(session), session.renderDelayMs());
+        mainThread.postDelayed(() -> flushAgentProgress(session), session.renderDelayMs());
     }
 
     private void flushAgentProgress(AgentProgressSession session) {
-        if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(() -> flushAgentProgress(session));
+        if (!mainThread.isMainThread()) {
+            mainThread.post(() -> flushAgentProgress(session));
             return;
         }
         if (session == null || !session.canRender()) {
@@ -2933,7 +2826,7 @@ public final class MainPresenter implements MainContract.Presenter {
             }
             return;
         }
-        if (session.generationId != generationSequence - 1 || !streaming) {
+        if (!chatSessionStore.isActiveGeneration(session.generationId)) {
             return;
         }
         session.notifyMirror();
@@ -2980,9 +2873,9 @@ public final class MainPresenter implements MainContract.Presenter {
             ModelCompletionResponse response,
             int usedToolCallCount
     ) {
-        mainHandler.post(() -> {
+        mainThread.post(() -> {
             flushPendingAssistantDelta();
-            if (generationId != generationSequence - 1 || !streaming) {
+            if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
             int index = findMessageIndex(assistantId);
@@ -3012,7 +2905,7 @@ public final class MainPresenter implements MainContract.Presenter {
                 if (!canExecuteToolCalls(selectedModel, usedToolCallCount, toolCalls.size())) {
                     messages.add(new ChatMessage(nextId(), ChatMessage.Role.ASSISTANT,
                             toolLimitMessage(selectedModel, usedToolCallCount, toolCalls.size()), false));
-                    streaming = false;
+                    chatSessionStore.setStreaming(false);
                     currentCancellationToken = null;
                     persistCurrentConversation();
                     render();
@@ -3023,7 +2916,7 @@ public final class MainPresenter implements MainContract.Presenter {
                 executeToolsAndContinue(generationId, selectedModel, toolCalls, usedToolCallCount + toolCalls.size());
                 return;
             }
-            streaming = false;
+            chatSessionStore.setStreaming(false);
             currentCancellationToken = null;
             persistCurrentConversation();
             scheduleMemoryExtractionIfNeeded(selectedModel);
@@ -3065,12 +2958,12 @@ public final class MainPresenter implements MainContract.Presenter {
             return;
         }
         String capturedProjectPath = projectPath;
-        new Thread(() -> memoryExtractionService.extractAndStore(
+        backgroundTasks.execute("linecode-memory-extract", () -> memoryExtractionService.extractAndStore(
                 selectedModel,
                 capturedProjectPath,
                 userInput,
                 transcript
-        ), "linecode-memory-extract").start();
+        ));
     }
 
     private String recentUserInput() {
@@ -3151,18 +3044,18 @@ public final class MainPresenter implements MainContract.Presenter {
             String homePath,
             ModelCancellationToken cancellationToken
     ) {
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-tool-execute", () -> {
             ToolExecutionBatch batch = executeToolCallsUntilPending(toolCalls, homePath, selectedModel, cancellationToken, generationId);
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 return;
             }
-            mainHandler.post(() -> {
-                if (generationId != generationSequence - 1 || !streaming) {
+            mainThread.post(() -> {
+                if (!chatSessionStore.isActiveGeneration(generationId)) {
                     return;
                 }
                 handleToolExecutionBatch(generationId, selectedModel, usedToolCallCount, homePath, cancellationToken, batch);
             });
-        }, "linecode-tool-execute").start();
+        });
     }
 
     private void handleToolExecutionBatch(
@@ -3213,7 +3106,7 @@ public final class MainPresenter implements MainContract.Presenter {
         streamingRawTextByMessageId.put(nextAssistantId, new StringBuilder());
         messages.add(new ChatMessage(nextAssistantId, ChatMessage.Role.ASSISTANT, "", true));
         render();
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-tool-continuation", () -> {
             try {
                 AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
                 ModelRequestOptions nextRequestOptions = requestOptions(aiSettings, selectedModel, usedToolCallCount);
@@ -3232,34 +3125,19 @@ public final class MainPresenter implements MainContract.Presenter {
             } catch (ModelCompletionException e) {
                 failGeneration(generationId, nextAssistantId, "模型通信失败：\n" + e.getMessage());
             }
-        }, "linecode-tool-continuation").start();
+        });
     }
 
     private boolean canExecuteToolCalls(ModelConfig selectedModel, int usedToolCallCount, int requestedCount) {
-        int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
-        if (limit == ModelConfig.UNLIMITED_TOOL_CALLS) {
-            return true;
-        }
-        if (requestedCount <= 0) {
-            return true;
-        }
-        return usedToolCallCount >= 0 && usedToolCallCount + requestedCount <= limit;
+        return generationController.canExecuteToolCalls(selectedModel, usedToolCallCount, requestedCount);
     }
 
     private boolean hasRemainingToolCalls(ModelConfig selectedModel, int usedToolCallCount) {
-        int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
-        return limit == ModelConfig.UNLIMITED_TOOL_CALLS || Math.max(0, usedToolCallCount) < limit;
+        return generationController.hasRemainingToolCalls(selectedModel, usedToolCallCount);
     }
 
     private String toolLimitMessage(ModelConfig selectedModel, int usedToolCallCount, int requestedCount) {
-        int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
-        if (limit == 0) {
-            return "当前模型已禁止工具调用，已停止继续执行。";
-        }
-        return "工具调用次数已达到上限，已停止继续执行。\n"
-                + "已使用 " + Math.max(0, usedToolCallCount)
-                + " 次，本次请求 " + Math.max(0, requestedCount)
-                + " 次，限制为 " + limit + " 次。";
+        return generationController.toolLimitMessage(selectedModel, usedToolCallCount, requestedCount);
     }
 
     private ToolExecutionBatch executeToolCallsUntilPending(
@@ -3271,7 +3149,7 @@ public final class MainPresenter implements MainContract.Presenter {
     ) {
         syncModePermission();
         toolRegistry.reloadExtensions();
-        ToolExecutionCoordinator.ToolExecutionPlan plan = toolExecutionCoordinator.createPlan(toolCalls);
+        ToolExecutionCoordinator.ToolExecutionPlan plan = toolRunController.createPlan(toolCalls);
         HashMap<String, ToolResult> resultById = new HashMap<>();
         ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId);
 
@@ -3345,8 +3223,8 @@ public final class MainPresenter implements MainContract.Presenter {
             String content,
             boolean error
     ) {
-        mainHandler.post(() -> {
-            if (generationId != generationSequence - 1 || !streaming) {
+        mainThread.post(() -> {
+            if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
             if (cancellationToken != null && cancellationToken.isCancelled()) {
@@ -3920,47 +3798,16 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private ArrayList<ToolResult> orderedResults(List<ToolCall> toolCalls, HashMap<String, ToolResult> resultById) {
-        ArrayList<ToolResult> ordered = new ArrayList<>();
-        if (toolCalls == null) {
-            return ordered;
-        }
-        for (ToolCall call : toolCalls) {
-            ToolResult result = resultById.get(call.getId());
-            if (result != null) {
-                ordered.add(result);
-            }
-        }
-        return ordered;
+        return toolRunController.orderedResults(toolCalls, resultById);
     }
 
     private ArrayList<ToolCall> remainingCalls(List<ToolCall> calls, int startIndex) {
-        ArrayList<ToolCall> remaining = new ArrayList<>();
-        if (calls == null) {
-            return remaining;
-        }
-        for (int i = Math.max(0, startIndex); i < calls.size(); i++) {
-            ToolCall call = calls.get(i);
-            if (call != null) {
-                remaining.add(call);
-            }
-        }
-        return remaining;
+        return toolRunController.remainingCalls(calls, startIndex);
     }
 
     private boolean shouldPauseForConfirmation(ToolCall call) {
         syncModePermission();
-        if (call == null) {
-            return false;
-        }
-        BaseTool tool = toolRegistry.get(call.getName());
-        if (tool == null || !tool.requiresConfirmation()) {
-            return false;
-        }
-        PermissionResult permission = toolSettingsRepository.canExecuteTool(tool.getName(), tool.getCategory());
-        if (!permission.isAllowed()) {
-            return false;
-        }
-        return "file_delete".equals(tool.getName()) || toolSettingsRepository.needsConfirmation(tool.getName());
+        return toolRunController.shouldPauseForConfirmation(call);
     }
 
     private void handlePendingToolReview(String state) {
@@ -3968,7 +3815,7 @@ public final class MainPresenter implements MainContract.Presenter {
         if (pending == null || pending.toolCall == null) {
             return;
         }
-        if (pending.generationId != generationSequence - 1 || !streaming) {
+        if (!chatSessionStore.isActiveGeneration(pending.generationId)) {
             pendingToolExecution = null;
             return;
         }
@@ -4014,7 +3861,7 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void executeAcceptedPendingTool(PendingToolExecution pending) {
-        new Thread(() -> {
+        backgroundTasks.execute("linecode-tool-confirmed", () -> {
             ToolResult result;
             try {
                 syncModePermission();
@@ -4042,8 +3889,8 @@ public final class MainPresenter implements MainContract.Presenter {
             if (pending.cancellationToken != null && pending.cancellationToken.isCancelled()) {
                 return;
             }
-            mainHandler.post(() -> {
-                if (pending.generationId != generationSequence - 1 || !streaming) {
+            mainThread.post(() -> {
+                if (!chatSessionStore.isActiveGeneration(pending.generationId)) {
                     return;
                 }
                 addOrReplaceToolResult(finalResult);
@@ -4058,7 +3905,7 @@ public final class MainPresenter implements MainContract.Presenter {
                         pending.cancellationToken
                 );
             });
-        }, "linecode-tool-confirmed").start();
+        });
     }
 
     private void addOrReplaceToolResults(List<ToolResult> results) {
@@ -4123,9 +3970,9 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void failGeneration(int generationId, String assistantId, String text) {
-        mainHandler.post(() -> {
+        mainThread.post(() -> {
             flushPendingAssistantDelta();
-            if (generationId != generationSequence - 1 || !streaming) {
+            if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
             int index = findMessageIndex(assistantId);
@@ -4136,7 +3983,7 @@ public final class MainPresenter implements MainContract.Presenter {
                 messages.add(new ChatMessage(nextId(), ChatMessage.Role.ASSISTANT, text, false));
             }
             streamingRawTextByMessageId.remove(assistantId);
-            streaming = false;
+            chatSessionStore.setStreaming(false);
             currentCancellationToken = null;
             persistCurrentConversation();
             render();
@@ -4158,7 +4005,7 @@ public final class MainPresenter implements MainContract.Presenter {
         long now = SystemClock.uptimeMillis();
         long delay = Math.max(0L, STREAM_RENDER_INTERVAL_MS - (now - lastStreamRenderAt));
         streamRenderScheduled = true;
-        mainHandler.postDelayed(this::flushPendingAssistantDelta, delay);
+        mainThread.postDelayed(this::flushPendingAssistantDelta, delay);
     }
 
     private void flushPendingAssistantDelta() {
@@ -4174,7 +4021,7 @@ public final class MainPresenter implements MainContract.Presenter {
         pendingStreamReasoningDelta.setLength(0);
         pendingStreamGenerationId = -1;
         pendingStreamAssistantId = "";
-        if (generationId != generationSequence - 1 || !streaming) {
+        if (!chatSessionStore.isActiveGeneration(generationId)) {
             return;
         }
         int index = findMessageIndex(assistantId);
@@ -4328,24 +4175,15 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     private void applyConversation(ConversationRecord conversation) {
-        messages.clear();
-        for (MessageRecord record : conversation.getMessages()) {
-            messages.add(record.toChatMessage());
-        }
-        currentConversationId = conversation.getId();
-        currentConversationCreatedAt = conversation.getCreatedAt();
-        resetMessageSequence();
+        chatSessionStore.applyConversation(conversation);
     }
 
     private void ensureCurrentConversation() {
-        if (currentConversationId.length() > 0) {
-            return;
-        }
-        currentConversationId = String.valueOf(System.currentTimeMillis());
-        currentConversationCreatedAt = System.currentTimeMillis();
+        chatSessionStore.ensureCurrentConversation(System.currentTimeMillis());
     }
 
     private void persistCurrentConversation() {
+        String currentConversationId = chatSessionStore.getCurrentConversationId();
         if (currentConversationId.length() == 0) {
             return;
         }
@@ -4371,7 +4209,7 @@ public final class MainPresenter implements MainContract.Presenter {
                 currentConversationId,
                 deriveTitle(),
                 projectPath,
-                currentConversationCreatedAt > 0 ? currentConversationCreatedAt : now,
+                chatSessionStore.getCurrentConversationCreatedAt() > 0 ? chatSessionStore.getCurrentConversationCreatedAt() : now,
                 now,
                 true,
                 "",
@@ -4393,22 +4231,8 @@ public final class MainPresenter implements MainContract.Presenter {
         return "新对话";
     }
 
-    private void resetMessageSequence() {
-        int max = 0;
-        for (ChatMessage message : messages) {
-            String id = message.getId();
-            if (id != null && id.startsWith("m")) {
-                try {
-                    max = Math.max(max, Integer.parseInt(id.substring(1)));
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-        messageSequence = Math.max(max + 1, messages.size() + 1);
-    }
-
     private String nextId() {
-        return "m" + messageSequence++;
+        return chatSessionStore.nextMessageId();
     }
 
     private String messageRawJson(ChatMessage message) {

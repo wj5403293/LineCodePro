@@ -676,14 +676,15 @@ public final class LearningContextRepository {
         if (safe(projectId).length() > 0) {
             builder.append('\n').append("- project: ").append(new File(projectId, ".linecode/skills").getAbsolutePath());
         }
-        builder.append('\n').append("需要完整 Skill 指南时，使用只读文件工具读取对应 SKILL.md。");
+        builder.append('\n').append("- ssh: ~/.linecode/skills");
+        builder.append('\n').append("需要完整 Skill 指南时，可使用文件读取/搜索/列目录工具访问对应 SKILL.md；Skills 的创建和安装由扩展系统处理，文件工具只维护已授权目录里的 SKILL.md。");
         return builder.toString();
     }
 
     private String privateBoundarySection() {
         String skillsRoot = workspacePaths.getSkillsRoot().getAbsolutePath();
         return "### 私有目录边界\n"
-                + "只读工具仅可使用系统明确注入的 .linecode 路径（例如 " + skillsRoot + " 和当前项目 .linecode/skills）；不要猜测或访问其他应用私有目录。";
+                + "文件工具可使用系统明确注入的 Skills 路径（例如 " + skillsRoot + " 和当前项目 .linecode/skills）；不要猜测或访问其他应用私有目录。";
     }
 
     private String titleLabel(String title, String fallbackId) {

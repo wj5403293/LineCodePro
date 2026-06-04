@@ -81,9 +81,9 @@ public final class ToolCallGenericView extends LinearLayout {
 
     private int iconFor(String name) {
         if (ToolCallUtils.isShellTool(name)) return IconButtonView.TERMINAL;
-        if (ToolCallUtils.isHttpTool(name)) return IconButtonView.SERVER;
+        if (ToolCallUtils.isHttpTool(name) || ToolCallUtils.isCustomMcpTool(name)) return IconButtonView.MCP;
         if (ToolCallUtils.isDeleteTool(name)) return IconButtonView.TRASH_2;
-        return IconButtonView.CPU;
+        return IconButtonView.MCP;
     }
 
     private void addSection(String title, String content, int color, int maxHeightRows) {

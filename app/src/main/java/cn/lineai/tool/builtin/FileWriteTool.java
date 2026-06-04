@@ -42,7 +42,7 @@ public final class FileWriteTool extends BaseTool {
             if (path.trim().length() == 0) {
                 return error("file_path 不能为空");
             }
-            File file = FileToolPathPolicy.resolve(context.getHomePath(), path);
+            File file = FileToolPathPolicy.resolve(context, path);
             if (file.exists() && file.isDirectory()) {
                 return error("路径是一个目录，无法写入文件: " + path + "\n如需创建文件，请指定完整文件路径。");
             }

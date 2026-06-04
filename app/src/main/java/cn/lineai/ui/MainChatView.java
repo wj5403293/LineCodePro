@@ -61,6 +61,14 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         void requestLegacyStoragePermissions();
 
         void recreateMainView(String screenId);
+
+        void openDocumentPicker(String mimeType, String[] extensions, DocumentPickCallback callback);
+    }
+
+    public interface DocumentPickCallback {
+        void onDocumentPicked(String uri, String displayName);
+
+        void onDocumentPickCancelled();
     }
 
     private final MainContract.Presenter presenter;
@@ -602,15 +610,55 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         if ("browser".equals(screenId)) {
             return new InAppBrowserScreenView(context, "about:blank", this::handleScreenBack);
         }
-        if ("agentEdit".equals(screenId)) {
-            return new AgentExtensionEditScreenView(context, this::handleScreenBack);
+        if ("agentEdit".equals(screenId) || (screenId != null && screenId.startsWith("agentEdit:"))) {
+            cn.lineai.model.ExtensionOverviewState overview = presenter.getExtensionOverview();
+            cn.lineai.model.ExtensionAgentConfig editingAgent = findAgent(overview, screenId == null ? "" : screenId.substring("agentEdit".length()).replaceFirst("^:", ""));
+            return new AgentExtensionEditScreenView(
+                    context,
+                    editingAgent,
+                    presenter.getExtensionAvailableTools(),
+                    presenter.getMcpSettingsState().getConfigs(),
+                    overview.getMcps(),
+                    new AgentExtensionEditScreenView.Listener() {
+                @Override
+                public void onBack() {
+                    handleScreenBack();
+                }
+
+                @Override
+                public cn.lineai.model.ExtensionAgentConfig onGenerateDraft(String description) throws Exception {
+                    return presenter.onAgentDraftGenerated(description);
+                }
+
+                @Override
+                public void onSave(cn.lineai.model.ExtensionAgentConfig config) {
+                    presenter.onAgentExtensionSaved(config);
+                }
+            });
         }
-        if ("mcpEdit".equals(screenId)) {
-            return new McpExtensionEditScreenView(context, this::handleScreenBack);
+        if ("mcpEdit".equals(screenId) || (screenId != null && screenId.startsWith("mcpEdit:"))) {
+            cn.lineai.model.ExtensionOverviewState overview = presenter.getExtensionOverview();
+            cn.lineai.model.ExtensionMcpConfig editingMcp = findMcp(overview, screenId == null ? "" : screenId.substring("mcpEdit".length()).replaceFirst("^:", ""));
+            return new McpExtensionEditScreenView(context, editingMcp, new McpExtensionEditScreenView.Listener() {
+                @Override
+                public void onBack() {
+                    handleScreenBack();
+                }
+
+                @Override
+                public java.util.List<cn.lineai.model.McpToolSummary> onQueryTools(String url, java.util.List<cn.lineai.model.McpRequestHeader> headers) throws Exception {
+                    return presenter.onMcpToolsQuery(url, headers);
+                }
+
+                @Override
+                public void onSave(cn.lineai.model.ExtensionMcpConfig config) {
+                    presenter.onMcpExtensionSaved(config);
+                }
+            });
         }
         if (screenId != null && screenId.startsWith("extension:")) {
             String kind = screenId.substring("extension:".length());
-            return new ExtensionDetailScreenView(context, kind, new ExtensionDetailScreenView.Listener() {
+            return new ExtensionDetailScreenView(context, kind, presenter.getExtensionOverview(), new ExtensionDetailScreenView.Listener() {
                 @Override
                 public void onBack() {
                     handleScreenBack();
@@ -622,8 +670,51 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                 }
 
                 @Override
+                public void onEditAgent(String id) {
+                    presenter.onSettingsItemSelected("agentEdit:" + id);
+                }
+
+                @Override
                 public void onAddMcp() {
                     presenter.onSettingsItemSelected("mcpEdit");
+                }
+
+                @Override
+                public void onEditMcp(String id) {
+                    presenter.onSettingsItemSelected("mcpEdit:" + id);
+                }
+
+                @Override
+                public void onCreateSkill(String location, String name, String description, String content) {
+                    presenter.onSkillCreated(location, name, description, content);
+                }
+
+                @Override
+                public void onInstallSkill(String location, String sourcePath, String name) {
+                    try {
+                        presenter.onSkillInstalled(location, sourcePath, name);
+                    } catch (Exception e) {
+                        android.widget.Toast.makeText(getContext(), e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                    }
+                }
+
+                @Override
+                public void onInstallSkillFromUri(String location, String uri, String displayName) {
+                    try {
+                        presenter.onSkillInstalledFromUri(location, uri, displayName);
+                    } catch (Exception e) {
+                        android.widget.Toast.makeText(getContext(), e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                    }
+                }
+
+                @Override
+                public void onEnabledChanged(String kind, String id, boolean enabled) {
+                    presenter.onExtensionEnabledChanged(kind, id, enabled);
+                }
+
+                @Override
+                public void onDelete(String kind, String id) {
+                    presenter.onExtensionDeleted(kind, id);
                 }
             });
         }
@@ -670,6 +761,30 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             return modelAddScreen(context, null, false);
         }
         return simpleScreen(screenId);
+    }
+
+    private cn.lineai.model.ExtensionAgentConfig findAgent(cn.lineai.model.ExtensionOverviewState state, String id) {
+        if (state == null || id == null || id.length() == 0) {
+            return null;
+        }
+        for (cn.lineai.model.ExtensionAgentConfig agent : state.getAgents()) {
+            if (id.equals(agent.getId())) {
+                return agent;
+            }
+        }
+        return null;
+    }
+
+    private cn.lineai.model.ExtensionMcpConfig findMcp(cn.lineai.model.ExtensionOverviewState state, String id) {
+        if (state == null || id == null || id.length() == 0) {
+            return null;
+        }
+        for (cn.lineai.model.ExtensionMcpConfig mcp : state.getMcps()) {
+            if (id.equals(mcp.getId())) {
+                return mcp;
+            }
+        }
+        return null;
     }
 
     private View modelAddScreen(Context context, ModelProviderPreset preset, boolean local) {
@@ -745,7 +860,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private String subtitleFor(String screenId) {
         if ("about".equals(screenId)) return "LineCode Java 原生 View 版本。当前页面用于对齐 LineAI 的 Android UI 结构。";
         if ("modelAddOptions".equals(screenId)) return "选择添加模型的方式，后续会接入真实表单和本地模型选择。";
-        if (screenId != null && screenId.startsWith("extension:")) return "扩展详情页骨架，后续会接入 Agent、MCP、Skills 和 .lip 包编辑。";
+        if (screenId != null && screenId.startsWith("extension:")) return "管理 Agent、MCP、Skills 扩展的安装、启用状态和删除操作。";
         return "该页面已经接入原生导航与统一样式，后续继续补真实设置项和业务逻辑。";
     }
 
@@ -764,7 +879,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         if ("about".equals(screenId)) return new String[] {"版本 1.0", "开源许可"};
         if ("modelAddOptions".equals(screenId)) return new String[] {"自定义 API 模型", "本地 GGUF 模型", "OpenAI 兼容供应商", "Codex 预设"};
         if ("tutorial".equals(screenId)) return new String[] {"初学者教程", "专业模式教程", "工具调用说明"};
-        if (screenId != null && screenId.startsWith("extension:")) return new String[] {"启用状态", "权限范围", "配置项", "删除扩展"};
+        if (screenId != null && screenId.startsWith("extension:")) return new String[] {"添加扩展", "已安装列表", "启用状态", "长按管理"};
         return new String[] {"界面骨架", "业务逻辑待接入"};
     }
 

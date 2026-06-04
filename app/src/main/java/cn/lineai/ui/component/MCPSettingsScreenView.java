@@ -264,11 +264,11 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
     }
 
     private int iconFor(String id) {
-        if ("http_server".equals(id)) return IconButtonView.SERVER;
+        if ("file_ops".equals(id) || "http_server".equals(id)) return IconButtonView.MCP;
         if ("shell".equals(id)) return IconButtonView.TERMINAL;
         if ("web_search".equals(id)) return IconButtonView.SEARCH;
         if ("agent".equals(id)) return IconButtonView.BRAIN;
-        return IconButtonView.FILE_CODE;
+        return IconButtonView.MCP;
     }
 
     private void addToolCard(LinearLayout content, int iconType, McpToolConfig config) {

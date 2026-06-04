@@ -3,14 +3,21 @@ package cn.lineai.mvp;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.data.repository.ConversationRecord;
 import cn.lineai.model.AiBehaviorSettings;
+import cn.lineai.model.ExtensionAgentConfig;
+import cn.lineai.model.ExtensionMcpConfig;
+import cn.lineai.model.ExtensionOverviewState;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.McpSettingsState;
+import cn.lineai.model.McpRequestHeader;
+import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.model.SheetOption;
+import cn.lineai.model.SkillRecord;
 import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
+import cn.lineai.tool.BaseTool;
 import java.util.Map;
 import java.util.List;
 
@@ -119,6 +126,28 @@ public interface MainContract {
         void onMcpToolGroupChanged(String id, boolean enabled);
 
         void onMcpWebSearchConfigChanged(WebSearchConfig config);
+
+        ExtensionOverviewState getExtensionOverview();
+
+        void onAgentExtensionSaved(ExtensionAgentConfig config);
+
+        ExtensionAgentConfig onAgentDraftGenerated(String description) throws Exception;
+
+        List<BaseTool> getExtensionAvailableTools();
+
+        void onMcpExtensionSaved(ExtensionMcpConfig config);
+
+        List<McpToolSummary> onMcpToolsQuery(String url, List<McpRequestHeader> headers) throws Exception;
+
+        SkillRecord onSkillCreated(String location, String name, String description, String content);
+
+        SkillRecord onSkillInstalled(String location, String sourcePath, String name) throws Exception;
+
+        SkillRecord onSkillInstalledFromUri(String location, String uri, String displayName) throws Exception;
+
+        void onExtensionEnabledChanged(String kind, String id, boolean enabled);
+
+        void onExtensionDeleted(String kind, String id);
 
         List<ModelConfig> getModels();
 

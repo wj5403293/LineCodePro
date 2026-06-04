@@ -35,7 +35,7 @@ public final class ExtensionsScreenView extends LinearLayout {
         addView(scrollView, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
         addCard(content, "agent", "Agent 扩展", "添加带触发条件和工具权限的自定义 Agent，可单独启停。", "可添加", IconButtonView.BRAIN);
-        addCard(content, "mcp", "MCP 扩展", "添加 HTTP/S MCP 服务，查询 tools 列表，可单独启停。", "HTTP/S", IconButtonView.CPU);
+        addCard(content, "mcp", "MCP 扩展", "添加 HTTP/S MCP 服务，查询 tools 列表，可单独启停。", "HTTP/S", IconButtonView.MCP);
         addCard(content, "skills", "Skills 扩展", "选择 ZIP 安装技能包；SSH 模式会推送到远端 ~/.linecode。", "ZIP", IconButtonView.ARCHIVE);
         addCard(content, "linecode", "LineCode 扩展", "导入 .lip 原生扩展包，可注册页面、菜单和 Hook。", "LIP", IconButtonView.PACKAGE);
     }

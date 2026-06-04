@@ -25,6 +25,7 @@ import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ConversationRecord;
 import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.DiffRepository;
+import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.FileTreeRepository;
 import cn.lineai.data.repository.LearningContextRepository;
 import cn.lineai.data.repository.MemoryExtractionService;
@@ -37,9 +38,15 @@ import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.ChatUiState;
+import cn.lineai.model.ExtensionAgentConfig;
+import cn.lineai.model.ExtensionMcpConfig;
+import cn.lineai.model.ExtensionOverviewState;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.MemoryOverviewState;
+import cn.lineai.model.McpRequestHeader;
 import cn.lineai.model.McpSettingsState;
+import cn.lineai.model.McpToolConfig;
+import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextInfo;
 import cn.lineai.model.ModelContextParser;
@@ -47,6 +54,7 @@ import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelRepository;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.model.SheetOption;
+import cn.lineai.model.SkillRecord;
 import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.BaseTool;
@@ -64,10 +72,12 @@ import cn.lineai.workspace.StoragePermissionManager;
 import cn.lineai.workspace.WorkspacePaths;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -95,6 +105,7 @@ public final class MainPresenter implements MainContract.Presenter {
     private final LearningContextRepository learningContextRepository;
     private final MemoryExtractionService memoryExtractionService;
     private final ToolSettingsRepository toolSettingsRepository;
+    private final ExtensionRepository extensionRepository;
     private final DiffRepository diffRepository;
     private final FileTreeRepository fileTreeRepository = new FileTreeRepository();
     private final ContextManager contextManager = new ContextManager();
@@ -359,6 +370,7 @@ public final class MainPresenter implements MainContract.Presenter {
         learningContextRepository = new LearningContextRepository(context);
         memoryExtractionService = new MemoryExtractionService(context, learningContextRepository);
         toolSettingsRepository = new ToolSettingsRepository(context);
+        extensionRepository = new ExtensionRepository(context);
         diffRepository = new DiffRepository(context);
         contextCompactionService = new ContextCompactionService(context);
         toolRegistry = new ToolRegistry(context);
@@ -1140,6 +1152,274 @@ public final class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    public ExtensionOverviewState getExtensionOverview() {
+        return extensionRepository.getOverview(projectPath);
+    }
+
+    @Override
+    public void onAgentExtensionSaved(ExtensionAgentConfig config) {
+        extensionRepository.saveAgentExtension(config);
+        toolRegistry.reloadExtensions();
+        returnToScreen("extension:agent");
+        render();
+    }
+
+    @Override
+    public ExtensionAgentConfig onAgentDraftGenerated(String description) throws Exception {
+        ModelConfig selectedModel = modelRepository.getSelectedModel();
+        if (selectedModel == null) {
+            throw new IllegalStateException("缺少模型，请先在设置中添加并选择一个模型。");
+        }
+        String request = safe(description).trim();
+        if (request.length() == 0) {
+            throw new IllegalArgumentException("请先描述你想创建的 Agent。");
+        }
+        ArrayList<BaseTool> tools = getExtensionAvailableTools();
+        JSONArray toolList = new JSONArray();
+        HashSet<String> allowedTools = new HashSet<>();
+        for (BaseTool tool : tools) {
+            allowedTools.add(tool.getName());
+            toolList.put(new JSONObject()
+                    .put("name", tool.getName())
+                    .put("category", tool.getCategory().name().toLowerCase(Locale.ROOT))
+                    .put("description", tool.getDescription()));
+        }
+        JSONArray mcpList = agentMcpOptionsJson();
+        HashSet<String> allowedMcps = agentMcpOptionIds();
+        ArrayList<ModelMessage> messages = new ArrayList<>();
+        messages.add(new SystemModelMessage("你是 LineCode 的自定义 Agent 配置生成器。\n"
+                + "根据用户描述生成一个 Agent 配置草稿，只输出 JSON 对象，不要 Markdown，不要解释。\n"
+                + "JSON 字段必须是：name, slug, prompt, trigger, toolNames, mcpIds。\n"
+                + "name 使用简短中文名；slug 使用小写英文、数字、- 或 _，必须以小写字母开头。\n"
+                + "prompt 要写成可直接作为 Agent 系统提示词使用的中文说明，包含角色、任务边界、工作流程、输出要求和安全约束。\n"
+                + "trigger 用中文描述何时适合触发这个 Agent。\n"
+                + "toolNames 只能从可用工具 name 中选择；mcpIds 只能从可用 MCP id 中选择；不确定时优先选择 file_read 和 glob。"));
+        messages.add(new UserModelMessage(new JSONObject()
+                .put("userNeed", request)
+                .put("availableTools", toolList)
+                .put("availableMcp", mcpList)
+                .toString(2)));
+        ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
+        JSONObject draft = extractJsonObject(response.getText());
+        String name = draft.optString("name").trim();
+        String slug = normalizeAgentSlug(draft.optString("slug", name));
+        String prompt = draft.optString("prompt").trim();
+        String trigger = draft.optString("trigger").trim();
+        if (name.length() == 0 || slug.length() == 0 || prompt.length() == 0) {
+            throw new IllegalStateException("AI 返回的配置缺少 name、slug 或 prompt。");
+        }
+        List<String> selectedTools = filteredStringArray(draft.optJSONArray("toolNames"), allowedTools);
+        if (selectedTools.isEmpty()) {
+            selectedTools = defaultAgentTools(allowedTools);
+        }
+        List<String> selectedMcps = filteredStringArray(draft.optJSONArray("mcpIds"), allowedMcps);
+        return new ExtensionAgentConfig("", true, name, slug, prompt, trigger, selectedTools, selectedMcps, 0, 0);
+    }
+
+    @Override
+    public ArrayList<BaseTool> getExtensionAvailableTools() {
+        toolRegistry.reloadExtensions();
+        ArrayList<BaseTool> tools = new ArrayList<>();
+        for (BaseTool tool : toolRegistry.getAll()) {
+            if (tool != null && !ToolRegistry.isExtensionToolName(tool.getName())) {
+                tools.add(tool);
+            }
+        }
+        return tools;
+    }
+
+    @Override
+    public void onMcpExtensionSaved(ExtensionMcpConfig config) {
+        extensionRepository.saveMcpExtension(config);
+        toolRegistry.reloadExtensions();
+        returnToScreen("extension:mcp");
+        render();
+    }
+
+    @Override
+    public List<McpToolSummary> onMcpToolsQuery(String url, List<McpRequestHeader> headers) throws Exception {
+        return extensionRepository.queryMcpTools(url, headers);
+    }
+
+    @Override
+    public SkillRecord onSkillCreated(String location, String name, String description, String content) {
+        SkillRecord skill = extensionRepository.createSkill(projectPath, location, name, description, content);
+        returnToScreen("extension:skills");
+        render();
+        return skill;
+    }
+
+    @Override
+    public SkillRecord onSkillInstalled(String location, String sourcePath, String name) throws Exception {
+        SkillRecord skill = extensionRepository.installSkill(projectPath, location, sourcePath, name);
+        returnToScreen("extension:skills");
+        render();
+        return skill;
+    }
+
+    @Override
+    public SkillRecord onSkillInstalledFromUri(String location, String uri, String displayName) throws Exception {
+        SkillRecord skill = extensionRepository.installSkillFromUri(projectPath, location, uri, displayName);
+        returnToScreen("extension:skills");
+        render();
+        return skill;
+    }
+
+    @Override
+    public void onExtensionEnabledChanged(String kind, String id, boolean enabled) {
+        if ("agent".equals(kind)) {
+            extensionRepository.setAgentEnabled(id, enabled);
+        } else if ("mcp".equals(kind)) {
+            extensionRepository.setMcpEnabled(id, enabled);
+        } else if ("skills".equals(kind)) {
+            extensionRepository.setSkillEnabled(id, enabled);
+        }
+        toolRegistry.reloadExtensions();
+        refreshVisibleScreen("extension:" + kind);
+        render();
+    }
+
+    @Override
+    public void onExtensionDeleted(String kind, String id) {
+        if ("agent".equals(kind)) {
+            extensionRepository.deleteAgent(id);
+        } else if ("mcp".equals(kind)) {
+            extensionRepository.deleteMcp(id);
+        } else if ("skills".equals(kind)) {
+            extensionRepository.deleteSkill(id);
+        }
+        toolRegistry.reloadExtensions();
+        refreshVisibleScreen("extension:" + kind);
+        render();
+    }
+
+    private JSONArray agentMcpOptionsJson() throws Exception {
+        JSONArray array = new JSONArray();
+        for (McpToolConfig config : toolSettingsRepository.getConfigs()) {
+            JSONArray tools = new JSONArray();
+            for (String tool : config.getTools()) {
+                tools.put(tool);
+            }
+            array.put(new JSONObject()
+                    .put("id", "builtin:" + config.getId())
+                    .put("name", config.getName())
+                    .put("description", tools.toString()));
+        }
+        for (ExtensionMcpConfig mcp : extensionRepository.getMcpExtensions()) {
+            if (!mcp.isEnabled()) {
+                continue;
+            }
+            JSONArray tools = new JSONArray();
+            for (McpToolSummary tool : mcp.getTools()) {
+                if (tool.isEnabled()) {
+                    tools.put(tool.getName());
+                }
+            }
+            array.put(new JSONObject()
+                    .put("id", "custom:" + mcp.getId())
+                    .put("name", mcp.getName())
+                    .put("description", tools.toString()));
+        }
+        return array;
+    }
+
+    private HashSet<String> agentMcpOptionIds() {
+        HashSet<String> ids = new HashSet<>();
+        for (McpToolConfig config : toolSettingsRepository.getConfigs()) {
+            ids.add("builtin:" + config.getId());
+        }
+        for (ExtensionMcpConfig mcp : extensionRepository.getMcpExtensions()) {
+            if (mcp.isEnabled()) {
+                ids.add("custom:" + mcp.getId());
+            }
+        }
+        return ids;
+    }
+
+    private JSONObject extractJsonObject(String text) throws Exception {
+        String source = safe(text);
+        int fenceStart = source.indexOf("```");
+        if (fenceStart >= 0) {
+            int contentStart = source.indexOf('\n', fenceStart);
+            int fenceEnd = contentStart < 0 ? -1 : source.indexOf("```", contentStart + 1);
+            if (contentStart >= 0 && fenceEnd > contentStart) {
+                source = source.substring(contentStart + 1, fenceEnd);
+            }
+        }
+        int start = source.indexOf('{');
+        int end = source.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            throw new IllegalStateException("AI 没有返回有效 JSON。");
+        }
+        return new JSONObject(source.substring(start, end + 1));
+    }
+
+    private List<String> filteredStringArray(JSONArray array, Set<String> allowed) {
+        if (array == null || allowed == null || allowed.isEmpty()) {
+            return Collections.emptyList();
+        }
+        ArrayList<String> values = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            String value = array.optString(i).trim();
+            if (allowed.contains(value) && !values.contains(value)) {
+                values.add(value);
+            }
+        }
+        return values;
+    }
+
+    private List<String> defaultAgentTools(Set<String> allowed) {
+        ArrayList<String> values = new ArrayList<>();
+        if (allowed.contains("file_read")) {
+            values.add("file_read");
+        }
+        if (allowed.contains("glob")) {
+            values.add("glob");
+        }
+        if (values.isEmpty() && !allowed.isEmpty()) {
+            values.add(allowed.iterator().next());
+        }
+        return values;
+    }
+
+    private String normalizeAgentSlug(String value) {
+        String raw = safe(value).trim().toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        boolean lastDash = false;
+        for (int i = 0; i < raw.length() && builder.length() < 48; i++) {
+            char ch = raw.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_') {
+                builder.append(ch);
+                lastDash = false;
+            } else if (ch == '-') {
+                if (!lastDash && builder.length() > 0) {
+                    builder.append(ch);
+                    lastDash = true;
+                }
+            } else if (!lastDash && builder.length() > 0) {
+                builder.append('-');
+                lastDash = true;
+            }
+        }
+        String clean = builder.toString();
+        while (clean.endsWith("-") || clean.endsWith("_")) {
+            clean = clean.substring(0, clean.length() - 1);
+        }
+        if (clean.length() == 0) {
+            clean = "custom-agent";
+        }
+        char first = clean.charAt(0);
+        if (first < 'a' || first > 'z') {
+            clean = "agent-" + clean;
+        }
+        return clean;
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    @Override
     public List<ModelConfig> getModels() {
         return modelRepository.getModels();
     }
@@ -1326,7 +1606,9 @@ public final class MainPresenter implements MainContract.Presenter {
         }
         if (safeScreenId.startsWith("extension:")
                 || "agentEdit".equals(safeScreenId)
-                || "mcpEdit".equals(safeScreenId)) {
+                || safeScreenId.startsWith("agentEdit:")
+                || "mcpEdit".equals(safeScreenId)
+                || safeScreenId.startsWith("mcpEdit:")) {
             return "extensions";
         }
         return "";
@@ -1465,7 +1747,9 @@ public final class MainPresenter implements MainContract.Presenter {
         String promptHomePath = ToolSettingsRepository.EXECUTION_SSH.equals(toolSettingsRepository.getExecutionMode())
                 ? ""
                 : projectPath;
-        String systemPrompt = systemPromptProvider.build(promptHomePath, aiSettings.getToneMode(), learningContext, buildToolPrompt(selectedModel, usedToolCallCount));
+        String extensionContext = extensionRepository.buildExtensionPrompt(projectPath);
+        String systemContext = joinPromptContext(learningContext, extensionContext);
+        String systemPrompt = systemPromptProvider.build(promptHomePath, aiSettings.getToneMode(), systemContext, buildToolPrompt(selectedModel, usedToolCallCount));
         modelMessages.add(new SystemModelMessage(systemPrompt));
         int contextTokens = selectedModel == null
                 ? ModelContextParser.parse("").getContextTokens()
@@ -1503,6 +1787,7 @@ public final class MainPresenter implements MainContract.Presenter {
         if (!hasRemainingToolCalls(selectedModel, usedToolCallCount)) {
             return "## 可用工具\n当前模型的工具调用次数限制已用尽，当前没有可用工具。";
         }
+        toolRegistry.reloadExtensions();
         String prompt = toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), supportsNativeTools(selectedModel));
         int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
         if (limit == ModelConfig.UNLIMITED_TOOL_CALLS) {
@@ -1511,6 +1796,18 @@ public final class MainPresenter implements MainContract.Presenter {
         int used = Math.max(0, usedToolCallCount);
         int remaining = Math.max(0, limit - used);
         return prompt + "\n\n工具调用次数限制：最多 " + limit + " 次；已使用 " + used + " 次；剩余 " + remaining + " 次。";
+    }
+
+    private String joinPromptContext(String first, String second) {
+        String left = first == null ? "" : first.trim();
+        String right = second == null ? "" : second.trim();
+        if (left.length() == 0) {
+            return right;
+        }
+        if (right.length() == 0) {
+            return left;
+        }
+        return left + "\n\n" + right;
     }
 
     private boolean supportsNativeTools(ModelConfig selectedModel) {
@@ -1890,6 +2187,7 @@ public final class MainPresenter implements MainContract.Presenter {
             ModelCancellationToken cancellationToken,
             int generationId
     ) {
+        toolRegistry.reloadExtensions();
         ToolExecutionCoordinator.ToolExecutionPlan plan = toolExecutionCoordinator.createPlan(toolCalls);
         HashMap<String, ToolResult> resultById = new HashMap<>();
         ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId);
@@ -1942,7 +2240,7 @@ public final class MainPresenter implements MainContract.Presenter {
             ModelCancellationToken cancellationToken,
             int generationId
     ) {
-        return new ToolContext(homePath, new ToolContext.AgentRunner() {
+        return new ToolContext(homePath, extensionRepository.skillWriteRoots(homePath), new ToolContext.AgentRunner() {
             @Override
             public ToolResult runAgent(JSONObject input, ToolContext context) {
                 return runAgentTool(input, context, selectedModel, cancellationToken, generationId);
@@ -2248,7 +2546,7 @@ public final class MainPresenter implements MainContract.Presenter {
         if (!allowedToolNames.contains(call.getName())) {
             return new ToolResult(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
         }
-        return toolExecutor.execute(call, new ToolContext(homePath));
+        return toolExecutor.execute(call, new ToolContext(homePath, extensionRepository.skillWriteRoots(homePath), null, "", null));
     }
 
     private String agentSystemPrompt(
@@ -2261,6 +2559,7 @@ public final class MainPresenter implements MainContract.Presenter {
         return agentRolePrompt(type)
                 + "\n\n你的任务: " + description
                 + "\n\n" + agentWorkspacePrompt(homePath)
+                + "\n\n" + extensionRepository.buildExtensionPrompt(homePath)
                 + "\n\n" + toolSettingsRepository.buildToolPrompt(agentTools, supportsNativeTools(selectedModel));
     }
 
@@ -2491,6 +2790,7 @@ public final class MainPresenter implements MainContract.Presenter {
         new Thread(() -> {
             ToolResult result;
             try {
+                toolRegistry.reloadExtensions();
                 result = toolExecutor
                         .executeConfirmed(pending.toolCall, toolContext(
                                 pending.homePath,

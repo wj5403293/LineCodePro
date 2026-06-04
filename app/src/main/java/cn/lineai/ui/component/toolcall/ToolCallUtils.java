@@ -60,6 +60,10 @@ final class ToolCallUtils {
         return "http_server".equals(name);
     }
 
+    static boolean isCustomMcpTool(String name) {
+        return name != null && name.startsWith("mcpx_");
+    }
+
     static boolean isShellTool(String name) {
         return "shell_execute".equals(name);
     }

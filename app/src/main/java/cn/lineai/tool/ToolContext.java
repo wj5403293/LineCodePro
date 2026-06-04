@@ -1,5 +1,8 @@
 package cn.lineai.tool;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.json.JSONObject;
 
 public final class ToolContext {
@@ -14,24 +17,36 @@ public final class ToolContext {
     }
 
     private final String homePath;
+    private final List<String> extraWriteRoots;
     private final AgentRunner agentRunner;
     private final String toolCallId;
     private final ProgressListener progressListener;
 
     public ToolContext(String homePath) {
-        this(homePath, null, "", null);
+        this(homePath, Collections.emptyList(), null, "", null);
     }
 
     public ToolContext(String homePath, AgentRunner agentRunner) {
-        this(homePath, agentRunner, "", null);
+        this(homePath, Collections.emptyList(), agentRunner, "", null);
     }
 
     public ToolContext(String homePath, AgentRunner agentRunner, String toolCallId) {
-        this(homePath, agentRunner, toolCallId, null);
+        this(homePath, Collections.emptyList(), agentRunner, toolCallId, null);
     }
 
     public ToolContext(String homePath, AgentRunner agentRunner, String toolCallId, ProgressListener progressListener) {
+        this(homePath, Collections.emptyList(), agentRunner, toolCallId, progressListener);
+    }
+
+    public ToolContext(
+            String homePath,
+            List<String> extraWriteRoots,
+            AgentRunner agentRunner,
+            String toolCallId,
+            ProgressListener progressListener
+    ) {
         this.homePath = homePath == null ? "" : homePath;
+        this.extraWriteRoots = immutableRoots(extraWriteRoots);
         this.agentRunner = agentRunner;
         this.toolCallId = toolCallId == null ? "" : toolCallId;
         this.progressListener = progressListener;
@@ -39,6 +54,10 @@ public final class ToolContext {
 
     public String getHomePath() {
         return homePath;
+    }
+
+    public List<String> getExtraWriteRoots() {
+        return extraWriteRoots;
     }
 
     public AgentRunner getAgentRunner() {
@@ -50,12 +69,24 @@ public final class ToolContext {
     }
 
     public ToolContext withToolCallId(String nextToolCallId) {
-        return new ToolContext(homePath, agentRunner, nextToolCallId, progressListener);
+        return new ToolContext(homePath, extraWriteRoots, agentRunner, nextToolCallId, progressListener);
     }
 
     public void reportToolProgress(String toolName, String content, boolean error) {
         if (progressListener != null && toolCallId.length() > 0) {
             progressListener.onToolProgress(toolCallId, toolName, content == null ? "" : content, error);
         }
+    }
+
+    private List<String> immutableRoots(List<String> roots) {
+        ArrayList<String> values = new ArrayList<>();
+        if (roots != null) {
+            for (String root : roots) {
+                if (root != null && root.trim().length() > 0) {
+                    values.add(root.trim());
+                }
+            }
+        }
+        return Collections.unmodifiableList(values);
     }
 }

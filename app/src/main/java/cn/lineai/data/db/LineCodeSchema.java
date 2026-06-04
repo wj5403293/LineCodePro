@@ -20,6 +20,8 @@ public final class LineCodeSchema {
     public static final String TABLE_CONVERSATION_INDEX = "conversation_index";
     public static final String TABLE_SKILLS = "skills";
     public static final String TABLE_SKILL_USAGE = "skill_usage";
+    public static final String TABLE_EXTENSION_AGENTS = "extension_agents";
+    public static final String TABLE_EXTENSION_MCPS = "extension_mcps";
     public static final String TABLE_IMPORT_JOBS = "import_jobs";
 
     public static final String[] CREATE_SQL = new String[] {
@@ -185,6 +187,30 @@ public final class LineCodeSchema {
                     + "conversation_id TEXT,"
                     + "used_at INTEGER NOT NULL"
                     + ")",
+            "CREATE TABLE IF NOT EXISTS extension_agents ("
+                    + "id TEXT PRIMARY KEY,"
+                    + "enabled INTEGER NOT NULL DEFAULT 1,"
+                    + "name TEXT NOT NULL,"
+                    + "slug TEXT NOT NULL,"
+                    + "prompt TEXT NOT NULL,"
+                    + "trigger TEXT,"
+                    + "tool_names_json TEXT,"
+                    + "mcp_ids_json TEXT,"
+                    + "created_at INTEGER NOT NULL,"
+                    + "updated_at INTEGER NOT NULL,"
+                    + "raw_json TEXT"
+                    + ")",
+            "CREATE TABLE IF NOT EXISTS extension_mcps ("
+                    + "id TEXT PRIMARY KEY,"
+                    + "enabled INTEGER NOT NULL DEFAULT 1,"
+                    + "name TEXT NOT NULL,"
+                    + "url TEXT NOT NULL,"
+                    + "request_headers_json TEXT,"
+                    + "tools_json TEXT,"
+                    + "created_at INTEGER NOT NULL,"
+                    + "updated_at INTEGER NOT NULL,"
+                    + "raw_json TEXT"
+                    + ")",
             "CREATE TABLE IF NOT EXISTS import_jobs ("
                     + "id TEXT PRIMARY KEY,"
                     + "source_name TEXT NOT NULL,"
@@ -202,7 +228,9 @@ public final class LineCodeSchema {
             "CREATE INDEX IF NOT EXISTS idx_message_blocks_message_order ON message_blocks(message_id, block_order)",
             "CREATE INDEX IF NOT EXISTS idx_conversation_index_project ON conversation_index(project_id, updated_at DESC)",
             "CREATE INDEX IF NOT EXISTS idx_memories_scope_project ON memories(scope, project_id)",
-            "CREATE INDEX IF NOT EXISTS idx_working_memory_project ON working_memory(project_id, expires_at)"
+            "CREATE INDEX IF NOT EXISTS idx_working_memory_project ON working_memory(project_id, expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_extension_agents_enabled ON extension_agents(enabled, updated_at DESC)",
+            "CREATE INDEX IF NOT EXISTS idx_extension_mcps_enabled ON extension_mcps(enabled, updated_at DESC)"
     };
 
     public static final String[] OPTIONAL_FTS_SQL = new String[] {
@@ -222,6 +250,8 @@ public final class LineCodeSchema {
             "DROP TABLE IF EXISTS conversation_index_fts",
             "DROP TABLE IF EXISTS memories_fts",
             "DROP TABLE IF EXISTS import_jobs",
+            "DROP TABLE IF EXISTS extension_mcps",
+            "DROP TABLE IF EXISTS extension_agents",
             "DROP TABLE IF EXISTS skill_usage",
             "DROP TABLE IF EXISTS skills",
             "DROP TABLE IF EXISTS conversation_index",

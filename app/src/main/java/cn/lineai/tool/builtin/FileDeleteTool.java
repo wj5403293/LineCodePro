@@ -58,7 +58,7 @@ public final class FileDeleteTool extends BaseTool {
         ArrayList<String> errors = new ArrayList<>();
         for (String path : paths) {
             try {
-                File target = FileToolPathPolicy.resolve(context.getHomePath(), path);
+                File target = FileToolPathPolicy.resolve(context, path);
                 if (!target.exists()) {
                     errors.add("路径不存在: " + path);
                     continue;

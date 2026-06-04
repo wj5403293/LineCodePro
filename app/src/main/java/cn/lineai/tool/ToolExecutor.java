@@ -72,7 +72,7 @@ public final class ToolExecutor {
         boolean existed;
         String oldContent = "";
         try {
-            file = FileToolPathPolicy.resolve(context.getHomePath(), path);
+            file = FileToolPathPolicy.resolve(context, path);
             existed = file.exists();
             if (existed && file.isDirectory()) {
                 return new ToolResult("", tool.getName(), "路径是一个目录，无法写入文件: " + path, true);

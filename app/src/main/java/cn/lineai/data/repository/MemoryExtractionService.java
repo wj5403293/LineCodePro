@@ -22,18 +22,24 @@ import org.json.JSONObject;
 
 public final class MemoryExtractionService {
     private static final String TEMPLATE_PATH = "prompts/memory-extraction-template.txt";
+    private static final String SKILL_TEMPLATE_PATH = "prompts/skill-extraction-template.txt";
     private static final int MAX_TRANSCRIPT_CHARS = 6000;
     private static final int MAX_MEMORY_CHARS = 320;
     private static final int MAX_MEMORIES = 5;
+    private static final int MAX_SKILLS = 2;
+    private static final int MAX_SKILL_CONTENT_CHARS = 8000;
 
     private final Context context;
     private final LearningContextRepository repository;
+    private final ExtensionRepository extensionRepository;
     private final ModelClient modelClient = new ModelClient();
     private StringTemplate cachedTemplate;
+    private StringTemplate cachedSkillTemplate;
 
     public MemoryExtractionService(Context context, LearningContextRepository repository) {
         this.context = context.getApplicationContext();
         this.repository = repository;
+        this.extensionRepository = new ExtensionRepository(this.context);
     }
 
     public void extractAndStore(ModelConfig selectedModel, String projectId, String userInput, String transcript) {
@@ -48,6 +54,7 @@ public final class MemoryExtractionService {
         for (ExtractedMemory memory : dedupe(candidates)) {
             repository.saveExtractedMemory(memory.scope, projectId, memory.content, memory.confidence);
         }
+        extractAndStoreSkills(selectedModel, projectId, userInput, transcript);
     }
 
     private List<ExtractedMemory> extractWithModel(
@@ -66,6 +73,83 @@ public final class MemoryExtractionService {
         messages.add(new UserModelMessage("请仅返回 JSON。"));
         ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
         return parseCandidates(response.getText(), userInput);
+    }
+
+    private void extractAndStoreSkills(ModelConfig selectedModel, String projectId, String userInput, String transcript) {
+        if (selectedModel == null || !hasSkillSignal(userInput, transcript)) {
+            return;
+        }
+        try {
+            HashMap<String, String> values = new HashMap<>();
+            values.put("PROJECT_ID", safe(projectId));
+            values.put("USER_INPUT", trimForPrompt(userInput, 1200));
+            values.put("TRANSCRIPT", trimForPrompt(transcript, MAX_TRANSCRIPT_CHARS));
+            ArrayList<ModelMessage> messages = new ArrayList<>();
+            messages.add(new SystemModelMessage(skillTemplate().render(values)));
+            messages.add(new UserModelMessage("请仅返回 JSON。"));
+            ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
+            for (ExtractedSkill skill : parseSkills(response.getText())) {
+                if (skillExists(projectId, skill.name)) {
+                    continue;
+                }
+                extensionRepository.createSkill(projectId, skill.location, skill.name, skill.description, skill.content);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private List<ExtractedSkill> parseSkills(String rawText) {
+        ArrayList<ExtractedSkill> skills = new ArrayList<>();
+        String json = extractJson(rawText);
+        if (json.length() == 0) {
+            return skills;
+        }
+        try {
+            JSONObject object = new JSONObject(json);
+            JSONArray array = object.optJSONArray("skills");
+            if (array == null && json.startsWith("[")) {
+                array = new JSONArray(json);
+            }
+            if (array == null) {
+                return skills;
+            }
+            for (int i = 0; i < array.length() && skills.size() < MAX_SKILLS; i++) {
+                JSONObject item = array.optJSONObject(i);
+                if (item == null) {
+                    continue;
+                }
+                String name = sanitizeSkillName(item.optString("name"));
+                String description = normalizeContent(item.optString("description"));
+                String content = item.optString("content").trim();
+                String location = "app".equals(item.optString("location")) ? "app" : "project";
+                if (name.length() == 0 || content.length() < 80 || content.length() > MAX_SKILL_CONTENT_CHARS) {
+                    continue;
+                }
+                if (shouldKeep(content, 0.80)) {
+                    skills.add(new ExtractedSkill(name, description, location, content));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return skills;
+    }
+
+    private boolean skillExists(String projectId, String name) {
+        String target = normalizedKey(name);
+        if (target.length() == 0) {
+            return true;
+        }
+        for (cn.lineai.model.SkillRecord skill : extensionRepository.getSkills(projectId)) {
+            if (normalizedKey(skill.getName()).equals(target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasSkillSignal(String userInput, String transcript) {
+        String text = (safe(userInput) + "\n" + safe(transcript)).toLowerCase(Locale.ROOT);
+        return containsAny(text, "skill", "skills", "沉淀", "复用", "长期", "流程", "规范", "以后", "下次", "自动创建");
     }
 
     private List<ExtractedMemory> parseCandidates(String rawText, String userInput) {
@@ -316,6 +400,37 @@ public final class MemoryExtractionService {
         return cachedTemplate;
     }
 
+    private StringTemplate skillTemplate() {
+        if (cachedSkillTemplate == null) {
+            cachedSkillTemplate = new StringTemplate(readAsset(SKILL_TEMPLATE_PATH));
+        }
+        return cachedSkillTemplate;
+    }
+
+    private String sanitizeSkillName(String name) {
+        String value = safe(name).trim().toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < value.length() && builder.length() < 64; i++) {
+            char ch = value.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_') {
+                builder.append(ch);
+            } else if (Character.isWhitespace(ch)) {
+                builder.append('-');
+            }
+        }
+        String clean = builder.toString();
+        while (clean.contains("--")) {
+            clean = clean.replace("--", "-");
+        }
+        while (clean.startsWith("-")) {
+            clean = clean.substring(1);
+        }
+        while (clean.endsWith("-")) {
+            clean = clean.substring(0, clean.length() - 1);
+        }
+        return clean;
+    }
+
     private String readAsset(String path) {
         try {
             InputStream input = context.getAssets().open(path);
@@ -349,6 +464,20 @@ public final class MemoryExtractionService {
             this.scope = normalizeScope(scope);
             this.content = normalizeContent(content);
             this.confidence = confidence;
+        }
+    }
+
+    private static final class ExtractedSkill {
+        final String name;
+        final String description;
+        final String location;
+        final String content;
+
+        ExtractedSkill(String name, String description, String location, String content) {
+            this.name = name == null ? "" : name;
+            this.description = description == null ? "" : description;
+            this.location = "app".equals(location) ? "app" : "project";
+            this.content = content == null ? "" : content;
         }
     }
 }

@@ -61,6 +61,7 @@ public final class SystemPromptProvider {
         HashMap<String, String> values = new HashMap<>();
         values.put("HOME_PATH", homePath.trim());
         values.put("LINECODE_ROOT", workspacePaths.getLinecodeRoot().getAbsolutePath());
+        values.put("GLOBAL_SKILLS_ROOT", workspacePaths.getSkillsRoot().getAbsolutePath());
         values.put("WORKSPACE_PRIVATE_ROOT", WorkspacePaths.join(homePath.trim(), ".linecode"));
         values.put("WORKSPACE_SKILLS_ROOT", WorkspacePaths.join(homePath.trim(), ".linecode/skills"));
         if (cachedWorkDirectoryTemplate == null) {

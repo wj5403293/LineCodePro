@@ -35,7 +35,7 @@ public final class ListDirectoryTool extends BaseTool {
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
         try {
-            File dir = FileToolPathPolicy.resolve(context.getHomePath(), input.optString("path"));
+            File dir = FileToolPathPolicy.resolve(context, input.optString("path"));
             if (!dir.exists()) {
                 return error("目录不存在: " + input.optString("path", "."));
             }

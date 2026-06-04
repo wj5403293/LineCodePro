@@ -7,6 +7,7 @@ import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.ToolCategory;
+import cn.lineai.tool.ToolRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -121,7 +122,9 @@ public final class ToolSettingsRepository {
             return PermissionResult.denied("工具名为空");
         }
         if (!getEnabledToolNames().contains(toolName)) {
-            return PermissionResult.denied("工具未启用或当前执行目标不可用: " + toolName);
+            if (!isEnabledExtensionTool(toolName, category)) {
+                return PermissionResult.denied("工具未启用或当前执行目标不可用: " + toolName);
+            }
         }
         if (PERMISSION_READONLY.equals(getPermissionMode()) && category != ToolCategory.READ) {
             return PermissionResult.denied("只读模式下不允许执行 " + toolName + "。请在权限设置中切换到自动或确认模式。");
@@ -155,6 +158,9 @@ public final class ToolSettingsRepository {
             for (BaseTool tool : implementedTools) {
                 if (tool != null && tool.getName().length() > 0) {
                     toolByName.put(tool.getName(), tool);
+                    if (isEnabledExtensionTool(tool.getName(), tool.getCategory())) {
+                        enabled.add(tool.getName());
+                    }
                 }
             }
             enabled.retainAll(toolByName.keySet());
@@ -187,11 +193,13 @@ public final class ToolSettingsRepository {
         StringBuilder builder = new StringBuilder();
         builder.append("## 可用工具\n以下工具列表由当前 MCP 设置、权限模式、执行目标和已注册工具动态生成。未列出的工具不可用，工具执行必须遵守当前权限模式。\n\n");
         List<McpToolConfig> promptConfigs = configs == null ? new ArrayList<>() : configs;
+        HashSet<String> renderedTools = new HashSet<>();
         for (McpToolConfig config : promptConfigs) {
             ArrayList<String> tools = new ArrayList<>();
             for (String tool : config.getTools()) {
                 if (enabled.contains(tool)) {
                     tools.add(tool);
+                    renderedTools.add(tool);
                 }
             }
             if (tools.isEmpty()) {
@@ -218,6 +226,7 @@ public final class ToolSettingsRepository {
             }
             builder.append('\n');
         }
+        appendExtensionTools(builder, enabled, renderedTools, toolByName);
         if (nativeToolProtocol) {
             builder.append("工具调用由当前模型协议的原生 tools/function calling 机制提供。需要读取、写入、搜索或列目录时，必须使用原生工具调用，不要把工具调用 JSON、XML、<tool_calls> 或 Markdown 代码块输出到正文。")
                     .append("每次工具返回后必须继续分析结果；如果任务还没完成，继续调用合适工具执行下一步。");
@@ -226,6 +235,40 @@ public final class ToolSettingsRepository {
                     .append("不要输出 OpenAI tool_calls JSON、Markdown 代码块或自然语言包装。每次工具返回后必须继续分析结果；如果任务还没完成，继续调用合适工具执行下一步。");
         }
         return builder.toString().trim();
+    }
+
+    private static void appendExtensionTools(
+            StringBuilder builder,
+            Set<String> enabled,
+            Set<String> renderedTools,
+            Map<String, BaseTool> toolByName
+    ) {
+        ArrayList<String> extensionTools = new ArrayList<>();
+        for (String toolName : enabled) {
+            if (!renderedTools.contains(toolName) && ToolRegistry.isExtensionToolName(toolName)) {
+                extensionTools.add(toolName);
+            }
+        }
+        if (extensionTools.isEmpty()) {
+            return;
+        }
+        builder.append("### 扩展\n");
+        for (String toolName : extensionTools) {
+            BaseTool tool = toolByName == null ? null : toolByName.get(toolName);
+            builder.append("  - ").append(toolName);
+            if (tool != null) {
+                builder.append(" [").append(categoryLabel(tool.getCategory())).append("]：")
+                        .append(tool.getDescription()).append('\n');
+                try {
+                    builder.append("    参数: ").append(tool.getParameters().toString()).append('\n');
+                } catch (Exception ignored) {
+                    builder.append("    参数: {}\n");
+                }
+            } else {
+                builder.append('\n');
+            }
+        }
+        builder.append('\n');
     }
 
     private static String renderSshToolPrompt(
@@ -323,5 +366,15 @@ public final class ToolSettingsRepository {
             return ToolCategory.WRITE;
         }
         return ToolCategory.SYSTEM;
+    }
+
+    private boolean isEnabledExtensionTool(String toolName, ToolCategory category) {
+        if (!ToolRegistry.isExtensionToolName(toolName)) {
+            return false;
+        }
+        if (!EXECUTION_LOCAL.equals(getExecutionMode())) {
+            return false;
+        }
+        return !PERMISSION_READONLY.equals(getPermissionMode()) || category == ToolCategory.READ;
     }
 }

@@ -50,7 +50,7 @@ public final class FileEditTool extends BaseTool {
             if (oldString.length() == 0) {
                 return error("old_string 不能为空");
             }
-            File file = FileToolPathPolicy.resolve(context.getHomePath(), path);
+            File file = FileToolPathPolicy.resolve(context, path);
             if (!file.exists()) {
                 return error("文件不存在: " + FileToolPathPolicy.displayPath(context.getHomePath(), file));
             }

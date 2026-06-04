@@ -3,10 +3,12 @@ package cn.lineai;
 import android.app.Activity;
 import android.Manifest;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
@@ -21,9 +23,11 @@ import cn.lineai.ui.theme.LineTheme;
 public final class MainActivity extends Activity implements MainChatView.WorkspaceHost {
     private static final int REQUEST_OPEN_WORKSPACE_TREE = 7001;
     private static final int REQUEST_LEGACY_STORAGE = 7002;
+    private static final int REQUEST_OPEN_DOCUMENT = 7003;
 
     private MainContract.Presenter presenter;
     private MainChatView mainView;
+    private MainChatView.DocumentPickCallback documentPickCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +57,10 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_OPEN_DOCUMENT) {
+            handleDocumentResult(resultCode, data);
+            return;
+        }
         if (requestCode != REQUEST_OPEN_WORKSPACE_TREE) {
             return;
         }
@@ -177,5 +185,62 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
             }, REQUEST_LEGACY_STORAGE);
         }
+    }
+
+    @Override
+    public void openDocumentPicker(String mimeType, String[] extensions, MainChatView.DocumentPickCallback callback) {
+        documentPickCallback = callback;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(mimeType == null || mimeType.length() == 0 ? "*/*" : mimeType);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        if (extensions != null && extensions.length > 0) {
+            intent.putExtra(Intent.EXTRA_TITLE, extensions[0]);
+        }
+        startActivityForResult(intent, REQUEST_OPEN_DOCUMENT);
+    }
+
+    private void handleDocumentResult(int resultCode, Intent data) {
+        MainChatView.DocumentPickCallback callback = documentPickCallback;
+        documentPickCallback = null;
+        if (callback == null) {
+            return;
+        }
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            callback.onDocumentPickCancelled();
+            return;
+        }
+        Uri uri = data.getData();
+        int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
+        if (flags != 0) {
+            try {
+                getContentResolver().takePersistableUriPermission(uri, flags);
+            } catch (SecurityException ignored) {
+            }
+        }
+        callback.onDocumentPicked(uri.toString(), displayName(uri));
+    }
+
+    private String displayName(Uri uri) {
+        if (uri == null) {
+            return "";
+        }
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(0);
+                if (name != null && name.length() > 0) {
+                    return name;
+                }
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+        String path = uri.getLastPathSegment();
+        return path == null ? "skill.zip" : path;
     }
 }

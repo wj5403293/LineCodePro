@@ -47,7 +47,7 @@ public final class FileReadTool extends BaseTool {
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
         try {
-            File file = FileToolPathPolicy.resolve(context.getHomePath(), input.optString("file_path"));
+            File file = FileToolPathPolicy.resolve(context, input.optString("file_path"));
             if (!file.exists()) {
                 return error("文件不存在: " + FileToolPathPolicy.displayPath(context.getHomePath(), file));
             }

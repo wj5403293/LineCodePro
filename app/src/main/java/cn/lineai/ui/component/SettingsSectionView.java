@@ -6,13 +6,14 @@ import android.widget.LinearLayout;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class SettingsSectionView extends LinearLayout {
+    private final SectionHeaderView header;
     private final LinearLayout group;
 
     public SettingsSectionView(Context context, String title) {
         super(context);
         setOrientation(VERTICAL);
 
-        SectionHeaderView header = new SectionHeaderView(context, title);
+        header = new SectionHeaderView(context, title);
         LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         headerParams.topMargin = LineTheme.dp(context, LineTheme.XL);
         headerParams.bottomMargin = LineTheme.dp(context, LineTheme.MD);
@@ -50,5 +51,13 @@ public final class SettingsSectionView extends LinearLayout {
 
     public LinearLayout getGroup() {
         return group;
+    }
+
+    public void setTitle(String title) {
+        header.setText((title == null ? "" : title).toUpperCase());
+    }
+
+    public void removeAllRows() {
+        group.removeAllViews();
     }
 }

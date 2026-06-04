@@ -40,7 +40,7 @@ public final class SettingsScreenView extends LinearLayout {
                 new RowSpec("llm", "AI 行为", "思考强度、交流语气和 reasoning 保留", IconButtonView.BRAIN),
         });
         addSection(content, "工具与执行", new RowSpec[] {
-                new RowSpec("mcp", "工具与执行", "MCP 工具开关、SSH 执行和网页搜索", IconButtonView.CPU),
+                new RowSpec("mcp", "工具与执行", "MCP 工具开关、SSH 执行和网页搜索", IconButtonView.MCP),
                 new RowSpec("extensions", "扩展", "Agent、MCP、Skills 和 LineCode 扩展", IconButtonView.PACKAGE),
         });
         addSection(content, "界面与输出", new RowSpec[] {

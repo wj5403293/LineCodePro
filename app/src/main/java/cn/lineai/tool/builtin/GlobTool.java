@@ -45,7 +45,7 @@ public final class GlobTool extends BaseTool {
             if (pattern.trim().length() == 0) {
                 return error("pattern 不能为空");
             }
-            File root = FileToolPathPolicy.resolve(context.getHomePath(), input.optString("path"));
+            File root = FileToolPathPolicy.resolve(context, input.optString("path"));
             if (!root.exists() || !root.isDirectory()) {
                 return error("搜索根目录不存在或不是目录: " + input.optString("path", "."));
             }

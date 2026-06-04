@@ -1,41 +1,179 @@
 package cn.lineai.ui.component;
 
 import android.content.Context;
+import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Gravity;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+import cn.lineai.model.ExtensionMcpConfig;
+import cn.lineai.model.McpRequestHeader;
+import cn.lineai.model.McpToolSummary;
 import cn.lineai.ui.theme.LineTheme;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public final class McpExtensionEditScreenView extends ScreenScaffoldView {
     public interface Listener {
         void onBack();
+
+        List<McpToolSummary> onQueryTools(String url, List<McpRequestHeader> headers) throws Exception;
+
+        void onSave(ExtensionMcpConfig config);
     }
 
-    public McpExtensionEditScreenView(Context context, Listener listener) {
-        super(context, "添加 MCP", listener::onBack, saveAction(context));
-        LinearLayout content = getContent();
-        addForm(content, "连接信息",
-                new FormTextFieldView(context, "名称", "", "例如：公司 MCP 服务", null, false, false),
-                new FormTextFieldView(context, "HTTP/S 地址", "", "https://example.com/mcp", "查询会请求 tools/list 并展示 MCP 工具列表。", false, false));
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Listener listener;
+    private final ExtensionMcpConfig editingMcp;
+    private final ArrayList<HeaderRow> headerRows = new ArrayList<>();
+    private ArrayList<McpToolSummary> queriedTools = new ArrayList<>();
 
-        SettingsSectionView headers = new SettingsSectionView(context, "自定义请求头");
-        headers.addRow(new ActionRowView(context, IconButtonView.PLUS, "添加请求头", "查询和调用 MCP tools 时会附带这些请求头。", false, false, null), false);
-        content.addView(headers, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+    private FormTextFieldView nameField;
+    private FormTextFieldView urlField;
+    private SettingsSectionView headersSection;
+    private SettingsSectionView toolsSection;
+
+    public McpExtensionEditScreenView(Context context, ExtensionMcpConfig editingMcp, Listener listener) {
+        super(context, editingMcp == null ? "添加 MCP" : "修改 MCP", listener::onBack, saveAction(context));
+        this.listener = listener;
+        this.editingMcp = editingMcp;
+        LinearLayout content = getContent();
+        nameField = new FormTextFieldView(context, "名称", value(editingMcp == null ? "" : editingMcp.getName()),
+                "例如：公司 MCP 服务", null, false, false);
+        urlField = new FormTextFieldView(context, "HTTP/S 地址", value(editingMcp == null ? "" : editingMcp.getUrl()),
+                "https://example.com/mcp", "查询会请求 tools/list 并展示 MCP 工具列表。", false, false);
+        addForm(content, "连接信息", nameField, urlField);
+
+        headersSection = new SettingsSectionView(context, "自定义请求头");
+        content.addView(headersSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        if (editingMcp != null) {
+            for (McpRequestHeader header : editingMcp.getRequestHeaders()) {
+                headerRows.add(new HeaderRow(context, header, headerRows, this::renderHeaders));
+            }
+            queriedTools = new ArrayList<>(editingMcp.getTools());
+        }
+        renderHeaders();
 
         SettingsSectionView query = new SettingsSectionView(context, "查询");
-        query.addRow(new ActionRowView(context, IconButtonView.SEARCH, "查询 MCP 列表", "填写地址后查询服务暴露的 tools。", false, true, null), false);
+        query.addRow(new ActionRowView(context, IconButtonView.SEARCH, "查询 MCP 列表",
+                "填写地址后查询服务暴露的 tools。", false, true, this::queryTools), false);
         content.addView(query, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView tools = new SettingsSectionView(context, "TOOLS 列表 · 已启用 0/0");
-        TextView empty = LineTheme.text(context, "查询后会在这里显示 tools 列表，可单独开启或关闭。", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, android.graphics.Typeface.NORMAL);
-        empty.setGravity(android.view.Gravity.CENTER);
-        LineTheme.padding(empty, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
-        tools.addRow(empty, false);
-        content.addView(tools, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        toolsSection = new SettingsSectionView(context, "TOOLS 列表");
+        content.addView(toolsSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        renderTools();
+        getRightAction().setOnClickListener(v -> save());
     }
 
-    private static android.view.View saveAction(Context context) {
-        android.widget.TextView save = LineTheme.textMedium(context, "保存", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY);
-        save.setGravity(android.view.Gravity.CENTER);
+    private void renderHeaders() {
+        headersSection.removeAllRows();
+        headersSection.addRow(new ActionRowView(getContext(), IconButtonView.PLUS, "添加请求头",
+                "查询和调用 MCP tools 时会附带这些请求头。", false, false, () -> {
+                    headerRows.add(new HeaderRow(getContext(), null, headerRows, this::renderHeaders));
+                    renderHeaders();
+                }), !headerRows.isEmpty());
+        for (int i = 0; i < headerRows.size(); i++) {
+            headersSection.addRow(headerRows.get(i), i < headerRows.size() - 1);
+        }
+    }
+
+    private void queryTools() {
+        String url = fieldValue(urlField);
+        if (!validUrl(url)) {
+            Toast.makeText(getContext(), "MCP 地址必须以 http:// 或 https:// 开头", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(getContext(), "正在查询 MCP tools...", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            try {
+                List<McpToolSummary> tools = listener.onQueryTools(url, headers());
+                mainHandler.post(() -> {
+                    queriedTools = new ArrayList<>(tools);
+                    renderTools();
+                    Toast.makeText(getContext(), "已查询到 " + queriedTools.size() + " 个 tools", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                mainHandler.post(() -> Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }, "linecode-mcp-query").start();
+    }
+
+    private void renderTools() {
+        toolsSection.removeAllRows();
+        int enabledCount = 0;
+        for (McpToolSummary tool : queriedTools) {
+            if (tool.isEnabled()) {
+                enabledCount++;
+            }
+        }
+        toolsSection.setTitle("TOOLS 列表 · 已启用 " + enabledCount + "/" + queriedTools.size());
+        if (queriedTools.isEmpty()) {
+            TextView empty = LineTheme.text(getContext(), "查询后会在这里显示 tools 列表，可单独开启或关闭。", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            empty.setGravity(Gravity.CENTER);
+            LineTheme.padding(empty, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
+            toolsSection.addRow(empty, false);
+            return;
+        }
+        for (int i = 0; i < queriedTools.size(); i++) {
+            McpToolSummary tool = queriedTools.get(i);
+            toolsSection.addRow(new SwitchRowView(getContext(), IconButtonView.MCP, tool.getName(),
+                    tool.getDescription().length() == 0 ? "MCP tool" : tool.getDescription(),
+                    tool.isEnabled(), (button, checked) -> {
+                        setToolEnabled(tool.getName(), checked);
+                        renderTools();
+                    }), i < queriedTools.size() - 1);
+        }
+    }
+
+    private void setToolEnabled(String name, boolean enabled) {
+        ArrayList<McpToolSummary> next = new ArrayList<>();
+        for (McpToolSummary tool : queriedTools) {
+            if (tool.getName().equals(name)) {
+                next.add(new McpToolSummary(tool.getName(), enabled, tool.getDescription(), tool.getInputSchemaJson()));
+            } else {
+                next.add(tool);
+            }
+        }
+        queriedTools = next;
+    }
+
+    private void save() {
+        String name = fieldValue(nameField);
+        String url = fieldValue(urlField);
+        if (name.length() == 0 || !validUrl(url)) {
+            Toast.makeText(getContext(), "请填写名称和有效 MCP 地址", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        listener.onSave(new ExtensionMcpConfig(
+                editingMcp == null ? "" : editingMcp.getId(),
+                editingMcp == null || editingMcp.isEnabled(),
+                name,
+                trimTrailingSlash(url),
+                headers(),
+                queriedTools,
+                editingMcp == null ? 0 : editingMcp.getCreatedAt(),
+                editingMcp == null ? 0 : editingMcp.getUpdatedAt()
+        ));
+    }
+
+    private List<McpRequestHeader> headers() {
+        ArrayList<McpRequestHeader> headers = new ArrayList<>();
+        for (HeaderRow row : headerRows) {
+            McpRequestHeader header = row.header();
+            if (header.getName().length() > 0) {
+                headers.add(header);
+            }
+        }
+        return headers;
+    }
+
+    private static TextView saveAction(Context context) {
+        TextView save = LineTheme.textMedium(context, "保存", LineTheme.FONT_MD, LineTheme.ACCENT);
+        save.setGravity(Gravity.CENTER);
         return save;
     }
 
@@ -59,5 +197,76 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         groupParams.leftMargin = LineTheme.dp(context, LineTheme.LG);
         groupParams.rightMargin = LineTheme.dp(context, LineTheme.LG);
         content.addView(group, groupParams);
+    }
+
+    private String fieldValue(FormTextFieldView field) {
+        return field == null ? "" : field.getInput().getText().toString().trim();
+    }
+
+    private String value(String input) {
+        return input == null ? "" : input;
+    }
+
+    private boolean validUrl(String url) {
+        String value = url == null ? "" : url.trim().toLowerCase();
+        return value.startsWith("http://") || value.startsWith("https://");
+    }
+
+    private String trimTrailingSlash(String url) {
+        String value = url == null ? "" : url.trim();
+        while (value.endsWith("/") && value.length() > "https://".length()) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
+    }
+
+    private static final class HeaderRow extends LinearLayout {
+        private final EditText nameInput;
+        private final EditText valueInput;
+
+        HeaderRow(Context context, McpRequestHeader header, List<HeaderRow> owner, Runnable onRemove) {
+            super(context);
+            setOrientation(HORIZONTAL);
+            setGravity(Gravity.CENTER_VERTICAL);
+            LineTheme.padding(this, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
+            nameInput = input(context, "名字", header == null ? "" : header.getName());
+            valueInput = input(context, "值", header == null ? "" : header.getValue());
+            addView(nameInput, new LayoutParams(0, LineTheme.dp(context, 42), 1f));
+            LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f);
+            valueParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
+            addView(valueInput, valueParams);
+            IconButtonView remove = new IconButtonView(context, IconButtonView.TRASH_2);
+            remove.setIconColor(LineTheme.TEXT_TERTIARY);
+            remove.setIconSizeDp(34, 16);
+            remove.setOnClickListener(v -> {
+                if (owner != null) {
+                    owner.remove(this);
+                }
+                if (onRemove != null) {
+                    onRemove.run();
+                }
+            });
+            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 34), LineTheme.dp(context, 42));
+            removeParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
+            addView(remove, removeParams);
+        }
+
+        McpRequestHeader header() {
+            return new McpRequestHeader(nameInput.getText().toString(), valueInput.getText().toString());
+        }
+
+        private static EditText input(Context context, String hint, String value) {
+            EditText input = new EditText(context);
+            input.setSingleLine(true);
+            input.setText(value == null ? "" : value);
+            input.setHint(hint);
+            input.setHintTextColor(LineTheme.TEXT_TERTIARY);
+            input.setTextColor(LineTheme.TEXT);
+            input.setTextSize(LineTheme.FONT_SM);
+            input.setIncludeFontPadding(false);
+            input.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_LIGHT, 8, LineTheme.BORDER_LIGHT));
+            input.setPadding(LineTheme.dp(context, LineTheme.MD), 0, LineTheme.dp(context, LineTheme.MD), 0);
+            return input;
+        }
     }
 }

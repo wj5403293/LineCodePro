@@ -11,6 +11,7 @@ import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.DiffRepository;
 import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.FileTreeRepository;
+import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.LearningContextRepository;
 import cn.lineai.data.repository.MemoryExtractionService;
 import cn.lineai.data.repository.OutputSettingsRepository;
@@ -31,6 +32,7 @@ public final class MainDependencies {
     final ModelRepository modelRepository;
     final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     final ChatModeRepository chatModeRepository;
+    final InputSettingsRepository inputSettingsRepository;
     final OutputSettingsRepository outputSettingsRepository;
     final ThemeSettingsRepository themeSettingsRepository;
     final PromptTemplateRepository promptTemplateRepository;
@@ -60,6 +62,7 @@ public final class MainDependencies {
         modelRepository = new ModelRepository(context);
         aiBehaviorSettingsRepository = new AiBehaviorSettingsRepository(context);
         chatModeRepository = new ChatModeRepository(context);
+        inputSettingsRepository = new InputSettingsRepository(context);
         outputSettingsRepository = new OutputSettingsRepository(context);
         themeSettingsRepository = new ThemeSettingsRepository(context);
         promptTemplateRepository = new PromptTemplateRepository(context);

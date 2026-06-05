@@ -1,6 +1,7 @@
 package cn.lineai.mvp;
 
 import cn.lineai.model.AiBehaviorSettings;
+import cn.lineai.model.InputSettings;
 import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.OutputSettings;
@@ -28,6 +29,10 @@ public interface SettingsController {
     void onAiPreserveReasoningChanged(boolean enabled);
 
     void onAiLearningModeChanged(boolean enabled);
+
+    InputSettings getInputSettings();
+
+    void onEnterKeyBehaviorChanged(String behavior);
 
     List<PromptTemplateItem> getPromptTemplates();
 

@@ -47,6 +47,7 @@ import cn.lineai.ui.component.ExtensionDetailScreenView;
 import cn.lineai.ui.component.ExtensionsScreenView;
 import cn.lineai.ui.component.HeaderView;
 import cn.lineai.ui.component.InAppBrowserScreenView;
+import cn.lineai.ui.component.InputSettingsScreenView;
 import cn.lineai.ui.component.KeepAliveSettingsScreenView;
 import cn.lineai.ui.component.LLMSettingsScreenView;
 import cn.lineai.ui.component.LicensesScreenView;
@@ -821,6 +822,19 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                 }
             });
         }
+        if ("input".equals(screenId)) {
+            return new InputSettingsScreenView(context, presenter.getInputSettings(), new InputSettingsScreenView.Listener() {
+                @Override
+                public void onBack() {
+                    handleScreenBack();
+                }
+
+                @Override
+                public void onEnterKeyBehaviorChanged(String behavior) {
+                    presenter.onEnterKeyBehaviorChanged(behavior);
+                }
+            });
+        }
         if ("mcp".equals(screenId)) {
             return new MCPSettingsScreenView(context, presenter.getMcpSettingsState(), new MCPSettingsScreenView.Listener() {
                 @Override
@@ -1206,6 +1220,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private String titleFor(String screenId) {
         if ("llm".equals(screenId)) return "AI 行为";
         if ("promptTemplates".equals(screenId)) return "自定义提示词";
+        if ("input".equals(screenId)) return "输入设置";
         if ("mcp".equals(screenId)) return "工具与执行";
         if ("theme".equals(screenId)) return "主题与外观";
         if ("output".equals(screenId)) return "输出与浏览";
@@ -1233,6 +1248,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
     private String[] rowsFor(String screenId) {
         if ("llm".equals(screenId)) return new String[] {"交流语气", "思考强度", "保留 reasoning", "自定义提示词"};
+        if ("input".equals(screenId)) return new String[] {"回车键逻辑"};
         if ("mcp".equals(screenId)) return new String[] {"MCP 执行模式", "SSH 工具", "网页搜索", "工具确认策略"};
         if ("theme".equals(screenId)) return new String[] {"深色主题", "浅色主题", "咖啡主题", "高对比模式"};
         if ("output".equals(screenId)) return new String[] {"代码自动换行", "网页打开方式", "内置浏览器 JavaScript", "Markdown 预览"};

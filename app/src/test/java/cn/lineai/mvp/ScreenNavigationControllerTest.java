@@ -40,6 +40,17 @@ public final class ScreenNavigationControllerTest {
         Assert.assertFalse(host.chatShown);
     }
 
+    @Test
+    public void inputSettingsBackReturnsToSettings() {
+        ScreenNavigationController controller = new ScreenNavigationController();
+        RecordingHost host = new RecordingHost();
+
+        controller.backFrom("input", host);
+
+        Assert.assertEquals("settings", host.lastScreenId);
+        Assert.assertFalse(host.chatShown);
+    }
+
     private static final class RecordingHost implements ScreenNavigationController.Host {
         private String lastScreenId = "";
         private boolean chatShown;

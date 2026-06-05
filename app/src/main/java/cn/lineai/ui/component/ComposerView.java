@@ -10,6 +10,7 @@ import android.text.InputType;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
@@ -20,6 +21,7 @@ import android.widget.TextView;
 import cn.lineai.model.ChatMode;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.model.InputAttachment;
+import cn.lineai.model.InputSettings;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +53,7 @@ public final class ComposerView extends LinearLayout {
     private PopupWindow modePopup;
     private boolean streaming;
     private String chatMode = ChatMode.DEFAULT;
+    private String enterKeyBehavior = InputSettings.ENTER_SEND;
     private Listener listener;
 
     public ComposerView(Context context) {
@@ -128,6 +131,27 @@ public final class ComposerView extends LinearLayout {
         input.setIncludeFontPadding(false);
         input.setPadding(LineTheme.dp(context, LineTheme.SM), LineTheme.dp(context, LineTheme.SM),
                 LineTheme.dp(context, LineTheme.SM), LineTheme.dp(context, LineTheme.SM));
+        input.setOnEditorActionListener((view, actionId, event) -> {
+            if (!InputSettings.ENTER_SEND.equals(enterKeyBehavior)) {
+                return false;
+            }
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                return submitCurrentInput();
+            }
+            if (isPlainEnterDown(event)) {
+                return submitCurrentInput();
+            }
+            return false;
+        });
+        input.setOnKeyListener((view, keyCode, event) -> {
+            if (!InputSettings.ENTER_SEND.equals(enterKeyBehavior)) {
+                return false;
+            }
+            if (keyCode == KeyEvent.KEYCODE_ENTER && isPlainEnterDown(event)) {
+                return submitCurrentInput();
+            }
+            return false;
+        });
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
         inputRow.addView(input, inputParams);
 
@@ -140,15 +164,7 @@ public final class ComposerView extends LinearLayout {
                 }
                 return;
             }
-            String value = input.getText().toString();
-            if (!canSend()) {
-                return;
-            }
-            if (listener != null) {
-                listener.onSend(value, getAttachments());
-            }
-            input.setText("");
-            clearAttachments();
+            submitCurrentInput();
         });
 
         LinearLayout modeRow = new LinearLayout(context);
@@ -267,6 +283,7 @@ public final class ComposerView extends LinearLayout {
         contextText.setText(state.getContextLabel());
         contextText.setTextColor(state.getContextPercent() >= 80 ? LineTheme.WARNING : LineTheme.TEXT_TERTIARY);
         chatMode = state.getChatMode();
+        updateEnterKeyBehavior(state.getEnterKeyBehavior());
         if (streaming && modePopup != null) {
             modePopup.dismiss();
         }
@@ -305,6 +322,32 @@ public final class ComposerView extends LinearLayout {
 
     private boolean canSend() {
         return input.getText().toString().trim().length() > 0 || !attachments.isEmpty();
+    }
+
+    private boolean submitCurrentInput() {
+        if (streaming || !canSend()) {
+            return true;
+        }
+        if (listener != null) {
+            listener.onSend(input.getText().toString(), getAttachments());
+        }
+        input.setText("");
+        clearAttachments();
+        return true;
+    }
+
+    private boolean isPlainEnterDown(KeyEvent event) {
+        return event != null
+                && event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                && !event.isShiftPressed();
+    }
+
+    private void updateEnterKeyBehavior(String behavior) {
+        enterKeyBehavior = InputSettings.normalizeEnterKeyBehavior(behavior);
+        input.setImeOptions(InputSettings.ENTER_SEND.equals(enterKeyBehavior)
+                ? EditorInfo.IME_ACTION_SEND
+                : EditorInfo.IME_ACTION_NONE);
     }
 
     private void clearAttachments() {

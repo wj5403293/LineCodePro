@@ -15,6 +15,7 @@ public final class ChatUiState {
     private final boolean thinkingAutoExpandEnabled;
     private final boolean codeWrapEnabled;
     private final String browserMode;
+    private final String enterKeyBehavior;
     private final String chatMode;
     private final String conversationId;
     private final List<ChatMessage> messages;
@@ -41,6 +42,7 @@ public final class ChatUiState {
                 false,
                 false,
                 OutputSettings.BROWSER_BUILTIN,
+                InputSettings.ENTER_SEND,
                 ChatMode.DEFAULT,
                 messages
         );
@@ -70,6 +72,7 @@ public final class ChatUiState {
                 thinkingAutoExpandEnabled,
                 false,
                 OutputSettings.BROWSER_BUILTIN,
+                InputSettings.ENTER_SEND,
                 ChatMode.DEFAULT,
                 messages
         );
@@ -101,6 +104,7 @@ public final class ChatUiState {
                 thinkingAutoExpandEnabled,
                 codeWrapEnabled,
                 browserMode,
+                InputSettings.ENTER_SEND,
                 ChatMode.DEFAULT,
                 messages
         );
@@ -133,6 +137,7 @@ public final class ChatUiState {
                 thinkingAutoExpandEnabled,
                 codeWrapEnabled,
                 browserMode,
+                InputSettings.ENTER_SEND,
                 chatMode,
                 "",
                 messages
@@ -155,6 +160,42 @@ public final class ChatUiState {
             String conversationId,
             List<ChatMessage> messages
     ) {
+        this(
+                projectLabel,
+                projectPath,
+                modelLabel,
+                contextLabel,
+                contextPercent,
+                streaming,
+                hasConfiguredModel,
+                thinkingScrollEnabled,
+                thinkingAutoExpandEnabled,
+                codeWrapEnabled,
+                browserMode,
+                InputSettings.ENTER_SEND,
+                chatMode,
+                conversationId,
+                messages
+        );
+    }
+
+    public ChatUiState(
+            String projectLabel,
+            String projectPath,
+            String modelLabel,
+            String contextLabel,
+            int contextPercent,
+            boolean streaming,
+            boolean hasConfiguredModel,
+            boolean thinkingScrollEnabled,
+            boolean thinkingAutoExpandEnabled,
+            boolean codeWrapEnabled,
+            String browserMode,
+            String enterKeyBehavior,
+            String chatMode,
+            String conversationId,
+            List<ChatMessage> messages
+    ) {
         this.projectLabel = projectLabel;
         this.projectPath = projectPath == null ? "" : projectPath;
         this.modelLabel = modelLabel;
@@ -166,6 +207,7 @@ public final class ChatUiState {
         this.thinkingAutoExpandEnabled = thinkingAutoExpandEnabled;
         this.codeWrapEnabled = codeWrapEnabled;
         this.browserMode = OutputSettings.normalizeBrowserMode(browserMode);
+        this.enterKeyBehavior = InputSettings.normalizeEnterKeyBehavior(enterKeyBehavior);
         this.chatMode = ChatMode.normalize(chatMode);
         this.conversationId = conversationId == null ? "" : conversationId;
         this.messages = messages == null ? Collections.emptyList() : Collections.unmodifiableList(messages);
@@ -213,6 +255,10 @@ public final class ChatUiState {
 
     public String getBrowserMode() {
         return browserMode;
+    }
+
+    public String getEnterKeyBehavior() {
+        return enterKeyBehavior;
     }
 
     public String getChatMode() {

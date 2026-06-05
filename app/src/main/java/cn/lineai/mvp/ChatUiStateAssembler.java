@@ -3,10 +3,12 @@ package cn.lineai.mvp;
 import cn.lineai.context.ContextManager;
 import cn.lineai.context.ContextSnapshot;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
+import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.ChatUiState;
+import cn.lineai.model.InputSettings;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextInfo;
 import cn.lineai.model.ModelContextParser;
@@ -18,17 +20,20 @@ import java.util.List;
 public final class ChatUiStateAssembler {
     private final ModelRepository modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
+    private final InputSettingsRepository inputSettingsRepository;
     private final OutputSettingsRepository outputSettingsRepository;
     private final ContextManager contextManager;
 
     public ChatUiStateAssembler(
             ModelRepository modelRepository,
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
+            InputSettingsRepository inputSettingsRepository,
             OutputSettingsRepository outputSettingsRepository,
             ContextManager contextManager
     ) {
         this.modelRepository = modelRepository;
         this.aiBehaviorSettingsRepository = aiBehaviorSettingsRepository;
+        this.inputSettingsRepository = inputSettingsRepository;
         this.outputSettingsRepository = outputSettingsRepository;
         this.contextManager = contextManager;
     }
@@ -48,6 +53,7 @@ public final class ChatUiStateAssembler {
                 ? ModelContextParser.parse("")
                 : ModelContextParser.parse(selectedModel.getModelId());
         AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
+        InputSettings inputSettings = inputSettingsRepository.get();
         OutputSettings outputSettings = outputSettingsRepository.get();
         ContextSnapshot contextSnapshot = contextManager.snapshot(messages, contextInfo.getContextTokens(),
                 aiSettings.isPreserveReasoningEnabled());
@@ -69,6 +75,7 @@ public final class ChatUiStateAssembler {
                 aiSettings.isThinkingAutoExpandEnabled(),
                 outputSettings.isCodeWrapEnabled(),
                 outputSettings.getBrowserMode(),
+                inputSettings.getEnterKeyBehavior(),
                 activeChatMode,
                 conversationId,
                 messages

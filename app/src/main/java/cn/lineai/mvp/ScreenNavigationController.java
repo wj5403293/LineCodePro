@@ -109,6 +109,7 @@ public final class ScreenNavigationController {
             return "";
         }
         if ("llm".equals(safeScreenId)
+                || "input".equals(safeScreenId)
                 || "models".equals(safeScreenId)
                 || "extensions".equals(safeScreenId)
                 || "mcp".equals(safeScreenId)

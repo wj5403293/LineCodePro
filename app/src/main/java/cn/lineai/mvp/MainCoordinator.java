@@ -25,6 +25,7 @@ import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.DiffRepository;
 import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.FileTreeRepository;
+import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.LearningContextRepository;
 import cn.lineai.data.repository.MemoryExtractionService;
 import cn.lineai.data.repository.MessageRecord;
@@ -43,6 +44,7 @@ import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.InputAttachment;
+import cn.lineai.model.InputSettings;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.McpRequestHeader;
 import cn.lineai.model.McpSettingsState;
@@ -111,6 +113,7 @@ public final class MainCoordinator implements MainUiController {
     private final ModelRepository modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final ChatModeRepository chatModeRepository;
+    private final InputSettingsRepository inputSettingsRepository;
     private final OutputSettingsRepository outputSettingsRepository;
     private final ThemeSettingsRepository themeSettingsRepository;
     private final PromptTemplateRepository promptTemplateRepository;
@@ -622,6 +625,7 @@ public final class MainCoordinator implements MainUiController {
         modelRepository = dependencies.modelRepository;
         aiBehaviorSettingsRepository = dependencies.aiBehaviorSettingsRepository;
         chatModeRepository = dependencies.chatModeRepository;
+        inputSettingsRepository = dependencies.inputSettingsRepository;
         outputSettingsRepository = dependencies.outputSettingsRepository;
         themeSettingsRepository = dependencies.themeSettingsRepository;
         promptTemplateRepository = dependencies.promptTemplateRepository;
@@ -649,6 +653,7 @@ public final class MainCoordinator implements MainUiController {
         chatUiStateAssembler = new ChatUiStateAssembler(
                 modelRepository,
                 aiBehaviorSettingsRepository,
+                inputSettingsRepository,
                 outputSettingsRepository,
                 contextManager
         );
@@ -1617,6 +1622,17 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void onAiLearningModeChanged(boolean enabled) {
         aiBehaviorSettingsRepository.setLearningModeEnabled(enabled);
+    }
+
+    @Override
+    public InputSettings getInputSettings() {
+        return inputSettingsRepository.get();
+    }
+
+    @Override
+    public void onEnterKeyBehaviorChanged(String behavior) {
+        inputSettingsRepository.setEnterKeyBehavior(behavior);
+        render();
     }
 
     @Override

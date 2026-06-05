@@ -44,6 +44,7 @@ public final class SettingsScreenView extends LinearLayout {
                 new RowSpec("extensions", "扩展", "Agent、MCP、Skills 和 LineCode 扩展", IconButtonView.PACKAGE),
         });
         addSection(content, "界面与输出", new RowSpec[] {
+                new RowSpec("input", "输入设置", "回车键发送或换行", IconButtonView.MESSAGE_SQUARE_TEXT),
                 new RowSpec("theme", "主题与外观", "主题模式、自定义颜色和高对比外观", IconButtonView.PALETTE),
                 new RowSpec("output", "输出与浏览", "代码换行、网页打开方式和内置浏览器 JS", IconButtonView.MONITOR),
                 new RowSpec("experimental", "实验性渲染", "仍在验证的消息渲染能力", IconButtonView.FLASK_CONICAL),

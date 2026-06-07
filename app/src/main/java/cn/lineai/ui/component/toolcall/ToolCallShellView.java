@@ -207,7 +207,7 @@ public final class ToolCallShellView extends LinearLayout {
         LinearLayout auto = smallActionButton(context, IconButtonView.ZAP, "自动运行",
                 LineTheme.SURFACE_LIGHT, LineTheme.BORDER_LIGHT, LineTheme.TEXT_SECONDARY, true);
         auto.setMinimumWidth(LineTheme.dp(context, 78));
-        auto.setOnClickListener(v -> review("accepted"));
+        auto.setOnClickListener(v -> review("session_auto"));
         section.addView(auto, new LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(context, 30)));
 
         View spacer = new View(context);

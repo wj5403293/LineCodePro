@@ -100,11 +100,14 @@ public final class MainCoordinator implements MainUiController {
     private static final int SSH_PREFETCH_MAX_DIRECTORIES = 24;
     private static final String DIRECTORY_PICKER_MODE_SSH_REMOTE = "ssh_remote";
     private static final String AGENT_TERMINATED_MESSAGE = "Agent 已终止。";
+    private static final String SHELL_EXECUTE_TOOL = "shell_execute";
+    private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
     private final ChatSessionStore chatSessionStore = new ChatSessionStore();
     private final ArrayList<ChatMessage> messages = chatSessionStore.mutableMessages();
     private final ScreenNavigationController screenNavigationController = new ScreenNavigationController();
     private final Set<String> expandedFilePaths = new HashSet<>();
+    private final Set<String> sessionAutoConfirmedTools = new HashSet<>();
     private final MainThreadDispatcher mainThread;
     private final BackgroundTaskRunner backgroundTasks;
     private final ChatUiStateAssembler chatUiStateAssembler;
@@ -173,6 +176,7 @@ public final class MainCoordinator implements MainUiController {
     private String permissionMode = "ask";
     private boolean pendingExternalProjectOpen;
     private PendingToolExecution pendingToolExecution;
+    private String sessionAutoConfirmedConversationId = "";
     private String fileClipboardPath = "";
     private String fileClipboardName = "";
     private boolean fileClipboardSsh;
@@ -759,6 +763,7 @@ public final class MainCoordinator implements MainUiController {
         chatSessionStore.setStreaming(false);
         persistCurrentConversation();
         chatSessionStore.startNewConversation(System.currentTimeMillis());
+        clearSessionAutoToolConfirmations();
         if (view != null) {
             view.hideOverlays();
             view.showChatScreen();
@@ -785,6 +790,7 @@ public final class MainCoordinator implements MainUiController {
             persistCurrentConversation();
         }
         loadConversation(id);
+        clearSessionAutoToolConfirmations();
         if (view != null) {
             view.hideOverlays();
             view.showChatScreen();
@@ -802,6 +808,7 @@ public final class MainCoordinator implements MainUiController {
             cancelActiveGeneration();
             chatSessionStore.setStreaming(false);
             chatSessionStore.clearCurrentConversation();
+            clearSessionAutoToolConfirmations();
         }
         render();
     }
@@ -1547,6 +1554,7 @@ public final class MainCoordinator implements MainUiController {
                 conversationRepository.deleteConversation(currentConversationId);
             }
             chatSessionStore.clearCurrentConversation();
+            clearSessionAutoToolConfirmations();
         }
         if (view != null && !"settings".equals(id) && !"tutorial".equals(id)) {
             view.hideOverlays();
@@ -3464,6 +3472,13 @@ public final class MainCoordinator implements MainUiController {
         return generationController.toolLimitMessage(selectedModel, usedToolCallCount, requestedCount);
     }
 
+    private ToolResult executeToolCallWithSessionPolicy(ToolCall call, ToolContext context) {
+        if (isSessionAutoConfirmed(call)) {
+            return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
+        }
+        return toolExecutor.execute(call, context);
+    }
+
     private ToolExecutionBatch executeToolCallsUntilPending(
             List<ToolCall> toolCalls,
             String homePath,
@@ -3513,7 +3528,7 @@ public final class MainCoordinator implements MainUiController {
                         remainingCalls(sequentialTasks, i + 1)
                 );
             }
-            resultById.put(call.getId(), toolExecutor.execute(call, context));
+            resultById.put(call.getId(), executeToolCallWithSessionPolicy(call, context));
         }
 
         return new ToolExecutionBatch(orderedResults(toolCalls, resultById), null, new ArrayList<>());
@@ -4131,7 +4146,51 @@ public final class MainCoordinator implements MainUiController {
 
     private boolean shouldPauseForConfirmation(ToolCall call) {
         syncModePermission();
+        if (isSessionAutoConfirmed(call)) {
+            return false;
+        }
         return toolRunController.shouldPauseForConfirmation(call);
+    }
+
+    private boolean isSessionAutoReview(String state, ToolCall call) {
+        return TOOL_REVIEW_SESSION_AUTO.equals(state)
+                && call != null
+                && SHELL_EXECUTE_TOOL.equals(call.getName());
+    }
+
+    private void rememberSessionAutoConfirmation(ToolCall call) {
+        if (call == null || !SHELL_EXECUTE_TOOL.equals(call.getName())) {
+            return;
+        }
+        synchronized (sessionAutoConfirmedTools) {
+            syncSessionAutoToolConfirmationsLocked();
+            sessionAutoConfirmedTools.add(call.getName());
+        }
+    }
+
+    private boolean isSessionAutoConfirmed(ToolCall call) {
+        if (call == null) {
+            return false;
+        }
+        synchronized (sessionAutoConfirmedTools) {
+            syncSessionAutoToolConfirmationsLocked();
+            return sessionAutoConfirmedTools.contains(call.getName());
+        }
+    }
+
+    private void clearSessionAutoToolConfirmations() {
+        synchronized (sessionAutoConfirmedTools) {
+            sessionAutoConfirmedTools.clear();
+            sessionAutoConfirmedConversationId = chatSessionStore.getCurrentConversationId();
+        }
+    }
+
+    private void syncSessionAutoToolConfirmationsLocked() {
+        String conversationId = chatSessionStore.getCurrentConversationId();
+        if (!conversationId.equals(sessionAutoConfirmedConversationId)) {
+            sessionAutoConfirmedTools.clear();
+            sessionAutoConfirmedConversationId = conversationId;
+        }
     }
 
     private void handlePendingToolReview(String state) {
@@ -4143,6 +4202,7 @@ public final class MainCoordinator implements MainUiController {
             pendingToolExecution = null;
             return;
         }
+        boolean sessionAutoAccepted = isSessionAutoReview(state, pending.toolCall);
         String normalizedState = "rejected".equals(state) ? "rejected" : "accepted";
         pendingToolExecution = null;
         if ("rejected".equals(normalizedState)) {
@@ -4167,6 +4227,9 @@ public final class MainCoordinator implements MainUiController {
                     pending.cancellationToken
             );
             return;
+        }
+        if (sessionAutoAccepted) {
+            rememberSessionAutoConfirmation(pending.toolCall);
         }
 
         ToolResult accepted = new ToolResult(

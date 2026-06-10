@@ -114,7 +114,7 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
         if ("shell".equals(id)) return IconButtonView.TERMINAL;
         if ("web_search".equals(id)) return IconButtonView.SEARCH;
         if ("image_understanding".equals(id)) return IconButtonView.PAINTBRUSH;
-        if ("image_generation".equals(id)) return IconButtonView.PAINTBRUSH;
+        if ("image_generation".equals(id)) return IconButtonView.SPARKLES;
         if ("agent".equals(id)) return IconButtonView.BRAIN;
         return IconButtonView.MCP;
     }

@@ -140,7 +140,7 @@ public final class ToolSettingsRepository {
             }
             for (String tool : config.getTools()) {
                 ToolCategory category = getToolCategory(tool);
-                if (PERMISSION_READONLY.equals(permissionMode) && category != ToolCategory.READ) {
+                if (PERMISSION_READONLY.equals(permissionMode) && !isReadonlyAllowed(category)) {
                     continue;
                 }
                 enabled.add(tool);
@@ -178,7 +178,7 @@ public final class ToolSettingsRepository {
                 return PermissionResult.denied("工具未启用或当前执行目标不可用: " + toolName);
             }
         }
-        if (PERMISSION_READONLY.equals(getPermissionMode()) && category != ToolCategory.READ) {
+        if (PERMISSION_READONLY.equals(getPermissionMode()) && !isReadonlyAllowed(category)) {
             return PermissionResult.denied("只读模式下不允许执行 " + toolName + "。请在权限设置中切换到自动或确认模式。");
         }
         return PermissionResult.allowed();
@@ -280,7 +280,7 @@ public final class ToolSettingsRepository {
         }
         appendExtensionTools(builder, enabled, renderedTools, toolByName);
         if (nativeToolProtocol) {
-            builder.append("工具调用由当前模型协议的原生 tools/function calling 机制提供。需要读取、写入、搜索或列目录时，必须使用原生工具调用，不要把工具调用 JSON、XML、<tool_calls> 或 Markdown 代码块输出到正文。")
+            builder.append("工具调用由当前模型协议的原生 tools/function calling 机制提供。需要读取、写入、搜索、生成图片或列目录时，必须使用原生工具调用，不要把工具调用 JSON、XML、<tool_calls> 或 Markdown 代码块输出到正文。")
                     .append("每次工具返回后必须继续分析结果；如果任务还没完成，继续调用合适工具执行下一步。");
         } else {
             builder.append("工具调用格式已锁定：需要调用工具时，只能输出 <tool_calls><tool_call name=\"工具名\"><argument name=\"参数名\">参数值</argument></tool_call></tool_calls>。")
@@ -397,6 +397,9 @@ public final class ToolSettingsRepository {
     }
 
     private static String categoryLabel(ToolCategory category) {
+        if (category == ToolCategory.GENERATE) {
+            return "generate";
+        }
         if (category == ToolCategory.WRITE) {
             return "write";
         }
@@ -423,14 +426,20 @@ public final class ToolSettingsRepository {
     public static ToolCategory getToolCategory(String toolName) {
         if ("file_read".equals(toolName) || "glob".equals(toolName) || "list_dir".equals(toolName)
                 || "web_search".equals(toolName) || "web_fetch".equals(toolName)
-                || "image_understanding".equals(toolName)
-                || "image_generation".equals(toolName)) {
+                || "image_understanding".equals(toolName)) {
             return ToolCategory.READ;
+        }
+        if ("image_generation".equals(toolName)) {
+            return ToolCategory.GENERATE;
         }
         if ("file_write".equals(toolName) || "file_edit".equals(toolName) || "file_delete".equals(toolName)) {
             return ToolCategory.WRITE;
         }
         return ToolCategory.SYSTEM;
+    }
+
+    private static boolean isReadonlyAllowed(ToolCategory category) {
+        return category == ToolCategory.READ || category == ToolCategory.GENERATE;
     }
 
     private boolean isEnabledExtensionTool(String toolName, ToolCategory category) {
@@ -444,6 +453,6 @@ public final class ToolSettingsRepository {
         if (!EXECUTION_LOCAL.equals(executionMode) && !EXECUTION_SSH.equals(executionMode)) {
             return false;
         }
-        return !PERMISSION_READONLY.equals(getPermissionMode()) || category == ToolCategory.READ;
+        return !PERMISSION_READONLY.equals(getPermissionMode()) || isReadonlyAllowed(category);
     }
 }

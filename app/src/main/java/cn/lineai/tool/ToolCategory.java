@@ -2,6 +2,7 @@ package cn.lineai.tool;
 
 public enum ToolCategory {
     READ("read"),
+    GENERATE("generate"),
     WRITE("write"),
     SYSTEM("system");
 

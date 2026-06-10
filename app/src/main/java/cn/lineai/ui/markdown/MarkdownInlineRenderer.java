@@ -35,6 +35,16 @@ public final class MarkdownInlineRenderer {
         return builder;
     }
 
+    public CharSequence renderRange(Node firstInclusive, Node stopExclusive) {
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+        Node child = firstInclusive;
+        while (child != null && child != stopExclusive) {
+            appendNode(builder, child);
+            child = child.getNext();
+        }
+        return builder;
+    }
+
     public void setLinkHandler(MarkdownLinkHandler linkHandler) {
         this.linkHandler = linkHandler;
     }

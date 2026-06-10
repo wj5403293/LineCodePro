@@ -10,6 +10,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import cn.lineai.ui.theme.LineTheme;
 import java.io.File;
+import java.util.Locale;
 
 public final class MarkdownImageView extends LinearLayout {
     public MarkdownImageView(Context context, String destination, String altText) {
@@ -43,12 +44,12 @@ public final class MarkdownImageView extends LinearLayout {
 
     private Bitmap decodeBitmap(String url) {
         try {
-            if (url.startsWith("data:image/")) {
+            if (url.toLowerCase(Locale.ROOT).startsWith("data:image/")) {
                 int comma = url.indexOf(',');
                 if (comma < 0) {
                     return null;
                 }
-                byte[] bytes = android.util.Base64.decode(url.substring(comma + 1), android.util.Base64.DEFAULT);
+                byte[] bytes = decodeBase64(url.substring(comma + 1));
                 return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
             }
             String path = url.startsWith("file://") ? Uri.parse(url).getPath() : url;
@@ -62,6 +63,14 @@ public final class MarkdownImageView extends LinearLayout {
             return BitmapFactory.decodeFile(file.getAbsolutePath());
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    private byte[] decodeBase64(String value) {
+        try {
+            return android.util.Base64.decode(value, android.util.Base64.DEFAULT);
+        } catch (IllegalArgumentException ignored) {
+            return android.util.Base64.decode(value, android.util.Base64.URL_SAFE);
         }
     }
 }

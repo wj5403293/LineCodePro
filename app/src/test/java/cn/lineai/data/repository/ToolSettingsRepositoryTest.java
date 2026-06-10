@@ -51,13 +51,18 @@ public final class ToolSettingsRepositoryTest {
         Assert.assertTrue(prompt.contains("\"query\""));
         Assert.assertTrue(prompt.contains("image_understanding [read]"));
         Assert.assertTrue(prompt.contains("\"path\""));
-        Assert.assertTrue(prompt.contains("image_generation [read]"));
+        Assert.assertTrue(prompt.contains("image_generation [generate]"));
         Assert.assertTrue(prompt.contains("\"prompt\""));
         Assert.assertTrue(prompt.contains("agent [system]"));
         Assert.assertTrue(prompt.contains("agent_pipeline [system]"));
         Assert.assertTrue(prompt.contains("\"depends_on\""));
         Assert.assertFalse(prompt.contains("shell_execute"));
         Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"工具名\">"));
+    }
+
+    @Test
+    public void imageGenerationHasGenerateCategory() {
+        Assert.assertEquals(ToolCategory.GENERATE, ToolSettingsRepository.getToolCategory("image_generation"));
     }
 
     @Test

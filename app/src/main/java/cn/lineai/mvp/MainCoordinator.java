@@ -3272,8 +3272,27 @@ public final class MainCoordinator implements MainUiController {
             render();
             return;
         }
+        if (hasImageGenerationResult(batch.completedResults)) {
+            chatSessionStore.setStreaming(false);
+            currentCancellationToken = null;
+            persistCurrentConversation();
+            render();
+            return;
+        }
         persistCurrentConversation();
         continueModelAfterTools(generationId, selectedModel, usedToolCallCount, cancellationToken);
+    }
+
+    private boolean hasImageGenerationResult(List<ToolResult> results) {
+        if (results == null) {
+            return false;
+        }
+        for (ToolResult result : results) {
+            if (result != null && "image_generation".equals(result.getToolName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void continueModelAfterTools(
@@ -3690,9 +3709,11 @@ public final class MainCoordinator implements MainUiController {
             return false;
         }
         if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            return tool.getCategory() == ToolCategory.READ;
+            return tool.getCategory() == ToolCategory.READ
+                    || tool.getCategory() == ToolCategory.GENERATE;
         }
         return tool.getCategory() == ToolCategory.READ
+                || tool.getCategory() == ToolCategory.GENERATE
                 || tool.getCategory() == ToolCategory.WRITE
                 || "http_server".equals(name);
     }

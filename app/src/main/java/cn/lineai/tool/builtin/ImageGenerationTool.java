@@ -24,6 +24,9 @@ import org.json.JSONObject;
 
 public final class ImageGenerationTool extends BaseTool {
     private static final int MAX_DOWNLOAD_BYTES = 12 * 1024 * 1024;
+    private static final int MAX_RESPONSE_BYTES = 24 * 1024 * 1024;
+    private static final String CODEX_PROTOCOL_VERSION = "0.120.0";
+    private static final String CODEX_ORIGINATOR = "codex_cli_rs";
 
     private final ToolSettingsRepository settingsRepository;
     private final ModelRepository modelRepository;
@@ -45,12 +48,12 @@ public final class ImageGenerationTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "根据提示词调用工具设置里选择的生图模型生成图片，成功后返回可直接嵌入 Markdown 的图片。支持 OpenAI 兼容 Images API。";
+        return "根据提示词调用工具设置里选择的生图模型生成图片，成功后返回可直接嵌入 Markdown 的图片。支持 OpenAI Images API 和 Responses image_generation 工具。";
     }
 
     @Override
     public ToolCategory getCategory() {
-        return ToolCategory.READ;
+        return ToolCategory.GENERATE;
     }
 
     @Override
@@ -94,16 +97,10 @@ public final class ImageGenerationTool extends BaseTool {
             if (context != null) {
                 context.reportToolProgress(getName(), "正在生成图片...", false);
             }
-            JSONObject body = requestBody(model, input, prompt, true);
-            String raw;
-            try {
-                raw = postJson(imagesEndpoint(model.getBaseUrl()), body, authHeaders(model));
-            } catch (Exception e) {
-                body = requestBody(model, input, prompt, false);
-                raw = postJson(imagesEndpoint(model.getBaseUrl()), body, authHeaders(model));
-            }
-            GeneratedImage image = parseImage(raw, context);
-            String displayMarkdown = "- ![" + markdownAlt(prompt) + "](" + image.dataUrl + ")";
+            GeneratedImage image = model.getProtocolType() == ModelProtocolType.CODEX_RESPONSES
+                    ? generateWithResponsesApi(model, input, prompt)
+                    : generateWithImagesApi(model, input, prompt, context);
+            String displayMarkdown = "![" + markdownAlt(prompt) + "](" + image.dataUrl + ")";
             String modelContent = "图片已生成并已在对话中显示。提示词: " + trimForModel(prompt)
                     + (image.revisedPrompt.length() == 0 ? "" : "\n修订提示词: " + trimForModel(image.revisedPrompt));
             JSONObject result = new JSONObject()
@@ -124,7 +121,38 @@ public final class ImageGenerationTool extends BaseTool {
         return modelId.length() == 0 ? null : modelRepository.getModel(modelId);
     }
 
-    private JSONObject requestBody(ModelConfig model, JSONObject input, String prompt, boolean requestBase64) throws Exception {
+    private GeneratedImage generateWithImagesApi(ModelConfig model, JSONObject input, String prompt, ToolContext context) throws Exception {
+        boolean requestBase64 = shouldRequestBase64Response(model);
+        JSONObject body = imagesRequestBody(model, input, prompt, requestBase64);
+        String raw;
+        try {
+            raw = postJson(imagesEndpoint(model.getBaseUrl()), body, authHeaders(model));
+        } catch (Exception e) {
+            if (!requestBase64) {
+                throw e;
+            }
+            body = imagesRequestBody(model, input, prompt, false);
+            raw = postJson(imagesEndpoint(model.getBaseUrl()), body, authHeaders(model));
+        }
+        return parseImagesResponse(raw, context);
+    }
+
+    private GeneratedImage generateWithResponsesApi(ModelConfig model, JSONObject input, String prompt) throws Exception {
+        JSONObject body = responsesRequestBody(model, input, prompt);
+        String raw = postJson(responsesEndpoint(model.getBaseUrl()), body, codexHeaders(model));
+        return parseResponsesImage(raw);
+    }
+
+    private JSONObject responsesRequestBody(ModelConfig model, JSONObject input, String prompt) throws Exception {
+        return new JSONObject()
+                .put("model", ModelContextParser.apiModelId(model.getModelId()))
+                .put("input", prompt)
+                .put("tools", new JSONArray().put(responsesImageGenerationTool(input)))
+                .put("tool_choice", new JSONObject().put("type", "image_generation"))
+                .put("store", isAzureResponsesEndpoint(model.getBaseUrl()));
+    }
+
+    private JSONObject imagesRequestBody(ModelConfig model, JSONObject input, String prompt, boolean requestBase64) throws Exception {
         JSONObject body = new JSONObject()
                 .put("model", ModelContextParser.apiModelId(model.getModelId()))
                 .put("prompt", prompt)
@@ -139,6 +167,19 @@ public final class ImageGenerationTool extends BaseTool {
         return body;
     }
 
+    private JSONObject responsesImageGenerationTool(JSONObject input) throws Exception {
+        JSONObject tool = new JSONObject()
+                .put("type", "image_generation")
+                .put("action", "generate");
+        String size = input == null ? "" : input.optString("size").trim();
+        if (size.length() > 0) {
+            tool.put("size", size);
+        }
+        putIfPresent(tool, "quality", input == null ? "" : input.optString("quality").trim());
+        putIfPresent(tool, "background", input == null ? "" : input.optString("background").trim());
+        return tool;
+    }
+
     private void putIfPresent(JSONObject body, String key, String value) throws Exception {
         if (value != null && value.trim().length() > 0) {
             body.put(key, value.trim());
@@ -148,6 +189,15 @@ public final class ImageGenerationTool extends BaseTool {
     private Map<String, String> authHeaders(ModelConfig model) {
         HashMap<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + model.getApiKey());
+        return headers;
+    }
+
+    private Map<String, String> codexHeaders(ModelConfig model) {
+        HashMap<String, String> headers = new HashMap<>();
+        headers.put("Authorization", "Bearer " + model.getApiKey());
+        headers.put("version", CODEX_PROTOCOL_VERSION);
+        headers.put("originator", CODEX_ORIGINATOR);
+        headers.put("User-Agent", CODEX_ORIGINATOR + "/" + CODEX_PROTOCOL_VERSION + " (Android; LineCode)");
         return headers;
     }
 
@@ -173,7 +223,7 @@ public final class ImageGenerationTool extends BaseTool {
             writer.flush();
             writer.close();
             int code = connection.getResponseCode();
-            String response = readAll(code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream(), 1024 * 1024);
+            String response = readAll(code >= 200 && code < 300 ? connection.getInputStream() : connection.getErrorStream(), MAX_RESPONSE_BYTES);
             if (code < 200 || code >= 300) {
                 throw new Exception("HTTP " + code + ": " + response);
             }
@@ -185,7 +235,7 @@ public final class ImageGenerationTool extends BaseTool {
         }
     }
 
-    private GeneratedImage parseImage(String raw, ToolContext context) throws Exception {
+    private GeneratedImage parseImagesResponse(String raw, ToolContext context) throws Exception {
         JSONObject response = new JSONObject(raw);
         JSONArray data = response.optJSONArray("data");
         if (data == null || data.length() == 0 || data.optJSONObject(0) == null) {
@@ -202,7 +252,7 @@ public final class ImageGenerationTool extends BaseTool {
             return new GeneratedImage(mimeType, "data:" + mimeType + ";base64," + b64, revisedPrompt);
         }
         String dataUrl = item.optString("data_url").trim();
-        if (dataUrl.startsWith("data:image/")) {
+        if (isImageDataUrl(dataUrl)) {
             return new GeneratedImage(mimeFromDataUrl(dataUrl), dataUrl, revisedPrompt);
         }
         String url = item.optString("url").trim();
@@ -216,6 +266,37 @@ public final class ImageGenerationTool extends BaseTool {
         return new GeneratedImage(downloaded.mimeType,
                 "data:" + downloaded.mimeType + ";base64," + android.util.Base64.encodeToString(downloaded.bytes, android.util.Base64.NO_WRAP),
                 revisedPrompt);
+    }
+
+    private GeneratedImage parseResponsesImage(String raw) throws Exception {
+        JSONObject response = new JSONObject(raw);
+        JSONObject error = response.optJSONObject("error");
+        if (error != null) {
+            String message = error.optString("message").trim();
+            throw new Exception(message.length() == 0 ? error.toString() : message);
+        }
+        JSONArray output = response.optJSONArray("output");
+        if (output == null || output.length() == 0) {
+            throw new Exception("Responses API 没有返回 output。");
+        }
+        for (int i = 0; i < output.length(); i++) {
+            JSONObject item = output.optJSONObject(i);
+            if (item == null || !"image_generation_call".equals(item.optString("type"))) {
+                continue;
+            }
+            String result = item.optString("result").trim();
+            if (isImageDataUrl(result)) {
+                return new GeneratedImage(mimeFromDataUrl(result), result, item.optString("revised_prompt").trim());
+            }
+            if (result.length() > 0) {
+                return new GeneratedImage("image/png", "data:image/png;base64," + result, item.optString("revised_prompt").trim());
+            }
+            String status = item.optString("status").trim();
+            if ("failed".equals(status)) {
+                throw new Exception("Responses API 图片生成失败。");
+            }
+        }
+        throw new Exception("Responses API 没有返回 image_generation_call.result。");
     }
 
     private DownloadedImage downloadImage(String url) throws Exception {
@@ -288,6 +369,43 @@ public final class ImageGenerationTool extends BaseTool {
         return base + "/images/generations";
     }
 
+    private String responsesEndpoint(String baseUrl) {
+        String base = baseUrl == null ? "" : baseUrl.trim();
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (base.endsWith("/chat/completions")) {
+            return base.substring(0, base.length() - "/chat/completions".length()) + "/responses";
+        }
+        if (base.endsWith("/images/generations")) {
+            return base.substring(0, base.length() - "/images/generations".length()) + "/responses";
+        }
+        if (base.endsWith("/responses")) {
+            return base;
+        }
+        return base + "/responses";
+    }
+
+    private boolean shouldRequestBase64Response(ModelConfig model) {
+        String id = ModelContextParser.apiModelId(model == null ? "" : model.getModelId())
+                .trim()
+                .toLowerCase(java.util.Locale.ROOT);
+        return !(id.startsWith("gpt-image-") || "chatgpt-image-latest".equals(id));
+    }
+
+    private boolean isAzureResponsesEndpoint(String baseUrl) {
+        if (baseUrl == null) {
+            return false;
+        }
+        String normalized = baseUrl.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("openai.azure.")
+                || normalized.contains("cognitiveservices.azure.")
+                || normalized.contains("aoai.azure.")
+                || normalized.contains("azure-api.")
+                || normalized.contains("azurefd.")
+                || normalized.contains("windows.net/openai");
+    }
+
     private String mimeFromDataUrl(String dataUrl) {
         int colon = dataUrl.indexOf(':');
         int semicolon = dataUrl.indexOf(';');
@@ -295,6 +413,10 @@ public final class ImageGenerationTool extends BaseTool {
             return dataUrl.substring(colon + 1, semicolon);
         }
         return "image/png";
+    }
+
+    private boolean isImageDataUrl(String value) {
+        return value != null && value.toLowerCase(java.util.Locale.ROOT).startsWith("data:image/");
     }
 
     private String markdownAlt(String prompt) {

@@ -32,7 +32,11 @@ public final class ToolCallReadView extends LinearLayout {
         String name = toolCall == null ? "" : toolCall.getName();
         JSONObject input = ToolCallUtils.parseInput(toolCall);
         String label = ToolCallUtils.displayInputLabel(name, input, projectPath);
-        boolean complete = result != null;
+        String reviewState = result == null ? "" : result.getReviewState();
+        boolean running = result == null
+                || "running".equals(reviewState)
+                || "pending".equals(reviewState);
+        boolean complete = result != null && !running;
         boolean error = result != null && result.isError();
         String actionLabel = actionLabel(name);
 
@@ -43,7 +47,7 @@ public final class ToolCallReadView extends LinearLayout {
         LineTheme.padding(header, LineTheme.SM, LineTheme.XS, LineTheme.SM, LineTheme.XS);
 
         IconButtonView icon = new IconButtonView(getContext(), iconFor(name));
-        icon.setIconColor(error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY);
+        icon.setIconColor(error ? LineTheme.DANGER : running ? LineTheme.ACCENT : LineTheme.TEXT_SECONDARY);
         icon.setIconSizeDp(26, 13);
         icon.setClickable(false);
         icon.setBackground(LineTheme.roundedStroke(getContext(), android.graphics.Color.TRANSPARENT, 8,
@@ -72,12 +76,15 @@ public final class ToolCallReadView extends LinearLayout {
         header.addView(status, new LayoutParams(LineTheme.dp(getContext(), 18), LineTheme.dp(getContext(), 18)));
         addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        if (error && result.getContent().length() > 0) {
+        if (running && result != null && result.getContent().length() > 0) {
+            addMessage(result.getContent(), LineTheme.TEXT_SECONDARY, IconButtonView.LOADER);
+        } else if (error && result.getContent().length() > 0) {
             addError(result.getContent());
         }
     }
 
     private String actionLabel(String name) {
+        if ("image_generation".equals(name)) return "图片生成";
         if ("image_understanding".equals(name)) return "图片理解";
         if ("web_search".equals(name)) return "搜索";
         if ("web_fetch".equals(name)) return "抓取";
@@ -98,6 +105,9 @@ public final class ToolCallReadView extends LinearLayout {
         }
         if ("image_understanding".equals(name)) {
             return IconButtonView.PAINTBRUSH;
+        }
+        if ("image_generation".equals(name)) {
+            return IconButtonView.SPARKLES;
         }
         return IconButtonView.EXPAND;
     }
@@ -122,6 +132,10 @@ public final class ToolCallReadView extends LinearLayout {
     }
 
     private void addError(String text) {
+        addMessage(text, LineTheme.DANGER, IconButtonView.CLOSE);
+    }
+
+    private void addMessage(String text, int color, int iconType) {
         View divider = new View(getContext());
         divider.setBackgroundColor(LineTheme.CODE_BORDER);
         addView(divider, new LayoutParams(LayoutParams.MATCH_PARENT, 1));
@@ -130,12 +144,12 @@ public final class ToolCallReadView extends LinearLayout {
         row.setOrientation(HORIZONTAL);
         row.setGravity(Gravity.TOP);
         LineTheme.padding(row, LineTheme.SM, LineTheme.XS, LineTheme.SM, LineTheme.XS);
-        IconButtonView icon = new IconButtonView(getContext(), IconButtonView.CLOSE);
-        icon.setIconColor(LineTheme.DANGER);
+        IconButtonView icon = new IconButtonView(getContext(), iconType);
+        icon.setIconColor(color);
         icon.setIconSizeDp(14, 12);
         icon.setClickable(false);
         row.addView(icon, new LayoutParams(LineTheme.dp(getContext(), 14), LineTheme.dp(getContext(), 14)));
-        TextView error = LineTheme.text(getContext(), text, LineTheme.FONT_XS, LineTheme.DANGER, Typeface.NORMAL);
+        TextView error = LineTheme.text(getContext(), text, LineTheme.FONT_XS, color, Typeface.NORMAL);
         LayoutParams params = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
         params.leftMargin = LineTheme.dp(getContext(), LineTheme.XS);
         row.addView(error, params);

@@ -79,6 +79,10 @@ public final class MarkdownRenderer {
                 addBlock(target, new MarkdownImageView(context, image.getDestination(), plainText(image)), depth == 0 ? 2 : 0, 7);
                 return;
             }
+            if (hasDirectImage(node)) {
+                renderParagraphWithImages(target, node, depth);
+                return;
+            }
             CharSequence text = inlineRenderer.render(node);
             if (text.toString().trim().length() > 0) {
                 addBlock(target, new MarkdownTextBlockView(context, text, LineTheme.FONT_MD, false, linkHandler), depth == 0 ? 2 : 0, 7);
@@ -172,6 +176,48 @@ public final class MarkdownRenderer {
             child = child.getNext();
         }
         return image;
+    }
+
+    private boolean hasDirectImage(Node node) {
+        Node child = node.getFirstChild();
+        while (child != null) {
+            if (child instanceof Image) {
+                return true;
+            }
+            child = child.getNext();
+        }
+        return false;
+    }
+
+    private void renderParagraphWithImages(LinearLayout target, Node paragraph, int depth) {
+        Node segmentStart = paragraph.getFirstChild();
+        Node child = segmentStart;
+        boolean renderedAny = false;
+        while (child != null) {
+            Node next = child.getNext();
+            if (child instanceof Image) {
+                renderedAny = addTextSegment(target, segmentStart, child, depth, renderedAny) || renderedAny;
+                int top = renderedAny ? 1 : depth == 0 ? 2 : 0;
+                addBlock(target, new MarkdownImageView(context, ((Image) child).getDestination(), plainText(child)), top, 7);
+                renderedAny = true;
+                segmentStart = next;
+            }
+            child = next;
+        }
+        addTextSegment(target, segmentStart, null, depth, renderedAny);
+    }
+
+    private boolean addTextSegment(LinearLayout target, Node firstInclusive, Node stopExclusive, int depth, boolean afterBlock) {
+        if (firstInclusive == null || firstInclusive == stopExclusive) {
+            return false;
+        }
+        CharSequence text = inlineRenderer.renderRange(firstInclusive, stopExclusive);
+        if (text.toString().trim().length() == 0) {
+            return false;
+        }
+        addBlock(target, new MarkdownTextBlockView(context, text, LineTheme.FONT_MD, false, linkHandler),
+                afterBlock ? 1 : depth == 0 ? 2 : 0, 7);
+        return true;
     }
 
     private String plainText(Node node) {

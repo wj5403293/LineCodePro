@@ -98,7 +98,7 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
         selectedParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(selected, selectedParams);
 
-        LinearLayout button = actionButton(context, "选择模型", IconButtonView.PAINTBRUSH, true, v -> listener.onOpenImageGenerationModelPicker());
+        LinearLayout button = actionButton(context, "选择模型", IconButtonView.SPARKLES, true, v -> listener.onOpenImageGenerationModelPicker());
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         buttonParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(button, buttonParams);

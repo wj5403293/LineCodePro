@@ -12,8 +12,10 @@ import org.commonmark.ext.gfm.tables.TableHead;
 import org.commonmark.ext.gfm.tables.TablesExtension;
 import org.commonmark.node.BulletList;
 import org.commonmark.node.FencedCodeBlock;
+import org.commonmark.node.Image;
 import org.commonmark.node.Node;
 import org.commonmark.node.OrderedList;
+import org.commonmark.node.Paragraph;
 import org.commonmark.parser.Parser;
 import org.junit.Test;
 
@@ -49,5 +51,29 @@ public final class CommonmarkParserTest {
         Node secondHeaderCell = head.getFirstChild().getFirstChild().getNext();
         assertTrue(secondHeaderCell instanceof TableCell);
         assertEquals(TableCell.Alignment.RIGHT, ((TableCell) secondHeaderCell).getAlignment());
+    }
+
+    @Test
+    public void parsesDataUrlImageDestination() {
+        String dataUrl = "data:image/png;base64,aGVsbG8=";
+        Node document = Parser.builder().build().parse("![cat](" + dataUrl + ")");
+
+        assertTrue(document.getFirstChild() instanceof Paragraph);
+        Node image = document.getFirstChild().getFirstChild();
+        assertTrue(image instanceof Image);
+        assertEquals(dataUrl, ((Image) image).getDestination());
+    }
+
+    @Test
+    public void parsesListDataUrlImageDestination() {
+        String dataUrl = "data:image/png;base64,aGVsbG8=";
+        Node document = Parser.builder().build().parse("- ![cat](" + dataUrl + ")");
+
+        assertTrue(document.getFirstChild() instanceof BulletList);
+        Node paragraph = document.getFirstChild().getFirstChild().getFirstChild();
+        assertTrue(paragraph instanceof Paragraph);
+        Node image = paragraph.getFirstChild();
+        assertTrue(image instanceof Image);
+        assertEquals(dataUrl, ((Image) image).getDestination());
     }
 }

@@ -2853,7 +2853,8 @@ public final class MainCoordinator implements MainUiController {
                 aiSettings.getToneMode(),
                 chatModePromptContext(activeChatMode),
                 systemContext,
-                buildToolPrompt(selectedModel, usedToolCallCount)
+                buildToolPrompt(selectedModel, usedToolCallCount),
+                selectedModel
         );
         modelMessages.add(new SystemModelMessage(systemPrompt));
         int contextTokens = selectedModel == null

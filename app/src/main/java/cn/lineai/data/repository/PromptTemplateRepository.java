@@ -22,6 +22,7 @@ public final class PromptTemplateRepository {
     public static final String ID_CHAT_MODE_CHAT = "chatModeChat";
     public static final String ID_CHAT_MODE_PLAN = "chatModePlan";
     public static final String ID_CHAT_MODE_AGENT = "chatModeAgent";
+    public static final String ID_MODEL_IDENTITY = "modelIdentity";
 
     private static final String KEY_PREFIX = "@linecode_prompt_template_";
     private static final List<Definition> DEFINITIONS = buildDefinitions();
@@ -125,7 +126,7 @@ public final class PromptTemplateRepository {
                 "System 提示词",
                 "主系统提示词，定义 LineCode 的身份、工作方式、工具循环、回答规范，并组合其它上下文模板。",
                 "prompts/system-prompt-template.txt",
-                "TOOLS_CONTEXT", "TONE_CONTEXT", "CHAT_MODE_CONTEXT", "WORK_DIRECTORY_CONTEXT", "LEARNING_CONTEXT"
+                "TOOLS_CONTEXT", "TONE_CONTEXT", "CHAT_MODE_CONTEXT", "WORK_DIRECTORY_CONTEXT", "LEARNING_CONTEXT", "MODEL_IDENTITY"
         ));
         definitions.add(new Definition(
                 ID_WORK_DIRECTORY,
@@ -194,6 +195,13 @@ public final class PromptTemplateRepository {
                 "上下文压缩模板",
                 "上下文过长时用于总结旧对话，要求模型输出可恢复任务状态的压缩摘要。",
                 "prompts/context-compaction-template.txt"
+        ));
+        definitions.add(new Definition(
+                ID_MODEL_IDENTITY,
+                "模型身份提示词",
+                "把当前模型的 modelId、名称、提供方和协议注入到 system prompt，让模型在回答自身能力相关问题时以模型标识为依据。",
+                "prompts/model-identity-template.txt",
+                "MODEL_ID", "MODEL_NAME", "MODEL_PROVIDER", "MODEL_PROTOCOL"
         ));
         return Collections.unmodifiableList(definitions);
     }

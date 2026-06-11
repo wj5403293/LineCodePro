@@ -3,6 +3,8 @@ package cn.lineai.ai.prompt;
 import android.content.Context;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.model.AiBehaviorSettings;
+import cn.lineai.model.ModelConfig;
+import cn.lineai.model.ModelProtocolType;
 import cn.lineai.workspace.WorkspacePaths;
 import java.util.HashMap;
 
@@ -35,7 +37,7 @@ public final class SystemPromptProvider {
     }
 
     public String build(String homePath, String toneMode, String learningContext, String toolsContext) {
-        return build(homePath, toneMode, "", learningContext, toolsContext);
+        return build(homePath, toneMode, "", learningContext, toolsContext, null);
     }
 
     public String build(
@@ -45,12 +47,24 @@ public final class SystemPromptProvider {
             String learningContext,
             String toolsContext
     ) {
+        return build(homePath, toneMode, chatModeContext, learningContext, toolsContext, null);
+    }
+
+    public String build(
+            String homePath,
+            String toneMode,
+            String chatModeContext,
+            String learningContext,
+            String toolsContext,
+            ModelConfig model
+    ) {
         HashMap<String, String> values = new HashMap<>();
         values.put("TONE_CONTEXT", toneContext(toneMode));
         values.put("CHAT_MODE_CONTEXT", chatModeContext == null ? "" : chatModeContext.trim());
         values.put("WORK_DIRECTORY_CONTEXT", workDirectoryContext(homePath));
         values.put("LEARNING_CONTEXT", learningContext == null ? "" : learningContext.trim());
         values.put("TOOLS_CONTEXT", toolsContext == null ? "" : toolsContext.trim());
+        values.put("MODEL_IDENTITY", modelIdentityContext(model));
         return template().render(values);
     }
 
@@ -76,5 +90,29 @@ public final class SystemPromptProvider {
             return new StringTemplate(promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_TONE_CHAT)).render(new HashMap<>());
         }
         return new StringTemplate(promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_TONE_CODING)).render(new HashMap<>());
+    }
+
+    private String modelIdentityContext(ModelConfig model) {
+        if (model == null) {
+            return "";
+        }
+        String modelId = safe(model.getModelId());
+        if (modelId.length() == 0) {
+            return "";
+        }
+        HashMap<String, String> values = new HashMap<>();
+        values.put("MODEL_ID", modelId);
+        values.put("MODEL_NAME", safe(model.getName()));
+        values.put("MODEL_PROVIDER", safe(model.getProviderLabel()));
+        values.put("MODEL_PROTOCOL", protocolLabel(model.getProtocolType()));
+        return new StringTemplate(promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_MODEL_IDENTITY)).render(values);
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String protocolLabel(ModelProtocolType type) {
+        return type == null ? "" : type.getLabel();
     }
 }

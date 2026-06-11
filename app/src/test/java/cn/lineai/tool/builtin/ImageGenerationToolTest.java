@@ -6,11 +6,18 @@ import static org.junit.Assert.assertTrue;
 
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelProtocolType;
+import cn.lineai.tool.ToolContext;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
 public final class ImageGenerationToolTest {
+    private static final String PNG_1X1_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+
     @Test
     public void responsesEndpointDerivesFromCommonBaseUrls() throws Exception {
         ImageGenerationTool tool = new ImageGenerationTool();
@@ -77,6 +84,67 @@ public final class ImageGenerationToolTest {
         assertEquals("b64_json", body.getString("response_format"));
     }
 
+    @Test
+    public void responsesParserRejectsNullStringResult() throws Exception {
+        ImageGenerationTool tool = new ImageGenerationTool();
+        String raw = new JSONObject()
+                .put("output", new JSONArray().put(new JSONObject()
+                        .put("type", "image_generation_call")
+                        .put("result", "null")))
+                .toString();
+
+        Exception error = invokeFailure(tool, "parseResponsesImage",
+                new Class<?>[] {String.class}, raw);
+
+        assertTrue(error.getMessage().contains("无效的图片数据"));
+    }
+
+    @Test
+    public void imagesParserRejectsNullStringFields() throws Exception {
+        ImageGenerationTool tool = new ImageGenerationTool();
+        String raw = new JSONObject()
+                .put("data", new JSONArray().put(new JSONObject()
+                        .put("b64_json", "null")
+                        .put("data_url", "data:image/png;base64,null")
+                        .put("url", "null")))
+                .toString();
+
+        Exception error = invokeFailure(tool, "parseImagesResponse",
+                new Class<?>[] {String.class, ToolContext.class}, raw, null);
+
+        assertTrue(error.getMessage().contains("无效的图片数据"));
+    }
+
+    @Test
+    public void responsesParserAcceptsPngBase64Result() throws Exception {
+        ImageGenerationTool tool = new ImageGenerationTool();
+        String raw = new JSONObject()
+                .put("output", new JSONArray().put(new JSONObject()
+                        .put("type", "image_generation_call")
+                        .put("result", PNG_1X1_BASE64)))
+                .toString();
+
+        Object image = invokeObject(tool, "parseResponsesImage",
+                new Class<?>[] {String.class}, raw);
+
+        assertEquals("data:image/png;base64," + PNG_1X1_BASE64, fieldString(image, "dataUrl"));
+    }
+
+    @Test
+    public void imagesParserAcceptsPngBase64Result() throws Exception {
+        ImageGenerationTool tool = new ImageGenerationTool();
+        String raw = new JSONObject()
+                .put("data", new JSONArray().put(new JSONObject()
+                        .put("b64_json", PNG_1X1_BASE64)
+                        .put("mime_type", "image/png")))
+                .toString();
+
+        Object image = invokeObject(tool, "parseImagesResponse",
+                new Class<?>[] {String.class, ToolContext.class}, raw, null);
+
+        assertEquals("data:image/png;base64," + PNG_1X1_BASE64, fieldString(image, "dataUrl"));
+    }
+
     private static ModelConfig model(String modelId) {
         return new ModelConfig("id", "name", ModelProtocolType.OPENAI_COMPATIBLE,
                 "OpenAI", "https://api.openai.com/v1", "key", modelId);
@@ -96,5 +164,40 @@ public final class ImageGenerationToolTest {
         Method method = ImageGenerationTool.class.getDeclaredMethod(methodName, types);
         method.setAccessible(true);
         return (JSONObject) method.invoke(tool, args);
+    }
+
+    private static Object invokeObject(
+            ImageGenerationTool tool,
+            String methodName,
+            Class<?>[] types,
+            Object... args
+    ) throws Exception {
+        Method method = ImageGenerationTool.class.getDeclaredMethod(methodName, types);
+        method.setAccessible(true);
+        return method.invoke(tool, args);
+    }
+
+    private static Exception invokeFailure(
+            ImageGenerationTool tool,
+            String methodName,
+            Class<?>[] types,
+            Object... args
+    ) throws Exception {
+        try {
+            invokeObject(tool, methodName, types, args);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                return (Exception) cause;
+            }
+            throw e;
+        }
+        throw new AssertionError("Expected " + methodName + " to fail");
+    }
+
+    private static String fieldString(Object target, String name) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return (String) field.get(target);
     }
 }

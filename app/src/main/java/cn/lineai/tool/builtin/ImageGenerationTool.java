@@ -17,6 +17,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.json.JSONArray;
@@ -243,20 +244,34 @@ public final class ImageGenerationTool extends BaseTool {
         }
         JSONObject item = data.getJSONObject(0);
         String revisedPrompt = item.optString("revised_prompt").trim();
-        String b64 = item.optString("b64_json").trim();
-        String mimeType = item.optString("mime_type").trim();
-        if (mimeType.length() == 0) {
+        boolean invalidImageData = false;
+        String b64 = optNonNullString(item, "b64_json");
+        String mimeType = optNonNullString(item, "mime_type");
+        if (mimeType.length() == 0 || isNullLikeString(mimeType)) {
             mimeType = "image/png";
         }
         if (b64.length() > 0) {
-            return new GeneratedImage(mimeType, "data:" + mimeType + ";base64," + b64, revisedPrompt);
+            if (isUsableBase64ImagePayload(b64)) {
+                return new GeneratedImage(mimeType, "data:" + mimeType + ";base64," + b64, revisedPrompt);
+            }
+            invalidImageData = true;
         }
-        String dataUrl = item.optString("data_url").trim();
+        String dataUrl = optNonNullString(item, "data_url");
         if (isImageDataUrl(dataUrl)) {
-            return new GeneratedImage(mimeFromDataUrl(dataUrl), dataUrl, revisedPrompt);
+            if (isUsableImageDataUrl(dataUrl)) {
+                return new GeneratedImage(mimeFromDataUrl(dataUrl), dataUrl, revisedPrompt);
+            }
+            invalidImageData = true;
         }
-        String url = item.optString("url").trim();
+        String url = optNonNullString(item, "url");
+        if (isNullLikeString(url)) {
+            invalidImageData = true;
+            url = "";
+        }
         if (url.length() == 0) {
+            if (invalidImageData) {
+                throw new Exception("接口返回了无效的图片数据。");
+            }
             throw new Exception("接口没有返回 b64_json、data_url 或 url。");
         }
         if (context != null) {
@@ -279,22 +294,34 @@ public final class ImageGenerationTool extends BaseTool {
         if (output == null || output.length() == 0) {
             throw new Exception("Responses API 没有返回 output。");
         }
+        boolean invalidImageData = false;
         for (int i = 0; i < output.length(); i++) {
             JSONObject item = output.optJSONObject(i);
             if (item == null || !"image_generation_call".equals(item.optString("type"))) {
                 continue;
             }
-            String result = item.optString("result").trim();
+            String result = optNonNullString(item, "result");
             if (isImageDataUrl(result)) {
-                return new GeneratedImage(mimeFromDataUrl(result), result, item.optString("revised_prompt").trim());
+                if (isUsableImageDataUrl(result)) {
+                    return new GeneratedImage(mimeFromDataUrl(result), result, item.optString("revised_prompt").trim());
+                }
+                invalidImageData = true;
+                continue;
             }
             if (result.length() > 0) {
-                return new GeneratedImage("image/png", "data:image/png;base64," + result, item.optString("revised_prompt").trim());
+                if (isUsableBase64ImagePayload(result)) {
+                    return new GeneratedImage("image/png", "data:image/png;base64," + result, item.optString("revised_prompt").trim());
+                }
+                invalidImageData = true;
+                continue;
             }
             String status = item.optString("status").trim();
             if ("failed".equals(status)) {
                 throw new Exception("Responses API 图片生成失败。");
             }
+        }
+        if (invalidImageData) {
+            throw new Exception("Responses API 返回了无效的图片数据。");
         }
         throw new Exception("Responses API 没有返回 image_generation_call.result。");
     }
@@ -417,6 +444,127 @@ public final class ImageGenerationTool extends BaseTool {
 
     private boolean isImageDataUrl(String value) {
         return value != null && value.toLowerCase(java.util.Locale.ROOT).startsWith("data:image/");
+    }
+
+    private boolean isUsableImageDataUrl(String value) {
+        String dataUrl = value == null ? "" : value.trim();
+        if (!isImageDataUrl(dataUrl)) {
+            return false;
+        }
+        int comma = dataUrl.indexOf(',');
+        if (comma < 0) {
+            return false;
+        }
+        String metadata = dataUrl.substring(0, comma).toLowerCase(java.util.Locale.ROOT);
+        return metadata.contains(";base64")
+                && isUsableBase64ImagePayload(dataUrl.substring(comma + 1));
+    }
+
+    private boolean isUsableBase64ImagePayload(String value) {
+        String payload = value == null ? "" : value.trim();
+        if (payload.length() == 0 || isNullLikeString(payload)) {
+            return false;
+        }
+        return hasKnownImageSignature(decodedBase64Prefix(payload, 16));
+    }
+
+    private byte[] decodedBase64Prefix(String value, int maxBytes) {
+        byte[] output = new byte[Math.max(0, maxBytes)];
+        int count = 0;
+        int buffer = 0;
+        int bits = 0;
+        boolean sawPadding = false;
+        for (int i = 0; i < value.length() && count < output.length; i++) {
+            char c = value.charAt(i);
+            if (Character.isWhitespace(c)) {
+                continue;
+            }
+            if (c == '=') {
+                sawPadding = true;
+                continue;
+            }
+            int sixBits = base64Value(c);
+            if (sixBits < 0 || sawPadding) {
+                return new byte[0];
+            }
+            buffer = (buffer << 6) | sixBits;
+            bits += 6;
+            if (bits >= 8) {
+                bits -= 8;
+                output[count] = (byte) ((buffer >> bits) & 0xff);
+                count++;
+            }
+        }
+        return Arrays.copyOf(output, count);
+    }
+
+    private int base64Value(char c) {
+        if (c >= 'A' && c <= 'Z') {
+            return c - 'A';
+        }
+        if (c >= 'a' && c <= 'z') {
+            return c - 'a' + 26;
+        }
+        if (c >= '0' && c <= '9') {
+            return c - '0' + 52;
+        }
+        if (c == '+' || c == '-') {
+            return 62;
+        }
+        if (c == '/' || c == '_') {
+            return 63;
+        }
+        return -1;
+    }
+
+    private boolean hasKnownImageSignature(byte[] bytes) {
+        if (bytes == null || bytes.length < 2) {
+            return false;
+        }
+        return startsWith(bytes, new int[] {0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
+                || startsWith(bytes, new int[] {0xff, 0xd8, 0xff})
+                || startsWith(bytes, new int[] {'G', 'I', 'F', '8'})
+                || startsWith(bytes, new int[] {'B', 'M'})
+                || (bytes.length >= 12
+                && startsWith(bytes, new int[] {'R', 'I', 'F', 'F'})
+                && bytes[8] == 'W'
+                && bytes[9] == 'E'
+                && bytes[10] == 'B'
+                && bytes[11] == 'P')
+                || (bytes.length >= 12
+                && bytes[4] == 'f'
+                && bytes[5] == 't'
+                && bytes[6] == 'y'
+                && bytes[7] == 'p'
+                && bytes[8] == 'a'
+                && bytes[9] == 'v'
+                && bytes[10] == 'i'
+                && bytes[11] == 'f');
+    }
+
+    private boolean startsWith(byte[] bytes, int[] prefix) {
+        if (bytes.length < prefix.length) {
+            return false;
+        }
+        for (int i = 0; i < prefix.length; i++) {
+            if ((bytes[i] & 0xff) != prefix[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private String optNonNullString(JSONObject object, String key) {
+        if (object == null) {
+            return "";
+        }
+        String value = object.optString(key, "").trim();
+        return value;
+    }
+
+    private boolean isNullLikeString(String value) {
+        String normalized = value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT);
+        return "null".equals(normalized) || "undefined".equals(normalized);
     }
 
     private String markdownAlt(String prompt) {

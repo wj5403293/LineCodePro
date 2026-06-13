@@ -24,31 +24,36 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check if releaseVersionName changed
+      - name: Check if versionCode changed
         id: check
         run: |
-          # 获取当前版本
-          CURRENT_VERSION=$(grep -E '^val releaseVersionName = "' app/build.gradle.kts | sed 's/.*"\([^"]*\)".*/\1/')
-          echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "Current version: $CURRENT_VERSION"
+          # 获取当前版本号和版本名
+          CURRENT_VERSION_CODE=$(grep -E 'versionCode = ' app/build.gradle.kts | sed 's/.*versionCode = \([0-9]*\).*/\1/')
+          CURRENT_VERSION_NAME=$(grep -E '^val releaseVersionName = "' app/build.gradle.kts | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "new_version_code=$CURRENT_VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "new_version_name=$CURRENT_VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION_NAME (code: $CURRENT_VERSION_CODE)"
 
           # 检查是否有足够的提交历史
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
-            # 获取上一个提交的版本
-            PREV_VERSION=$(git show HEAD~1:app/build.gradle.kts 2>/dev/null | grep -E '^val releaseVersionName = "' | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
-            echo "old_version=$PREV_VERSION" >> $GITHUB_OUTPUT
-            echo "Previous version: $PREV_VERSION"
+            # 获取上一个提交的版本号
+            PREV_VERSION_CODE=$(git show HEAD~1:app/build.gradle.kts 2>/dev/null | grep -E 'versionCode = ' | sed 's/.*versionCode = \([0-9]*\).*/\1/' || echo "")
+            PREV_VERSION_NAME=$(git show HEAD~1:app/build.gradle.kts 2>/dev/null | grep -E '^val releaseVersionName = "' | sed 's/.*"\([^"]*\)".*/\1/' || echo "")
+            echo "old_version_code=$PREV_VERSION_CODE" >> $GITHUB_OUTPUT
+            echo "old_version_name=$PREV_VERSION_NAME" >> $GITHUB_OUTPUT
+            echo "Previous version: $PREV_VERSION_NAME (code: $PREV_VERSION_CODE)"
 
-            # 检查版本是否变化
-            if [ "$CURRENT_VERSION" != "$PREV_VERSION" ] && [ -n "$PREV_VERSION" ]; then
+            # 检查版本号是否增加
+            if [ -n "$PREV_VERSION_CODE" ] && [ "$CURRENT_VERSION_CODE" -gt "$PREV_VERSION_CODE" ]; then
               echo "version_changed=true" >> $GITHUB_OUTPUT
-              echo "Version changed from $PREV_VERSION to $CURRENT_VERSION"
+              echo "Version code increased from $PREV_VERSION_CODE to $CURRENT_VERSION_CODE"
             else
               echo "version_changed=false" >> $GITHUB_OUTPUT
-              echo "No version change detected"
+              echo "No version code increase detected"
             fi
           else
-            echo "old_version=" >> $GITHUB_OUTPUT
+            echo "old_version_code=" >> $GITHUB_OUTPUT
+            echo "old_version_name=" >> $GITHUB_OUTPUT
             echo "version_changed=false" >> $GITHUB_OUTPUT
             echo "First commit, skipping release"
           fi

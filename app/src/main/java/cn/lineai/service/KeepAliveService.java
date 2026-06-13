@@ -220,7 +220,7 @@ public final class KeepAliveService extends Service {
     }
 
     private void updateNotification() {
-        if (isForeground) {
+        if (isForeground && notificationManager.areNotificationsEnabled()) {
             notificationManager.notify(NOTIFICATION_ID, buildNotification());
         }
     }

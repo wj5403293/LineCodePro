@@ -85,6 +85,10 @@ final class ToolCallUtils {
         }
     }
 
+    static boolean isImageGenerationTool(String name) {
+        return "image_generation".equals(name);
+    }
+
     static boolean isReadTool(String name) {
         return "file_read".equals(name) || "glob".equals(name) || "list_dir".equals(name)
                 || "web_search".equals(name) || "web_fetch".equals(name)

@@ -295,31 +295,31 @@ public final class ChatMessage {
     public ChatMessage withContent(String nextContent, String nextReasoningContent, boolean nextStreaming) {
         return new ChatMessage(id, role, nextContent, nextReasoningContent, nextStreaming, hidden,
                 excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
-                compactStatus, responseInputItemJson, attachments);
+                compactStatus, responseInputItemJson, attachments, modelSwitchNotification);
     }
 
     public ChatMessage withToolCalls(List<ToolCall> nextToolCalls, boolean nextHidden) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, nextHidden,
                 excludeFromContext, nextToolCalls, toolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
-                compactStatus, responseInputItemJson, attachments);
+                compactStatus, responseInputItemJson, attachments, modelSwitchNotification);
     }
 
     public ChatMessage withToolResults(List<ToolResult> nextToolResults) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
                 excludeFromContext, toolCalls, nextToolResults, toolCallId, toolName, error, diffId, reviewState, reviewMessage,
-                compactStatus, responseInputItemJson, attachments);
+                compactStatus, responseInputItemJson, attachments, modelSwitchNotification);
     }
 
     public ChatMessage withToolReview(String nextDiffId, String nextReviewState, String nextReviewMessage) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
                 excludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
-                nextDiffId, nextReviewState, nextReviewMessage, compactStatus, responseInputItemJson, attachments);
+                nextDiffId, nextReviewState, nextReviewMessage, compactStatus, responseInputItemJson, attachments, modelSwitchNotification);
     }
 
     public ChatMessage withExcludeFromContext(boolean nextExcludeFromContext) {
         return new ChatMessage(id, role, content, reasoningContent, streaming, hidden,
                 nextExcludeFromContext, toolCalls, toolResults, toolCallId, toolName, error,
-                diffId, reviewState, reviewMessage, compactStatus, responseInputItemJson, attachments);
+                diffId, reviewState, reviewMessage, compactStatus, responseInputItemJson, attachments, modelSwitchNotification);
     }
 
     public ChatMessage withCompactStatus(String nextCompactStatus, boolean nextStreaming) {
@@ -360,7 +360,7 @@ public final class ChatMessage {
     }
 
     public static ChatMessage modelSwitchNotice(String id, String fromModel, String toModel) {
-        String content = "\u6a21\u578b\u5df2\u4ece " + fromModel + " \u66f4\u6539\u4e3a " + toModel + "\u3002";
+        String content = "模型已从 " + fromModel + " 更改为 " + toModel + "。";
         return new ChatMessage(id, Role.ASSISTANT, "", "", false, false, true,
                 Collections.emptyList(), Collections.emptyList(), "", "", false,
                 "", "", "", "", "", Collections.emptyList(), content);

@@ -17,4 +17,6 @@ public interface ModelController {
     void onModelsDeleted(List<String> ids);
 
     void onModelQuickSwitch(String modelId);
+
+    void showModelManagement();
 }

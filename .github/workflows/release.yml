@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_changed: ${{ steps.check.outputs.version_changed }}
-      old_version: ${{ steps.check.outputs.old_version }}
-      new_version: ${{ steps.check.outputs.new_version }}
+      old_version_code: ${{ steps.check.outputs.old_version_code }}
+      old_version_name: ${{ steps.check.outputs.old_version_name }}
+      new_version_code: ${{ steps.check.outputs.new_version_code }}
+      new_version_name: ${{ steps.check.outputs.new_version_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -142,22 +144,22 @@ jobs:
       - name: Generate release notes
         id: notes
         env:
-          NEW_VERSION: ${{ needs.check-version-change.outputs.new_version }}
+          NEW_VERSION_NAME: ${{ needs.check-version-change.outputs.new_version_name }}
         run: |
           # 从 update.md 提取当前版本的更新内容
           if [ -f update.md ]; then
-            # 提取当前版本部分（从 ## v${NEW_VERSION} 到下一个 ## v 或文件结束）
-            sed -n "/^## v${NEW_VERSION}/,/^## v[^${NEW_VERSION}]/p" update.md | sed '/^## v[^${NEW_VERSION}]/d' > version_notes.md || echo "" > version_notes.md
+            # 提取当前版本部分（从 ## v${NEW_VERSION_NAME} 到下一个 ## v 或文件结束）
+            sed -n "/^## v${NEW_VERSION_NAME}/,/^## v[^${NEW_VERSION_NAME}]/p" update.md | sed '/^## v[^${NEW_VERSION_NAME}]/d' > version_notes.md || echo "" > version_notes.md
           else
             echo "" > version_notes.md
           fi
 
           # 生成发布说明
           {
-            echo "## LineCode Pro v${NEW_VERSION}"
+            echo "## LineCode Pro v${NEW_VERSION_NAME}"
             echo ""
             echo "### 版本信息"
-            echo "- 版本名称: v${NEW_VERSION}"
+            echo "- 版本名称: v${NEW_VERSION_NAME}"
             echo "- 版本号: ${{ steps.version.outputs.version_code }}"
             echo ""
             if [ -s version_notes.md ]; then
@@ -170,8 +172,8 @@ jobs:
             echo "---"
             echo ""
             echo "### 下载说明"
-            echo "- \`LineCode Pro ${NEW_VERSION}.APK\` - Release APK"
-            echo "- \`LineCode Pro ${NEW_VERSION}.APK.idsig\` - APK 签名文件"
+            echo "- \`LineCode Pro ${NEW_VERSION_NAME}.APK\` - Release APK"
+            echo "- \`LineCode Pro ${NEW_VERSION_NAME}.APK.idsig\` - APK 签名文件"
           } > release_notes.md
 
           echo "release_notes_file=release_notes.md" >> $GITHUB_OUTPUT

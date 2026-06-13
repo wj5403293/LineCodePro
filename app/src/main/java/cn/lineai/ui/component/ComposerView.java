@@ -118,7 +118,7 @@ public final class ComposerView extends LinearLayout {
         modelChevronParams.leftMargin = LineTheme.dp(context, 2);
         modelSelectorButton.addView(modelChevron, modelChevronParams);
 
-        metaRow.addView(modelSelectorButton, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        metaRow.addView(modelSelectorButton, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         contextText = LineTheme.text(context, "", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
         LinearLayout.LayoutParams contextParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);

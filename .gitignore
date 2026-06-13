@@ -17,3 +17,4 @@ app/release/*
 signing.properties
 *.keystore
 问题.txt
+.trae/

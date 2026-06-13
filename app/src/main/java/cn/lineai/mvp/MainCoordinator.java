@@ -105,6 +105,8 @@ public final class MainCoordinator implements MainUiController {
     private static final String SHELL_EXECUTE_TOOL = "shell_execute";
     private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
+    private final Context context;
+
     private final ChatSessionStore chatSessionStore = new ChatSessionStore();
     private final ArrayList<ChatMessage> messages = chatSessionStore.mutableMessages();
     private final ScreenNavigationController screenNavigationController = new ScreenNavigationController();
@@ -623,6 +625,7 @@ public final class MainCoordinator implements MainUiController {
     }
 
     MainCoordinator(MainDependencies dependencies) {
+        this.context = dependencies.context;
         modelRepository = dependencies.modelRepository;
         modelManagementController = new ModelManagementController(
                 modelRepository,
@@ -4774,5 +4777,37 @@ public final class MainCoordinator implements MainUiController {
         } catch (Exception ignored) {
             return "";
         }
+    }
+
+    @Override
+    public void onClearDiffCache() {
+        cn.lineai.data.repository.StorageStatsRepository storageStatsRepository =
+                new cn.lineai.data.repository.StorageStatsRepository(context);
+        storageStatsRepository.clearDiffCache();
+        refreshVisibleScreen("storage");
+        render();
+    }
+
+    @Override
+    public void onClearChatHistory() {
+        cn.lineai.data.repository.StorageStatsRepository storageStatsRepository =
+                new cn.lineai.data.repository.StorageStatsRepository(context);
+        storageStatsRepository.clearChatHistory();
+        messages.clear();
+        chatSessionStore.clearCurrentConversation();
+        conversationRepository.clearAll();
+        refreshVisibleScreen("storage");
+        render();
+    }
+
+    @Override
+    public void onKeepAliveSettingsChanged() {
+        cn.lineai.data.repository.KeepAliveRepository keepAliveRepository =
+                new cn.lineai.data.repository.KeepAliveRepository(context);
+        cn.lineai.data.repository.KeepAliveRepository.KeepAliveSettings settings = keepAliveRepository.getSettings();
+        cn.lineai.service.KeepAliveService.start(context,
+                settings.wakeLockEnabled,
+                settings.foregroundEnabled,
+                settings.fakeAudioEnabled);
     }
 }

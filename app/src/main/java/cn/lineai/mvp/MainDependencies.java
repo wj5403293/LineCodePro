@@ -30,6 +30,7 @@ import cn.lineai.workspace.SafPathResolver;
 import cn.lineai.workspace.StoragePermissionManager;
 
 public final class MainDependencies {
+    final Context context;
     final ModelRepository modelRepository;
     final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     final ChatModeRepository chatModeRepository;
@@ -61,6 +62,7 @@ public final class MainDependencies {
     final LineCodeArchiveService lineCodeArchiveService;
 
     public MainDependencies(Context context) {
+        this.context = context;
         modelRepository = new ModelRepository(context);
         aiBehaviorSettingsRepository = new AiBehaviorSettingsRepository(context);
         chatModeRepository = new ChatModeRepository(context);

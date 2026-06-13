@@ -1057,7 +1057,22 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             });
         }
         if ("storage".equals(screenId)) {
-            return new StorageManagementScreenView(context, this::handleScreenBack);
+            return new StorageManagementScreenView(context, new StorageManagementScreenView.Listener() {
+                @Override
+                public void onBack() {
+                    handleScreenBack();
+                }
+
+                @Override
+                public void onClearDiffCache() {
+                    presenter.onClearDiffCache();
+                }
+
+                @Override
+                public void onClearChatHistory() {
+                    presenter.onClearChatHistory();
+                }
+            });
         }
         if ("memory".equals(screenId)) {
             return new MemorySettingsScreenView(context, new MemorySettingsScreenView.Listener() {
@@ -1083,7 +1098,17 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             });
         }
         if ("keepAlive".equals(screenId)) {
-            return new KeepAliveSettingsScreenView(context, this::handleScreenBack);
+            return new KeepAliveSettingsScreenView(context, new KeepAliveSettingsScreenView.Listener() {
+                @Override
+                public void onBack() {
+                    handleScreenBack();
+                }
+
+                @Override
+                public void onSettingsChanged() {
+                    presenter.onKeepAliveSettingsChanged();
+                }
+            });
         }
         if ("sshSettings".equals(screenId)) {
             return new SshSettingsScreenView(context, new SshSettingsScreenView.Listener() {

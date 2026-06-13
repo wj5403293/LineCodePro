@@ -87,4 +87,10 @@ public interface SettingsController {
     void onLineCodeImportPicked(String uri, String displayName);
 
     void onLineCodeImportCancelled();
+
+    void onClearDiffCache();
+
+    void onClearChatHistory();
+
+    void onKeepAliveSettingsChanged();
 }

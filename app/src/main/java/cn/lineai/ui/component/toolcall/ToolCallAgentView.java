@@ -36,10 +36,16 @@ public final class ToolCallAgentView extends LinearLayout {
         lastResult = result;
         removeAllViews();
 
+        String toolName = toolCall == null ? "" : toolCall.getName();
+        boolean isCustomAgent = ToolCallUtils.isCustomAgentTool(toolName);
         JSONObject input = ToolCallUtils.parseInput(toolCall);
         JSONObject progress = progressPayload(result);
-        String name = progress == null ? input.optString("description", "Agent") : progress.optString("description", input.optString("description", "Agent"));
-        String type = normalizeType(progress == null ? input.optString("type") : progress.optString("type", input.optString("type")));
+        String name = progress == null
+                ? (isCustomAgent ? input.optString("task", toolName) : input.optString("description", "Agent"))
+                : progress.optString("description", isCustomAgent ? input.optString("task", toolName) : input.optString("description", "Agent"));
+        String type = normalizeType(progress == null
+                ? (isCustomAgent ? "sub-coding" : input.optString("type"))
+                : progress.optString("type", isCustomAgent ? "sub-coding" : input.optString("type")));
         String progressStatus = progress == null ? "" : progress.optString("status");
         boolean running = progress != null && ("running".equals(progressStatus) || "waiting_unlock".equals(progressStatus));
         boolean complete = result != null && !running;

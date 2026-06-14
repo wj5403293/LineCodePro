@@ -112,6 +112,10 @@ final class ToolCallUtils {
         return name != null && name.startsWith("mcpx_");
     }
 
+    static boolean isCustomAgentTool(String name) {
+        return name != null && name.startsWith("agentx_");
+    }
+
     static boolean isShellTool(String name) {
         return "shell_execute".equals(name);
     }

@@ -120,9 +120,11 @@ public final class ComposerView extends LinearLayout {
 
         metaRow.addView(modelSelectorButton, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
+        android.view.View metaSpacer = new android.view.View(context);
+        metaRow.addView(metaSpacer, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+
         contextText = LineTheme.text(context, "", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
         LinearLayout.LayoutParams contextParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        contextParams.leftMargin = LineTheme.dp(context, LineTheme.MD);
         metaRow.addView(contextText, contextParams);
 
         android.view.View divider = new android.view.View(context);
@@ -465,6 +467,7 @@ public final class ComposerView extends LinearLayout {
 
     private void showModelPopup(View anchor) {
         if (streaming) return;
+        input.clearFocus();
         if (modelPopup != null && modelPopup.isShowing()) { modelPopup.dismiss(); return; }
         Context ctx = getContext();
         int popupWidth = LineTheme.dp(ctx, 240);

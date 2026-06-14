@@ -50,6 +50,14 @@ public final class ToolCallBlockView extends LinearLayout {
             addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
+        if (ToolCallUtils.isCustomAgentTool(name)) {
+            ToolCallAgentView view = new ToolCallAgentView(getContext());
+            view.setToolReviewListener(toolReviewListener);
+            view.setProjectPath(projectPath);
+            view.bind(toolCall, result);
+            addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            return;
+        }
         if (ToolCallUtils.isImageGenerationTool(name)) {
             ToolCallReadView view = new ToolCallReadView(getContext());
             view.setProjectPath(projectPath);

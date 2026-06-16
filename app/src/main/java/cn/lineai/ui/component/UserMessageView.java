@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.InputAttachment;
 import cn.lineai.ui.theme.LineTheme;
@@ -81,7 +82,7 @@ public final class UserMessageView extends LinearLayout {
             return "";
         }
         String content = message.getContent();
-        if ("已附加文件".equals(content.trim()) && message.hasAttachments()) {
+        if (getContext().getString(R.string.message_user_attached_files).equals(content.trim()) && message.hasAttachments()) {
             return "";
         }
         return content;

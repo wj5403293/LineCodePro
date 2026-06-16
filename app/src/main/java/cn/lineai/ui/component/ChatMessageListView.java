@@ -14,6 +14,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.model.InputAttachment;
@@ -65,7 +66,7 @@ public final class ChatMessageListView extends FrameLayout {
         addView(listView, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         scrollToBottomButton = new IconButtonView(context, IconButtonView.CHEVRON_DOWN);
-        scrollToBottomButton.setContentDescription("滚动到底部");
+        scrollToBottomButton.setContentDescription(context.getString(R.string.message_list_scroll_to_bottom_desc));
         refreshScrollToBottomButtonStyle();
         scrollToBottomButton.setVisibility(GONE);
         scrollToBottomButton.setOnClickListener(v -> scrollToBottom());
@@ -194,14 +195,14 @@ public final class ChatMessageListView extends FrameLayout {
         box.setGravity(Gravity.CENTER);
         LineTheme.padding(box, LineTheme.XL, 80, LineTheme.XL, 80);
 
-        TextView title = LineTheme.text(context, "请先配置模型", LineTheme.FONT_XL, LineTheme.TEXT, Typeface.BOLD);
+        TextView title = LineTheme.text(context, context.getString(R.string.message_list_configure_title), LineTheme.FONT_XL, LineTheme.TEXT, Typeface.BOLD);
         box.addView(title, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
 
         TextView desc = LineTheme.text(context,
-                "进入 设置 → 模型管理 → 添加模型，保存后再发送消息。",
+                context.getString(R.string.message_list_configure_desc),
                 LineTheme.FONT_MD,
                 LineTheme.TEXT_SECONDARY,
                 Typeface.NORMAL);

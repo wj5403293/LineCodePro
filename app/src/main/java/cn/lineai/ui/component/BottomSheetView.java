@@ -14,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.SheetOption;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
@@ -141,10 +142,11 @@ public final class BottomSheetView extends FrameLayout {
     }
 
     private void showDeleteConfirmation(SheetOption option) {
-        AlertDialog dialog = new AlertDialog.Builder(getContext())
-                .setTitle("移除工作区")
-                .setMessage("从已打开目录中移除「" + option.getLabel() + "」？\n\n不会删除真实目录。")
-                .setNegativeButton("取消", null)
+        Context context = getContext();
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setTitle(context.getString(R.string.drawer_project_remove_title))
+                .setMessage(context.getString(R.string.drawer_project_remove_message, option.getLabel()))
+                .setNegativeButton(context.getString(R.string.common_cancel), null)
                 .setPositiveButton(option.getDeleteActionLabel(), (d, which) -> {
                     if (listener != null) {
                         listener.onSheetOptionSelected(option.getDeleteActionId());

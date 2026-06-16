@@ -5,6 +5,7 @@ import android.graphics.Typeface;
 import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class TutorialScreenView extends ScreenScaffoldView {
@@ -13,33 +14,33 @@ public final class TutorialScreenView extends ScreenScaffoldView {
     }
 
     public TutorialScreenView(Context context, Listener listener) {
-        super(context, "使用教程", listener::onBack, null);
+        super(context, context.getString(R.string.screen_tutorial_title), listener::onBack, null);
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.MD, LineTheme.LG, 100);
 
         LinearLayout selector = new LinearLayout(context);
         selector.setOrientation(LinearLayout.VERTICAL);
         selector.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_ELEVATED, 16, LineTheme.BORDER_LIGHT));
-        addVariant(selector, "新手版", "零基础、一步一步照做", true);
-        addVariant(selector, "专业版", "协议、执行环境、MCP 与安全细节", false);
+        addVariant(selector, context.getString(R.string.screen_tutorial_variant_beginner), context.getString(R.string.screen_tutorial_desc_beginner), true);
+        addVariant(selector, context.getString(R.string.screen_tutorial_variant_pro), context.getString(R.string.screen_tutorial_pro_desc), false);
         content.addView(selector, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        TextView subtitle = LineTheme.text(context, "从项目、模型、权限和工具调用开始，快速完成 LineCode 的基础配置。", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        TextView subtitle = LineTheme.text(context, context.getString(R.string.screen_tutorial_subtitle), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         subtitle.setLineSpacing(LineTheme.dp(context, 3), 1f);
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         subtitleParams.topMargin = LineTheme.dp(context, LineTheme.LG);
         subtitleParams.bottomMargin = LineTheme.dp(context, LineTheme.MD);
         content.addView(subtitle, subtitleParams);
 
-        addHeading(content, "1. 选择工作区");
-        addParagraph(content, "点击顶部项目名，可以切换当前项目、打开已有目录或创建新项目。所有文件操作都会以当前项目作为上下文。");
-        addHeading(content, "2. 添加模型");
-        addParagraph(content, "进入设置 → 模型管理 → 添加模型，选择预置提供商或自定义 OpenAI 兼容地址。手机本地模型使用 GGUF 文件入口。");
-        addHeading(content, "3. 配置工具");
-        addParagraph(content, "在工具与执行里选择本地工作区或 SSH Shell，按需启用文件、Shell、HTTP 服务和网页搜索工具。");
-        addHeading(content, "4. 使用扩展");
-        addParagraph(content, "扩展页用于添加 Agent、MCP、Skills 和 .lip 包。每类扩展都有独立详情页和编辑页。");
-        addCode(content, "Base URL: https://api.example.com/v1\nModel ID: qwen/qwen3-coder\nPermission: 每次询问");
+        addHeading(content, context.getString(R.string.screen_tutorial_section_workspace));
+        addParagraph(content, context.getString(R.string.screen_tutorial_workspace_p1));
+        addHeading(content, context.getString(R.string.screen_tutorial_section_model));
+        addParagraph(content, context.getString(R.string.screen_tutorial_model_p1));
+        addHeading(content, context.getString(R.string.screen_tutorial_section_tools));
+        addParagraph(content, context.getString(R.string.screen_tutorial_tools_p1));
+        addHeading(content, context.getString(R.string.screen_tutorial_section_extensions));
+        addParagraph(content, context.getString(R.string.screen_tutorial_extensions_p1));
+        addCode(content, context.getString(R.string.screen_tutorial_code));
     }
 
     private void addVariant(LinearLayout selector, String title, String desc, boolean active) {

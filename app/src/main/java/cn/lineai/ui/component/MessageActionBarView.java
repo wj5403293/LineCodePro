@@ -3,6 +3,7 @@ package cn.lineai.ui.component;
 import android.content.Context;
 import android.view.Gravity;
 import android.widget.LinearLayout;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class MessageActionBarView extends LinearLayout {
@@ -18,13 +19,13 @@ public final class MessageActionBarView extends LinearLayout {
         setMinimumHeight(LineTheme.dp(context, 22));
 
         copyButton = icon(context, IconButtonView.COPY);
-        copyButton.setContentDescription("复制消息");
+        copyButton.setContentDescription(context.getString(R.string.message_action_copy_desc));
         addView(copyButton, iconParams(context));
 
         IconButtonView recall = null;
         if (recallEnabled) {
             recall = icon(context, IconButtonView.ROTATE_CCW);
-            recall.setContentDescription("撤回消息");
+            recall.setContentDescription(context.getString(R.string.message_action_recall_desc));
             addView(recall, iconParams(context));
         }
         recallButton = recall;

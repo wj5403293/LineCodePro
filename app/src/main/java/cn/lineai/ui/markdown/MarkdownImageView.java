@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 import java.io.File;
 import java.util.Locale;
@@ -19,8 +20,12 @@ public final class MarkdownImageView extends LinearLayout {
         String url = destination == null ? "" : destination.trim();
         Bitmap bitmap = decodeBitmap(url);
         if (bitmap == null) {
+            String imageLabel = context.getString(R.string.markdown_image_label);
+            String fallbackText = altText == null || altText.trim().length() == 0
+                    ? imageLabel
+                    : imageLabel.substring(0, imageLabel.length() - 1) + ": " + altText.trim() + "]";
             TextView fallback = LineTheme.text(context,
-                    altText == null || altText.trim().length() == 0 ? "[图片]" : "[图片: " + altText.trim() + "]",
+                    fallbackText,
                     LineTheme.FONT_SM,
                     LineTheme.TEXT_TERTIARY,
                     Typeface.NORMAL);

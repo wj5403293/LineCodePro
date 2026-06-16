@@ -7,6 +7,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.FlowLayoutView;
@@ -73,22 +74,22 @@ public final class ToolCallAgentPipelineView extends LinearLayout {
         titleParams.rightMargin = LineTheme.dp(getContext(), LineTheme.SM);
         header.addView(titleBlock, titleParams);
 
-        TextView title = LineTheme.text(getContext(), "Agent Pipeline", LineTheme.FONT_SM, LineTheme.TEXT, Typeface.BOLD);
+        TextView title = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_pipeline_title), LineTheme.FONT_SM, LineTheme.TEXT, Typeface.BOLD);
         title.setSingleLine(true);
         titleBlock.addView(title, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         FlowLayoutView summary = new FlowLayoutView(getContext());
         summary.setSpacingDp(LineTheme.SM, 3);
-        summary.addView(summaryItem(IconButtonView.CIRCLE_CHECK, completed + " 完成", LineTheme.SUCCESS));
+        summary.addView(summaryItem(IconButtonView.CIRCLE_CHECK, getContext().getString(R.string.tool_call_pipeline_completed, completed), LineTheme.SUCCESS));
         if (running > 0) {
-            summary.addView(summaryItem(IconButtonView.LOADER, running + " 运行", LineTheme.ACCENT));
+            summary.addView(summaryItem(IconButtonView.LOADER, getContext().getString(R.string.tool_call_pipeline_summary_running, running), LineTheme.ACCENT));
         }
         int waiting = Math.max(0, total - completed - running - failed);
         if (waiting > 0) {
-            summary.addView(summaryItem(IconButtonView.CLOCK_3, waiting + " 等待中", LineTheme.TEXT_TERTIARY));
+            summary.addView(summaryItem(IconButtonView.CLOCK_3, getContext().getString(R.string.tool_call_pipeline_summary_waiting, waiting), LineTheme.TEXT_TERTIARY));
         }
         if (failed > 0) {
-            summary.addView(summaryItem(IconButtonView.CIRCLE_X, failed + " 失败", LineTheme.DANGER));
+            summary.addView(summaryItem(IconButtonView.CIRCLE_X, getContext().getString(R.string.tool_call_pipeline_summary_failed, failed), LineTheme.DANGER));
         }
         LayoutParams summaryParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         summaryParams.topMargin = LineTheme.dp(getContext(), 3);
@@ -138,7 +139,7 @@ public final class ToolCallAgentPipelineView extends LinearLayout {
             markdownView.setMarkdown(result.getContent());
             list.addView(markdownView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         } else {
-            TextView empty = LineTheme.text(getContext(), "正在创建 Agent 流水线...", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            TextView empty = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_pipeline_running), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             list.addView(empty, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -168,7 +169,7 @@ public final class ToolCallAgentPipelineView extends LinearLayout {
         boolean running = "running".equals(rowStatus);
         boolean done = "done".equals(rowStatus) || (complete && summary != null && !summary.error) || (complete && summary == null && !pipelineError);
         boolean error = (summary != null && summary.error) || "error".equals(rowStatus) || (complete && pipelineError && summary == null);
-        String status = error ? "失败" : running ? "运行中" : done ? "完成" : "等待中";
+        String status = error ? getContext().getString(R.string.tool_call_status_failed) : running ? getContext().getString(R.string.tool_call_status_running) : done ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_pipeline_status_waiting);
         int typeColor = "explore".equals(type) ? LineTheme.ACCENT : LineTheme.DANGER;
         int statusColor = error ? LineTheme.DANGER : running ? LineTheme.ACCENT : done ? LineTheme.SUCCESS : LineTheme.TEXT_TERTIARY;
 
@@ -379,7 +380,7 @@ public final class ToolCallAgentPipelineView extends LinearLayout {
     }
 
     private String typeLabel(String type) {
-        return "explore".equals(type) ? "探索" : "编程";
+        return "explore".equals(type) ? getContext().getString(R.string.tool_call_agent_type_explore) : getContext().getString(R.string.tool_call_agent_type_coding);
     }
 
     private static final class AgentSummary {

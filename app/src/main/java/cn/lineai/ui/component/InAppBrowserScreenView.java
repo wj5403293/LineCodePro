@@ -13,6 +13,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.security.UrlPolicy;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -52,10 +53,10 @@ public final class InAppBrowserScreenView extends LinearLayout {
         chevron.setIconSizeDp(22, 22);
         chevron.setClickable(false);
         back.addView(chevron, new LinearLayout.LayoutParams(LineTheme.dp(context, 22), LineTheme.dp(context, 22)));
-        back.addView(LineTheme.text(context, "退出", LineTheme.FONT_MD, LineTheme.TEXT, Typeface.NORMAL));
+        back.addView(LineTheme.text(context, getContext().getString(R.string.in_app_browser_exit), LineTheme.FONT_MD, LineTheme.TEXT, Typeface.NORMAL));
         header.addView(back, new LinearLayout.LayoutParams(LineTheme.dp(context, 56), LayoutParams.WRAP_CONTENT));
 
-        TextView title = LineTheme.textMedium(context, url == null ? "网页" : url, LineTheme.FONT_MD, LineTheme.TEXT);
+        TextView title = LineTheme.textMedium(context, url == null ? context.getString(R.string.in_app_browser_default_title) : url, LineTheme.FONT_MD, LineTheme.TEXT);
         title.setGravity(Gravity.CENTER);
         title.setSingleLine(true);
         header.addView(title, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
@@ -64,7 +65,7 @@ public final class InAppBrowserScreenView extends LinearLayout {
 
         WebView webView = new WebView(context);
         webView.setBackgroundColor(LineTheme.BG);
-        webView.setContentDescription("网页内容");
+        webView.setContentDescription(getContext().getString(R.string.in_app_browser_content_desc));
         hardenWebView(webView);
         setJavaScriptEnabled(webView, javaScriptEnabled);
         webView.getSettings().setDomStorageEnabled(true);

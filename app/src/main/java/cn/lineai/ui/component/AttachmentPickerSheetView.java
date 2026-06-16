@@ -10,6 +10,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.HashSet;
@@ -104,14 +105,14 @@ public final class AttachmentPickerSheetView extends FrameLayout {
         this.selectedPaths = new HashSet<>(selectedPaths == null ? java.util.Collections.emptyList() : selectedPaths);
         this.source = source == null || source.length() == 0 ? "local" : source;
         titleView.setText(title == null ? "" : title);
-        subtitleView.setText("已选择 " + this.selectedPaths.size() + " 个文件");
+        subtitleView.setText(getContext().getString(R.string.sheet_attachment_selected_count, this.selectedPaths.size()));
         body.removeAllViews();
         resizePanel();
 
         if (loading) {
-            addStatus(message == null || message.length() == 0 ? "正在读取文件..." : message);
+            addStatus(message == null || message.length() == 0 ? getContext().getString(R.string.sheet_status_reading_files) : message);
         } else if (tree == null) {
-            addStatus(message == null || message.length() == 0 ? "没有可选择的文件" : message);
+            addStatus(message == null || message.length() == 0 ? getContext().getString(R.string.sheet_status_no_files) : message);
         } else {
             ScrollView scrollView = new ScrollView(getContext());
             LinearLayout treeList = new LinearLayout(getContext());
@@ -243,7 +244,7 @@ public final class AttachmentPickerSheetView extends FrameLayout {
     }
 
     private void addEmptyRow(LinearLayout treeList, int depth) {
-        TextView status = LineTheme.text(getContext(), "空目录", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView status = LineTheme.text(getContext(), getContext().getString(R.string.sheet_status_empty_dir), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         status.setSingleLine(true);
         LineTheme.padding(status, LineTheme.MD + depth * 18, LineTheme.SM, LineTheme.MD, LineTheme.SM);
         treeList.addView(status, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));

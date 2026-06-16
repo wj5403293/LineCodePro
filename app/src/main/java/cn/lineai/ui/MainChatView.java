@@ -23,6 +23,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.FileTreeNode;
@@ -401,7 +402,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         LineTheme.padding(panel, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
 
         TextView titleView = LineTheme.textMedium(getContext(),
-                title == null || title.length() == 0 ? "文件操作" : title,
+                title == null || title.length() == 0 ? getContext().getString(R.string.dialog_file_action_title) : title,
                 LineTheme.FONT_LG,
                 LineTheme.TEXT);
         panel.addView(titleView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -456,8 +457,8 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                 .setTitle(title == null ? "" : title)
                 .setMessage(message == null ? "" : message)
                 .setView(input)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定", (d, which) -> presenter.onDialogInputSubmitted(actionId, input.getText().toString()))
+                .setNegativeButton(getContext().getString(R.string.common_cancel), null)
+                .setPositiveButton(getContext().getString(R.string.common_confirm), (d, which) -> presenter.onDialogInputSubmitted(actionId, input.getText().toString()))
                 .create();
         dialog.setOnShowListener(d -> {
             input.requestFocus();
@@ -478,8 +479,10 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         AlertDialog dialog = new AlertDialog.Builder(getContext())
                 .setTitle(title == null ? "" : title)
                 .setMessage(message == null ? "" : message)
-                .setNegativeButton("取消", null)
-                .setPositiveButton(confirmLabel == null || confirmLabel.length() == 0 ? "确定" : confirmLabel,
+                .setNegativeButton(getContext().getString(R.string.common_cancel), null)
+                .setPositiveButton(confirmLabel == null || confirmLabel.length() == 0
+                        ? getContext().getString(R.string.common_confirm)
+                        : confirmLabel,
                         (d, which) -> presenter.onDialogConfirmed(actionId))
                 .create();
         if (danger) {
@@ -636,7 +639,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
         } catch (RuntimeException e) {
-            Toast.makeText(getContext(), "无法打开链接: " + safeUrl, Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.toast_open_link_failed, safeUrl), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -654,7 +657,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("LineCode message", text));
-            Toast.makeText(getContext(), "已复制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.toast_copied), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -676,7 +679,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         drawerView.render(
                 presenter.getConversationMetas(),
                 presenter.getCurrentConversationId(),
-                projectLabel.length() == 0 ? "LineCode" : projectLabel,
+                projectLabel.length() == 0 ? getContext().getString(R.string.header_project_default) : projectLabel,
                 projectPath.length() == 0 ? "" : projectPath,
                 presenter.canRemoveCurrentProject(),
                 drawerView.isFilesTabActive() ? presenter.getFileTree() : null
@@ -807,7 +810,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             });
         }
         if ("imageUnderstandingModel".equals(screenId)) {
-            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageUnderstandingModelId(), "选择图片理解模型", false, new ModelListScreenView.Listener() {
+            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageUnderstandingModelId(), getContext().getString(R.string.screen_models_pick_image_understanding), false, new ModelListScreenView.Listener() {
                 @Override
                 public void onBack() {
                     handleScreenBack();
@@ -832,7 +835,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             });
         }
         if ("imageGenerationModel".equals(screenId)) {
-            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageGenerationModelId(), "选择图片生成模型", false, new ModelListScreenView.Listener() {
+            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageGenerationModelId(), getContext().getString(R.string.screen_models_pick_image_generation), false, new ModelListScreenView.Listener() {
                 @Override
                 public void onBack() {
                     handleScreenBack();
@@ -1146,7 +1149,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             return new TutorialScreenView(context, this::handleScreenBack);
         }
         if ("pluginPage".equals(screenId)) {
-            return new PluginPageScreenView(context, "插件页面", this::handleScreenBack);
+            return new PluginPageScreenView(context, getContext().getString(R.string.plugin_page_title), this::handleScreenBack);
         }
         if (screenId != null && screenId.startsWith("browser:")) {
             return new InAppBrowserScreenView(context, screenId.substring("browser:".length()),
@@ -1365,7 +1368,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         if ("deepseek".equals(id)) return "DeepSeek";
         if ("glm".equals(id)) return "GLM";
         if ("mimo".equals(id)) return "Mimo";
-        if ("mimo-token-plan".equals(id)) return "Mimo Token 计划";
+        if ("mimo-token-plan".equals(id)) return getContext().getString(R.string.provider_mimo_token_plan);
         if ("kimi".equals(id)) return "Kimi";
         if ("qwen".equals(id)) return "Qwen";
         if ("openai".equals(id)) return "OpenAI";
@@ -1402,54 +1405,131 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     }
 
     private String titleFor(String screenId) {
-        if ("llm".equals(screenId)) return "AI 行为";
-        if ("promptTemplates".equals(screenId)) return "自定义提示词";
-        if ("input".equals(screenId)) return "输入设置";
-        if ("mcp".equals(screenId)) return "工具与执行";
-        if ("toolSettings".equals(screenId)) return "工具设置";
-        if ("theme".equals(screenId)) return "主题与外观";
-        if ("output".equals(screenId)) return "输出与浏览";
-        if ("experimental".equals(screenId)) return "实验性渲染";
-        if ("storage".equals(screenId)) return "存储管理";
-        if ("memory".equals(screenId)) return "记忆";
-        if ("data".equals(screenId)) return "数据管理";
-        if ("keepAlive".equals(screenId)) return "后台保活";
-        if ("sshSettings".equals(screenId)) return "SSH 连接";
-        if ("termuxIntegration".equals(screenId)) return "Termux 对接";
-        if ("about".equals(screenId)) return "关于 LineCode";
-        if ("modelAddOptions".equals(screenId)) return "添加模型";
-        if ("licenses".equals(screenId)) return "开源许可";
-        if ("tutorial".equals(screenId)) return "教程";
-        if (screenId != null && screenId.startsWith("extension:")) return "扩展详情";
-        return "LineCode";
+        Context context = getContext();
+        if ("llm".equals(screenId)) return context.getString(R.string.screen_llm_title);
+        if ("promptTemplates".equals(screenId)) return context.getString(R.string.screen_prompt_templates_title);
+        if ("input".equals(screenId)) return context.getString(R.string.screen_input_title);
+        if ("mcp".equals(screenId)) return context.getString(R.string.screen_mcp_title);
+        if ("toolSettings".equals(screenId)) return context.getString(R.string.screen_tools_title);
+        if ("theme".equals(screenId)) return context.getString(R.string.fallback_screen_theme_title);
+        if ("output".equals(screenId)) return context.getString(R.string.fallback_screen_output_title);
+        if ("experimental".equals(screenId)) return context.getString(R.string.screen_experimental_title);
+        if ("storage".equals(screenId)) return context.getString(R.string.screen_storage_title);
+        if ("memory".equals(screenId)) return context.getString(R.string.screen_memory_title);
+        if ("data".equals(screenId)) return context.getString(R.string.fallback_screen_data_title);
+        if ("keepAlive".equals(screenId)) return context.getString(R.string.fallback_screen_keep_alive_title_alt);
+        if ("sshSettings".equals(screenId)) return context.getString(R.string.screen_ssh_title);
+        if ("termuxIntegration".equals(screenId)) return context.getString(R.string.screen_termux_title);
+        if ("about".equals(screenId)) return context.getString(R.string.fallback_screen_about_title_alt);
+        if ("modelAddOptions".equals(screenId)) return context.getString(R.string.screen_model_add_options_title);
+        if ("licenses".equals(screenId)) return context.getString(R.string.fallback_screen_licenses_title);
+        if ("tutorial".equals(screenId)) return context.getString(R.string.fallback_screen_tutorial_title_alt);
+        if (screenId != null && screenId.startsWith("extension:")) return context.getString(R.string.fallback_screen_extension_title);
+        return context.getString(R.string.header_project_default);
     }
 
     private String subtitleFor(String screenId) {
-        if ("about".equals(screenId)) return "LineCode Java 原生 View 版本。当前页面用于对齐 LineAI 的 Android UI 结构。";
-        if ("modelAddOptions".equals(screenId)) return "选择添加模型的方式，后续会接入真实表单和本地模型选择。";
-        if (screenId != null && screenId.startsWith("extension:")) return "管理 Agent、MCP、Skills 扩展的安装、启用状态和删除操作。";
-        return "该页面已经接入原生导航与统一样式，后续继续补真实设置项和业务逻辑。";
+        Context context = getContext();
+        if ("about".equals(screenId)) return context.getString(R.string.fallback_screen_about_subtitle);
+        if ("modelAddOptions".equals(screenId)) return context.getString(R.string.fallback_screen_model_add_options_subtitle);
+        if (screenId != null && screenId.startsWith("extension:")) return context.getString(R.string.fallback_screen_extension_subtitle);
+        return context.getString(R.string.fallback_screen_default_subtitle);
     }
 
     private String[] rowsFor(String screenId) {
-        if ("llm".equals(screenId)) return new String[] {"交流语气", "思考强度", "保留 reasoning", "自定义提示词"};
-        if ("input".equals(screenId)) return new String[] {"回车键逻辑"};
-        if ("mcp".equals(screenId)) return new String[] {"执行目标", "本地工具", "SSH Shell", "工具确认策略"};
-        if ("toolSettings".equals(screenId)) return new String[] {"图片理解", "网页搜索", "模型选择", "搜索 API"};
-        if ("theme".equals(screenId)) return new String[] {"深色主题", "浅色主题", "咖啡主题", "高对比模式"};
-        if ("output".equals(screenId)) return new String[] {"代码自动换行", "网页打开方式", "内置浏览器 JavaScript", "Markdown 预览"};
-        if ("experimental".equals(screenId)) return new String[] {"实验性键盘避让", "实验性消息渲染"};
-        if ("storage".equals(screenId)) return new String[] {"聊天记录", "配置文件", "Diff 缓存", "工作区占用"};
-        if ("memory".equals(screenId)) return new String[] {"长期记忆", "项目记忆", "短期记忆", "检索索引"};
-        if ("data".equals(screenId)) return new String[] {"完整导出", ".linecode 导入", "数据归档"};
-        if ("keepAlive".equals(screenId)) return new String[] {"Wake Lock", "前台服务", "模拟音乐播放", "电池白名单"};
-        if ("sshSettings".equals(screenId)) return new String[] {"Host", "Port", "Username", "Private key", "测试连接"};
-        if ("termuxIntegration".equals(screenId)) return new String[] {"授权指令", "RUN_COMMAND 权限", "自动配置 OpenSSH"};
-        if ("about".equals(screenId)) return new String[] {"版本 1.0", "开源许可"};
-        if ("modelAddOptions".equals(screenId)) return new String[] {"自定义 API 模型", "本地 GGUF 模型", "OpenAI 兼容供应商", "Codex 预设"};
-        if ("tutorial".equals(screenId)) return new String[] {"初学者教程", "专业模式教程", "工具调用说明"};
-        if (screenId != null && screenId.startsWith("extension:")) return new String[] {"添加扩展", "已安装列表", "启用状态", "长按管理"};
-        return new String[] {"界面骨架", "业务逻辑待接入"};
+        Context context = getContext();
+        if ("llm".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_llm_tone),
+                context.getString(R.string.fallback_row_llm_thinking),
+                context.getString(R.string.fallback_row_llm_keep_reasoning),
+                context.getString(R.string.fallback_row_llm_prompts)
+        };
+        if ("input".equals(screenId)) return new String[] {context.getString(R.string.fallback_row_input_enter)};
+        if ("mcp".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_mcp_execution),
+                context.getString(R.string.fallback_row_mcp_local),
+                context.getString(R.string.fallback_row_mcp_ssh),
+                context.getString(R.string.fallback_row_mcp_confirm)
+        };
+        if ("toolSettings".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_tools_image_understanding),
+                context.getString(R.string.fallback_row_tools_web_search),
+                context.getString(R.string.fallback_row_tools_model_select),
+                context.getString(R.string.fallback_row_tools_search_api)
+        };
+        if ("theme".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_theme_dark),
+                context.getString(R.string.fallback_row_theme_light),
+                context.getString(R.string.fallback_row_theme_coffee),
+                context.getString(R.string.fallback_row_theme_high_contrast)
+        };
+        if ("output".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_output_code_wrap),
+                context.getString(R.string.fallback_row_output_open_mode),
+                context.getString(R.string.fallback_row_output_browser_js),
+                context.getString(R.string.fallback_row_output_markdown_preview)
+        };
+        if ("experimental".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_experimental_keyboard),
+                context.getString(R.string.fallback_row_experimental_rendering)
+        };
+        if ("storage".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_storage_chat),
+                context.getString(R.string.fallback_row_storage_config),
+                context.getString(R.string.fallback_row_storage_diff_cache),
+                context.getString(R.string.fallback_row_storage_workspace)
+        };
+        if ("memory".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_memory_long_term),
+                context.getString(R.string.fallback_row_memory_project),
+                context.getString(R.string.fallback_row_memory_short_term),
+                context.getString(R.string.fallback_row_memory_index)
+        };
+        if ("data".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_data_full_export),
+                context.getString(R.string.fallback_row_data_linecode_import),
+                context.getString(R.string.fallback_row_data_archive)
+        };
+        if ("keepAlive".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_keep_alive_wake_lock),
+                context.getString(R.string.fallback_row_keep_alive_foreground),
+                context.getString(R.string.fallback_row_keep_alive_fake_music),
+                context.getString(R.string.fallback_row_keep_alive_battery_whitelist)
+        };
+        if ("sshSettings".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_ssh_host),
+                context.getString(R.string.fallback_row_ssh_port),
+                context.getString(R.string.fallback_row_ssh_username),
+                context.getString(R.string.fallback_row_ssh_private_key),
+                context.getString(R.string.fallback_row_ssh_test)
+        };
+        if ("termuxIntegration".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_termux_grant),
+                context.getString(R.string.fallback_row_termux_run_command_perm),
+                context.getString(R.string.fallback_row_termux_auto_ssh)
+        };
+        if ("about".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_about_version),
+                context.getString(R.string.screen_about_open_source_licenses)
+        };
+        if ("modelAddOptions".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_model_add_custom_api),
+                context.getString(R.string.fallback_row_model_add_local_gguf),
+                context.getString(R.string.fallback_row_model_add_openai_provider),
+                context.getString(R.string.fallback_row_model_add_codex_preset)
+        };
+        if ("tutorial".equals(screenId)) return new String[] {
+                context.getString(R.string.fallback_row_tutorial_beginner),
+                context.getString(R.string.fallback_row_tutorial_pro),
+                context.getString(R.string.fallback_row_tutorial_tools)
+        };
+        if (screenId != null && screenId.startsWith("extension:")) return new String[] {
+                context.getString(R.string.fallback_row_extension_add),
+                context.getString(R.string.fallback_row_extension_installed),
+                context.getString(R.string.fallback_row_extension_enabled),
+                context.getString(R.string.fallback_row_extension_manage)
+        };
+        return new String[] {context.getString(R.string.fallback_row_default), context.getString(R.string.fallback_row_default_subtitle)};
     }
 
     @SuppressWarnings("deprecation")

@@ -10,6 +10,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
@@ -114,7 +115,7 @@ public final class DirectoryPickerSheetView extends FrameLayout {
         resizePanel();
 
         if (tree == null) {
-            addStatus(message == null || message.length() == 0 ? "目录不可访问" : message);
+            addStatus(message == null || message.length() == 0 ? getContext().getString(R.string.sheet_status_inaccessible) : message);
         } else {
             ScrollView scrollView = new ScrollView(getContext());
             LinearLayout treeList = new LinearLayout(getContext());
@@ -124,7 +125,7 @@ public final class DirectoryPickerSheetView extends FrameLayout {
             body.addView(scrollView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             addParentRow(treeList, tree);
             if (loading) {
-                addInlineStatus(treeList, message == null || message.length() == 0 ? "正在读取目录..." : message);
+                addInlineStatus(treeList, message == null || message.length() == 0 ? getContext().getString(R.string.sheet_status_reading_dir) : message);
             }
             addDirectoryContents(treeList, tree);
         }
@@ -204,7 +205,7 @@ public final class DirectoryPickerSheetView extends FrameLayout {
         textsParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
         row.addView(texts, textsParams);
 
-        TextView label = LineTheme.textMedium(context, "上一级", LineTheme.FONT_SM, LineTheme.TEXT);
+        TextView label = LineTheme.textMedium(context, getContext().getString(R.string.sheet_parent_dir), LineTheme.FONT_SM, LineTheme.TEXT);
         texts.addView(label, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         TextView path = LineTheme.text(context, parentPath, LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
@@ -242,7 +243,7 @@ public final class DirectoryPickerSheetView extends FrameLayout {
         }
         List<FileTreeNode> children = node.getChildren();
         if (children.isEmpty()) {
-            addInlineStatus(treeList, "空目录");
+            addInlineStatus(treeList, getContext().getString(R.string.sheet_status_empty_dir));
             return;
         }
         for (int i = 0; i < children.size(); i++) {

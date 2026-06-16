@@ -12,6 +12,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.ArrayList;
@@ -42,7 +43,7 @@ public final class ModelListScreenView extends LinearLayout {
     private final Set<String> multiSelectedIds = new HashSet<>();
 
     public ModelListScreenView(Context context, List<ModelConfig> models, String selectedModelId, Listener listener) {
-        this(context, models, selectedModelId, "模型", true, listener);
+        this(context, models, selectedModelId, context.getString(R.string.screen_models_title), true, listener);
     }
 
     public ModelListScreenView(
@@ -57,7 +58,7 @@ public final class ModelListScreenView extends LinearLayout {
         this.models = new ArrayList<>(models == null ? new ArrayList<>() : models);
         this.selectedModelId = selectedModelId == null ? "" : selectedModelId;
         this.listener = listener;
-        this.title = title == null || title.length() == 0 ? "模型" : title;
+        this.title = title == null || title.length() == 0 ? context.getString(R.string.screen_models_title) : title;
         this.allowManagement = allowManagement;
         setOrientation(VERTICAL);
         setBackgroundColor(LineTheme.BG);
@@ -94,7 +95,7 @@ public final class ModelListScreenView extends LinearLayout {
             trash.setIconSizeDp(36, 20);
             trash.setOnClickListener(v -> showDeleteConfirm());
             headerHost.addView(
-                    new ScreenHeaderView(context, "已选 " + multiSelectedIds.size() + " 项", close, trash),
+                    new ScreenHeaderView(context, context.getString(R.string.screen_models_selected_count, multiSelectedIds.size()), close, trash),
                     new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             );
             return;
@@ -118,8 +119,8 @@ public final class ModelListScreenView extends LinearLayout {
         list.removeAllViews();
         if (models.isEmpty()) {
             String emptyText = allowManagement
-                    ? "还没有模型。点击右上角 + 添加 OpenAI 兼容、Codex 或 Anthropic 模型。"
-                    : "还没有模型。请先在模型管理中添加 OpenAI 兼容、Codex 或 Anthropic 模型。";
+                    ? context.getString(R.string.screen_models_empty_can_add)
+                    : context.getString(R.string.screen_models_empty_readonly);
             TextView empty = LineTheme.text(context, emptyText, LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             empty.setLineSpacing(LineTheme.dp(context, 3), 1f);
             list.addView(empty, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -212,13 +213,13 @@ public final class ModelListScreenView extends LinearLayout {
         Dialog dialog = createBottomDialog(context);
         LinearLayout panel = createBottomPanel(context);
         addHandle(panel);
-        addSheetTitle(panel, model.getName().length() == 0 ? "模型" : model.getName());
+        addSheetTitle(panel, model.getName().length() == 0 ? context.getString(R.string.screen_models_title) : model.getName());
         addDivider(panel);
-        addActionRow(panel, "修改", "编辑名称、密钥和模型 ID", () -> {
+        addActionRow(panel, context.getString(R.string.screen_models_action_modify), context.getString(R.string.screen_models_action_modify_desc), () -> {
             dialog.dismiss();
             listener.onEditModel(model.getId());
         });
-        addActionRow(panel, "多选", "选择多个模型后批量删除", () -> {
+        addActionRow(panel, context.getString(R.string.screen_models_action_multi_select), context.getString(R.string.screen_models_action_multi_select_desc), () -> {
             dialog.dismiss();
             startMultiSelect(model.getId());
         });
@@ -234,13 +235,13 @@ public final class ModelListScreenView extends LinearLayout {
         Dialog dialog = createBottomDialog(context);
         LinearLayout panel = createBottomPanel(context);
         addHandle(panel);
-        addSheetTitle(panel, "删除模型");
-        TextView desc = LineTheme.text(context, "确定删除 " + multiSelectedIds.size() + " 个模型？", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        addSheetTitle(panel, context.getString(R.string.screen_models_delete_title));
+        TextView desc = LineTheme.text(context, context.getString(R.string.screen_models_delete_message, multiSelectedIds.size()), LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LineTheme.padding(desc, LineTheme.LG, 0, LineTheme.LG, LineTheme.MD);
         panel.addView(desc, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         addDivider(panel);
-        addActionRow(panel, "取消", "", dialog::dismiss);
-        addActionRow(panel, "删除", "删除后需要重新添加才能使用", () -> {
+        addActionRow(panel, context.getString(R.string.common_cancel), "", dialog::dismiss);
+        addActionRow(panel, context.getString(R.string.common_delete), context.getString(R.string.screen_models_delete_warning), () -> {
             ArrayList<String> ids = new ArrayList<>(multiSelectedIds);
             dialog.dismiss();
             listener.onDeleteModels(ids);

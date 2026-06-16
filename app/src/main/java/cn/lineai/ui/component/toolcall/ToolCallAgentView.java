@@ -7,6 +7,7 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.FlowLayoutView;
@@ -54,7 +55,7 @@ public final class ToolCallAgentView extends LinearLayout {
         String thinking = progress == null ? "" : progress.optString("thinking");
         JSONArray nestedToolCalls = progress == null ? null : progress.optJSONArray("tool_calls");
         int toolCount = progress == null ? toolCount(result) : progress.optInt("tool_call_count", nestedToolCalls == null ? 0 : nestedToolCalls.length());
-        String status = error ? "失败" : complete ? "完成" : "运行中";
+        String status = error ? getContext().getString(R.string.tool_call_status_failed) : complete ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_status_running);
         int typeColor = "explore".equals(type) ? LineTheme.ACCENT : LineTheme.DANGER;
         int statusColor = error ? LineTheme.DANGER : complete ? LineTheme.SUCCESS : LineTheme.ACCENT;
 
@@ -90,7 +91,7 @@ public final class ToolCallAgentView extends LinearLayout {
         meta.setSpacingDp(LineTheme.XS, 3);
         meta.addView(pill(typeLabel(type), typeColor, LineTheme.CODE_BG, LineTheme.CODE_BORDER));
         if (toolCount > 0) {
-            meta.addView(pill(toolCount + " 工具", LineTheme.TEXT_TERTIARY, LineTheme.SURFACE_LIGHT, LineTheme.CODE_BORDER));
+            meta.addView(pill(getContext().getString(R.string.tool_call_agent_tool_count, toolCount), LineTheme.TEXT_TERTIARY, LineTheme.SURFACE_LIGHT, LineTheme.CODE_BORDER));
         }
         LayoutParams metaParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         metaParams.topMargin = LineTheme.dp(getContext(), 3);
@@ -140,14 +141,14 @@ public final class ToolCallAgentView extends LinearLayout {
             content.addView(thinkingView, thinkingParams);
         }
         if (!complete && output.trim().length() == 0) {
-            TextView runningText = LineTheme.text(getContext(), "正在执行任务...", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            TextView runningText = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_agent_running), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             content.addView(runningText, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         } else if (output.length() > 0) {
             MarkdownView markdownView = new MarkdownView(getContext());
             markdownView.setMarkdown(output);
             content.addView(markdownView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         } else {
-            TextView empty = LineTheme.text(getContext(), error ? "执行失败" : "任务完成", LineTheme.FONT_XS,
+            TextView empty = LineTheme.text(getContext(), error ? getContext().getString(R.string.tool_call_agent_failed) : getContext().getString(R.string.tool_call_agent_done), LineTheme.FONT_XS,
                     error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
             content.addView(empty, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
@@ -180,7 +181,7 @@ public final class ToolCallAgentView extends LinearLayout {
     }
 
     private String typeLabel(String type) {
-        return "explore".equals(type) ? "探索" : "编程";
+        return "explore".equals(type) ? getContext().getString(R.string.tool_call_agent_type_explore) : getContext().getString(R.string.tool_call_agent_type_coding);
     }
 
     private int toolCount(ToolResult result) {
@@ -227,7 +228,7 @@ public final class ToolCallAgentView extends LinearLayout {
         if (nestedToolCalls == null || nestedToolCalls.length() == 0) {
             return;
         }
-        TextView label = LineTheme.text(getContext(), "工具调用", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
+        TextView label = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_agent_tool_calls_label), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
         LayoutParams labelParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         labelParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
         content.addView(label, labelParams);

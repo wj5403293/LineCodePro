@@ -18,6 +18,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ChatMode;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.model.InputAttachment;
@@ -150,7 +151,7 @@ public final class ComposerView extends LinearLayout {
         input = new EditText(context);
         input.setTextColor(LineTheme.TEXT);
         input.setHintTextColor(LineTheme.TEXT_TERTIARY);
-        input.setHint("输入消息...");
+        input.setHint(context.getString(R.string.composer_hint_default));
         input.setTextSize(LineTheme.FONT_MD);
         input.setSingleLine(false);
         input.setMinLines(2);
@@ -338,7 +339,9 @@ public final class ComposerView extends LinearLayout {
         input.setEnabled(!streaming);
         attachButton.setEnabled(!streaming);
         attachButton.setAlpha(streaming ? 0.62f : 1f);
-        input.setHint(state.hasConfiguredModel() ? "输入消息..." : "请先到设置 → 模型管理配置模型");
+        input.setHint(state.hasConfiguredModel()
+                ? getContext().getString(R.string.composer_hint_default)
+                : getContext().getString(R.string.composer_hint_no_model));
         updateModeButtons();
         updateModelSelector();
         updateSendButton();
@@ -432,7 +435,7 @@ public final class ComposerView extends LinearLayout {
         chip.addView(name, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
         IconButtonView remove = new IconButtonView(context, IconButtonView.CLOSE);
-        remove.setContentDescription("移除附件");
+        remove.setContentDescription(getContext().getString(R.string.composer_attachment_remove_desc));
         remove.setIconColor(LineTheme.TEXT_TERTIARY);
         remove.setIconSizeDp(18, 12);
         remove.setOnClickListener(v -> {

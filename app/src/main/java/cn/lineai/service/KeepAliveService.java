@@ -91,7 +91,7 @@ public final class KeepAliveService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "LineCode 保活",
+                    getString(R.string.notification_keep_alive_title),
                     NotificationManager.IMPORTANCE_LOW
             );
             channel.setDescription("LineCode 编码任务后台保活通知");
@@ -204,7 +204,7 @@ public final class KeepAliveService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             return new Notification.Builder(this, CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("LineCode")
+                    .setContentTitle(getString(R.string.notification_keep_alive_title))
                     .setContentText(currentStatus)
                     .setOngoing(true)
                     .setPriority(Notification.PRIORITY_LOW)
@@ -212,7 +212,7 @@ public final class KeepAliveService extends Service {
         } else {
             return new Notification.Builder(this)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("LineCode")
+                    .setContentTitle(getString(R.string.notification_keep_alive_title))
                     .setContentText(currentStatus)
                     .setOngoing(true)
                     .build();

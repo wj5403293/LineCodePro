@@ -23,6 +23,7 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.ai.ModelCompletionException;
 import cn.lineai.ai.protocol.ModelCatalogClient;
 import cn.lineai.model.ModelConfig;
@@ -40,7 +41,7 @@ public final class ModelAddScreenView extends LinearLayout {
         void onSave(ModelConfig model);
     }
 
-    private static final String[] PROVIDER_LABELS = new String[] {"OpenAI", "Codex", "Anthropic", "本地"};
+    private final String[] providerLabels = new String[4];
 
     private final TextView saveAction;
     private final TextView providerLabelView;
@@ -95,14 +96,18 @@ public final class ModelAddScreenView extends LinearLayout {
         this.preset = preset;
         this.lockedPreset = preset != null || editing;
         this.protocolType[0] = editing ? editingModel.getProtocolType() : this.local ? ModelProtocolType.LOCAL_GGUF : preset == null ? ModelProtocolType.OPENAI_COMPATIBLE : preset.getProtocolType();
-        this.providerLabel = this.local ? "本地" : editing ? cleanProviderLabel(editingModel.getProviderLabel()) : preset == null ? null : preset.getLabel();
+        this.providerLabel = this.local ? context.getString(R.string.model_provider_local) : editing ? cleanProviderLabel(editingModel.getProviderLabel()) : preset == null ? null : preset.getLabel();
+        this.providerLabels[0] = "OpenAI";
+        this.providerLabels[1] = "Codex";
+        this.providerLabels[2] = "Anthropic";
+        this.providerLabels[3] = context.getString(R.string.model_provider_local);
         setOrientation(VERTICAL);
         setBackgroundColor(LineTheme.BG);
 
-        saveAction = LineTheme.textMedium(context, "保存", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY);
+        saveAction = LineTheme.textMedium(context, context.getString(R.string.common_save), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY);
         saveAction.setGravity(Gravity.CENTER);
         LineTheme.padding(saveAction, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
-        addView(new ScreenHeaderView(context, editing ? "修改模型" : "添加模型", listener::onBack, saveAction), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(new ScreenHeaderView(context, context.getString(editing ? R.string.screen_model_add_title_edit : R.string.screen_model_add_title_add), listener::onBack, saveAction), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         ScrollView scrollView = new ScrollView(context);
         LinearLayout content = new LinearLayout(context);
@@ -115,16 +120,16 @@ public final class ModelAddScreenView extends LinearLayout {
         content.addView(providerLabelView, labelParams(context, LineTheme.LG, LineTheme.SM));
         LinearLayout providerRow = new LinearLayout(context);
         providerRow.setOrientation(HORIZONTAL);
-        for (int i = 0; i < PROVIDER_LABELS.length; i++) {
+        for (int i = 0; i < providerLabels.length; i++) {
             final int index = i;
             boolean enabled = !lockedPreset || isActiveProviderIndex(index);
-            addToggle(providerRow, PROVIDER_LABELS[i], isActiveProviderIndex(index), enabled, () -> {
+            addToggle(providerRow, providerLabels[i], isActiveProviderIndex(index), enabled, () -> {
                 if (index == 3) {
-                    Toast.makeText(context, "请从“加载本地模型”进入本地模型表单。", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, R.string.screen_model_add_open_local_form, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 if (this.local) {
-                    Toast.makeText(context, "请返回后进入自定义模型表单。", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, R.string.screen_model_add_open_custom_form, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 if (!lockedPreset) {
@@ -150,8 +155,8 @@ public final class ModelAddScreenView extends LinearLayout {
         }
         content.addView(providerRow, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        content.addView(label(context, "名称"), labelParams(context, LineTheme.LG, LineTheme.SM));
-        nameInput = input(context, editing ? editingModel.getName() : "", this.local ? "如 Qwen2.5 7B 本地" : preset == null ? "如 GPT-4o、Claude Sonnet" : "可留空，默认使用模型 ID", false, false);
+        content.addView(label(context, context.getString(R.string.screen_model_add_field_name)), labelParams(context, LineTheme.LG, LineTheme.SM));
+        nameInput = input(context, editing ? editingModel.getName() : "", this.local ? context.getString(R.string.screen_model_add_hint_local_name) : preset == null ? context.getString(R.string.screen_model_add_hint_remote_name) : context.getString(R.string.screen_model_add_hint_name_optional), false, false);
         content.addView(nameInput, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         if (this.local) {
@@ -167,8 +172,8 @@ public final class ModelAddScreenView extends LinearLayout {
             modelInputHost = null;
             modelIdInput = null;
         } else {
-            content.addView(label(context, "Base URL"), labelParams(context, LineTheme.LG, LineTheme.SM));
-            baseUrlInput = input(context, editing ? editingModel.getBaseUrl() : preset == null ? "" : preset.getBaseUrl(), preset == null ? "https://api.example.com/v1" : preset.getPlaceholder(), false, false);
+            content.addView(label(context, context.getString(R.string.screen_model_add_field_base_url)), labelParams(context, LineTheme.LG, LineTheme.SM));
+            baseUrlInput = input(context, editing ? editingModel.getBaseUrl() : preset == null ? "" : preset.getBaseUrl(), preset == null ? context.getString(R.string.screen_model_add_hint_base_url) : preset.getPlaceholder(), false, false);
             content.addView(baseUrlInput, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             baseUrlHintView = LineTheme.text(context, hintFor(preset), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             baseUrlHintView.setLineSpacing(LineTheme.dp(context, 3), 1f);
@@ -176,19 +181,19 @@ public final class ModelAddScreenView extends LinearLayout {
             hintParams.topMargin = LineTheme.dp(context, LineTheme.SM);
             content.addView(baseUrlHintView, hintParams);
 
-            content.addView(label(context, "API Key"), labelParams(context, LineTheme.LG, LineTheme.SM));
-            apiKeyInput = input(context, editing ? editingModel.getApiKey() : "", "sk-...", false, true);
+            content.addView(label(context, context.getString(R.string.screen_model_add_field_api_key)), labelParams(context, LineTheme.LG, LineTheme.SM));
+            apiKeyInput = input(context, editing ? editingModel.getApiKey() : "", context.getString(R.string.screen_model_add_hint_api_key), false, true);
             content.addView(apiKeyInput, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
             LinearLayout modelIdHeader = new LinearLayout(context);
             modelIdHeader.setOrientation(HORIZONTAL);
             modelIdHeader.setGravity(Gravity.CENTER_VERTICAL);
-            TextView modelIdLabel = label(context, "模型 ID");
+            TextView modelIdLabel = label(context, context.getString(R.string.screen_model_add_field_model_id));
             modelIdHeader.addView(modelIdLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
             LinearLayout switchWrap = new LinearLayout(context);
             switchWrap.setOrientation(HORIZONTAL);
             switchWrap.setGravity(Gravity.CENTER_VERTICAL);
-            TextView customText = LineTheme.textMedium(context, "自定义", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY);
+            TextView customText = LineTheme.textMedium(context, context.getString(R.string.screen_model_add_custom_id_label), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY);
             switchWrap.addView(customText, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
             customIdSwitch = new Switch(context);
             tintSwitch(customIdSwitch);
@@ -201,8 +206,8 @@ public final class ModelAddScreenView extends LinearLayout {
             modelInputHost = new LinearLayout(context);
             modelInputHost.setOrientation(VERTICAL);
             content.addView(modelInputHost, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-            modelIdInput = input(context, editing ? editingModel.getModelId() : "", "输入模型 ID", false, false);
-            queryLabel = LineTheme.text(context, "请先查询并选择模型", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            modelIdInput = input(context, editing ? editingModel.getModelId() : "", context.getString(R.string.screen_model_add_hint_model_id), false, false);
+            queryLabel = LineTheme.text(context, context.getString(R.string.screen_model_add_pick_first), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             queryLabel.setSingleLine(true);
             queryLabel.setEllipsize(TextUtils.TruncateAt.END);
             queryButton = createQueryButton(context);
@@ -225,17 +230,17 @@ public final class ModelAddScreenView extends LinearLayout {
                 fetchModelCatalog();
             });
 
-            content.addView(label(context, "工具调用次数限制"), labelParams(context, LineTheme.LG, LineTheme.SM));
+            content.addView(label(context, context.getString(R.string.screen_model_add_field_tool_call_limit)), labelParams(context, LineTheme.LG, LineTheme.SM));
             toolCallLimitInput = input(
                     context,
                     String.valueOf(editing ? editingModel.getToolCallLimit() : ModelConfig.DEFAULT_TOOL_CALL_LIMIT),
-                    "200",
+                    context.getString(R.string.screen_model_add_hint_tool_call_limit),
                     false,
                     false
             );
             toolCallLimitInput.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
             content.addView(toolCallLimitInput, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-            TextView toolLimitHint = LineTheme.text(context, "-1 表示不限制；0 表示禁止工具调用；默认 200。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            TextView toolLimitHint = LineTheme.text(context, context.getString(R.string.screen_model_add_max_tool_calls_hint), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             toolLimitHint.setLineSpacing(LineTheme.dp(context, 3), 1f);
             LinearLayout.LayoutParams toolLimitHintParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
             toolLimitHintParams.topMargin = LineTheme.dp(context, LineTheme.SM);
@@ -309,7 +314,7 @@ public final class ModelAddScreenView extends LinearLayout {
     }
 
     private void addLocalUi(Context context, LinearLayout content) {
-        content.addView(label(context, "模型文件"), labelParams(context, LineTheme.LG, LineTheme.SM));
+        content.addView(label(context, context.getString(R.string.screen_model_add_local_field_file)), labelParams(context, LineTheme.LG, LineTheme.SM));
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
@@ -331,8 +336,8 @@ public final class ModelAddScreenView extends LinearLayout {
         fileTextParams.leftMargin = LineTheme.dp(context, LineTheme.MD);
         fileTextParams.rightMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(fileText, fileTextParams);
-        fileText.addView(LineTheme.text(context, "选择 GGUF 模型文件", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD));
-        TextView desc = LineTheme.text(context, "通过 SAF 选择文件，应用会导入本地副本", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        fileText.addView(LineTheme.text(context, context.getString(R.string.screen_model_add_local_pick_file_label), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD));
+        TextView desc = LineTheme.text(context, context.getString(R.string.screen_model_add_local_pick_file_desc), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 3);
         fileText.addView(desc, descParams);
@@ -341,26 +346,26 @@ public final class ModelAddScreenView extends LinearLayout {
         down.setIconSizeDp(16, 14);
         down.setClickable(false);
         card.addView(down, new LinearLayout.LayoutParams(LineTheme.dp(context, 16), LineTheme.dp(context, 16)));
-        card.setOnClickListener(v -> Toast.makeText(context, "本地文件选择器稍后接入。", Toast.LENGTH_SHORT).show());
+        card.setOnClickListener(v -> Toast.makeText(context, R.string.screen_model_add_local_picker_pending, Toast.LENGTH_SHORT).show());
         content.addView(card, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        content.addView(label(context, "上下文长度"), labelParams(context, LineTheme.LG, LineTheme.SM));
+        content.addView(label(context, context.getString(R.string.screen_model_add_context_length_label)), labelParams(context, LineTheme.LG, LineTheme.SM));
         EditText ctx = input(context, "4096", "4096", false, false);
         ctx.setInputType(InputType.TYPE_CLASS_NUMBER);
         content.addView(ctx, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        TextView hint = LineTheme.text(context, "手机端建议从 4096 开始；保存后模型 ID 会自动带上上下文标记。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView hint = LineTheme.text(context, context.getString(R.string.screen_model_add_context_length_hint), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         hintParams.topMargin = LineTheme.dp(context, LineTheme.SM);
         content.addView(hint, hintParams);
 
-        content.addView(label(context, "加速"), labelParams(context, LineTheme.LG, LineTheme.SM));
+        content.addView(label(context, context.getString(R.string.screen_model_add_acceleration_label)), labelParams(context, LineTheme.LG, LineTheme.SM));
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(HORIZONTAL);
-        addToggle(row, "自动", true, true, null);
-        addToggle(row, "CPU", false, true, null);
-        addToggle(row, "NPU", false, true, null);
+        addToggle(row, context.getString(R.string.screen_model_add_acceleration_auto), true, true, null);
+        addToggle(row, context.getString(R.string.screen_model_add_acceleration_cpu), false, true, null);
+        addToggle(row, context.getString(R.string.screen_model_add_acceleration_npu), false, true, null);
         content.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        TextView accelHint = LineTheme.text(context, "自动模式会优先尝试 Android Hexagon NPU，设备或模型不支持时回退 CPU。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView accelHint = LineTheme.text(context, context.getString(R.string.screen_model_add_acceleration_auto_desc), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         accelHint.setLineSpacing(LineTheme.dp(context, 3), 1f);
         LinearLayout.LayoutParams accelHintParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         accelHintParams.topMargin = LineTheme.dp(context, LineTheme.SM);
@@ -374,7 +379,7 @@ public final class ModelAddScreenView extends LinearLayout {
         LinearLayout enabledHeader = new LinearLayout(context);
         enabledHeader.setOrientation(HORIZONTAL);
         enabledHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = label(context, "专用压缩模型");
+        TextView title = label(context, context.getString(R.string.screen_model_add_compaction_label));
         enabledHeader.addView(title, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         compressionEnabledSwitch = new Switch(context);
         tintSwitch(compressionEnabledSwitch);
@@ -382,7 +387,7 @@ public final class ModelAddScreenView extends LinearLayout {
         enabledHeader.addView(compressionEnabledSwitch, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         compressionSection.addView(enabledHeader, labelParams(context, LineTheme.LG, LineTheme.SM));
 
-        TextView hint = LineTheme.text(context, "开启后在自动压缩时优先使用提供方的压缩模型；OpenAI/Codex 都走 OpenAI Responses 路径，不走 Chat Completions。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView hint = LineTheme.text(context, context.getString(R.string.screen_model_add_compaction_hint), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         hint.setLineSpacing(LineTheme.dp(context, 3), 1f);
         compressionDetailsSection = new LinearLayout(context);
         compressionDetailsSection.setOrientation(VERTICAL);
@@ -392,7 +397,7 @@ public final class ModelAddScreenView extends LinearLayout {
         LinearLayout autoHeader = new LinearLayout(context);
         autoHeader.setOrientation(HORIZONTAL);
         autoHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView autoLabel = label(context, "自动");
+        TextView autoLabel = label(context, context.getString(R.string.screen_model_add_compaction_auto_label));
         autoHeader.addView(autoLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         compressionAutoSwitch = new Switch(context);
         tintSwitch(compressionAutoSwitch);
@@ -403,11 +408,11 @@ public final class ModelAddScreenView extends LinearLayout {
         LinearLayout modelIdHeader = new LinearLayout(context);
         modelIdHeader.setOrientation(HORIZONTAL);
         modelIdHeader.setGravity(Gravity.CENTER_VERTICAL);
-        modelIdHeader.addView(label(context, "压缩模型 ID"), new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        modelIdHeader.addView(label(context, context.getString(R.string.screen_model_add_compaction_id_label)), new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout switchWrap = new LinearLayout(context);
         switchWrap.setOrientation(HORIZONTAL);
         switchWrap.setGravity(Gravity.CENTER_VERTICAL);
-        switchWrap.addView(LineTheme.textMedium(context, "自定义", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY),
+        switchWrap.addView(LineTheme.textMedium(context, context.getString(R.string.screen_model_add_custom_id_label), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY),
                 new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         compressionCustomIdSwitch = new Switch(context);
         tintSwitch(compressionCustomIdSwitch);
@@ -423,8 +428,8 @@ public final class ModelAddScreenView extends LinearLayout {
 
         String editingCompressionId = editing ? editingModel.getCompressionModelId() : "";
         selectedCompressionModelId[0] = editingCompressionId;
-        compressionModelIdInput = input(context, editingCompressionId, "输入压缩模型 ID", false, false);
-        compressionQueryLabel = LineTheme.text(context, "请先查询并选择模型", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        compressionModelIdInput = input(context, editingCompressionId, context.getString(R.string.screen_model_add_compaction_id_hint), false, false);
+        compressionQueryLabel = LineTheme.text(context, context.getString(R.string.screen_model_add_pick_first), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         compressionQueryLabel.setSingleLine(true);
         compressionQueryLabel.setEllipsize(TextUtils.TruncateAt.END);
         compressionQueryButton = createCompressionQueryButton(context);
@@ -489,7 +494,7 @@ public final class ModelAddScreenView extends LinearLayout {
         selector.setBackground(LineTheme.roundedStroke(getContext(), LineTheme.SURFACE_LIGHT, 12, LineTheme.BORDER_LIGHT));
         LineTheme.padding(selector, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
         boolean hasSelected = selectedCompressionModelId[0].length() > 0;
-        compressionQueryLabel.setText(hasSelected ? selectedCompressionModelId[0] : "请先查询并选择模型");
+        compressionQueryLabel.setText(hasSelected ? selectedCompressionModelId[0] : getContext().getString(R.string.screen_model_add_pick_first));
         compressionQueryLabel.setTextColor(hasSelected ? LineTheme.TEXT : LineTheme.TEXT_TERTIARY);
         selector.addView(compressionQueryLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         IconButtonView down = new IconButtonView(getContext(), IconButtonView.CHEVRON_DOWN);
@@ -524,7 +529,7 @@ public final class ModelAddScreenView extends LinearLayout {
         selector.setBackground(LineTheme.roundedStroke(getContext(), LineTheme.SURFACE_LIGHT, 12, LineTheme.BORDER_LIGHT));
         LineTheme.padding(selector, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
         boolean hasSelected = selectedModelId[0].length() > 0;
-        queryLabel.setText(hasSelected ? selectedModelId[0] : "请先查询并选择模型");
+        queryLabel.setText(hasSelected ? selectedModelId[0] : getContext().getString(R.string.screen_model_add_pick_first));
         queryLabel.setTextColor(hasSelected ? LineTheme.TEXT : LineTheme.TEXT_TERTIARY);
         selector.addView(queryLabel, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         IconButtonView down = new IconButtonView(getContext(), IconButtonView.CHEVRON_DOWN);
@@ -561,7 +566,7 @@ public final class ModelAddScreenView extends LinearLayout {
         queryIcon.setIconSizeDp(16, 16);
         button.addView(queryIcon, new LinearLayout.LayoutParams(LineTheme.dp(context, 16), LineTheme.dp(context, 16)));
 
-        queryText = LineTheme.text(context, "查询", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
+        queryText = LineTheme.text(context, context.getString(R.string.screen_model_add_query_button), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         textParams.leftMargin = LineTheme.dp(context, LineTheme.XS);
         button.addView(queryText, textParams);
@@ -580,7 +585,7 @@ public final class ModelAddScreenView extends LinearLayout {
         compressionQueryIcon.setIconSizeDp(16, 16);
         button.addView(compressionQueryIcon, new LinearLayout.LayoutParams(LineTheme.dp(context, 16), LineTheme.dp(context, 16)));
 
-        compressionQueryText = LineTheme.text(context, "查询", LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
+        compressionQueryText = LineTheme.text(context, context.getString(R.string.screen_model_add_query_button), LineTheme.FONT_MD, LineTheme.TEXT_TERTIARY, Typeface.BOLD);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         textParams.leftMargin = LineTheme.dp(context, LineTheme.XS);
         button.addView(compressionQueryText, textParams);
@@ -602,7 +607,7 @@ public final class ModelAddScreenView extends LinearLayout {
                     fetchedModelIds.addAll(ids);
                     updateQueryState();
                     if (ids.isEmpty()) {
-                        Toast.makeText(getContext(), "未获取到模型列表，请检查 Base URL 和 API Key。", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), R.string.screen_model_add_fetch_failed, Toast.LENGTH_LONG).show();
                         return;
                     }
                     showModelPicker(ids);
@@ -632,7 +637,7 @@ public final class ModelAddScreenView extends LinearLayout {
                     fetchedCompressionModelIds.addAll(ids);
                     updateCompressionQueryState();
                     if (ids.isEmpty()) {
-                        Toast.makeText(getContext(), "未获取到模型列表，请检查 Base URL 和 API Key。", Toast.LENGTH_LONG).show();
+                        Toast.makeText(getContext(), R.string.screen_model_add_fetch_failed, Toast.LENGTH_LONG).show();
                         return;
                     }
                     showModelPicker(ids, true);
@@ -670,7 +675,7 @@ public final class ModelAddScreenView extends LinearLayout {
         handleParams.bottomMargin = LineTheme.dp(context, LineTheme.XS);
         panel.addView(handle, handleParams);
 
-        TextView title = LineTheme.text(context, "选择模型", LineTheme.FONT_LG, LineTheme.TEXT, Typeface.BOLD);
+        TextView title = LineTheme.text(context, context.getString(R.string.screen_model_add_picker_title), LineTheme.FONT_LG, LineTheme.TEXT, Typeface.BOLD);
         LineTheme.padding(title, LineTheme.LG, 0, LineTheme.LG, LineTheme.MD);
         panel.addView(title, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
@@ -688,7 +693,7 @@ public final class ModelAddScreenView extends LinearLayout {
         for (String id : ids) {
             addPickerRow(list, dialog, id, false, compression);
         }
-        addPickerRow(list, dialog, "自定义 ID...", true, compression);
+        addPickerRow(list, dialog, getContext().getString(R.string.screen_model_add_custom_id_picker), true, compression);
         panel.addView(new View(context), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 34)));
 
         dialog.setContentView(panel);
@@ -756,7 +761,7 @@ public final class ModelAddScreenView extends LinearLayout {
 
     private ModelConfig buildModelConfig(Context context) {
         if (local) {
-            Toast.makeText(context, "请先选择 GGUF 文件。本地推理稍后接入。", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.screen_model_add_gguf_required, Toast.LENGTH_SHORT).show();
             return null;
         }
         String baseUrl = effectiveBaseUrl();
@@ -775,19 +780,19 @@ public final class ModelAddScreenView extends LinearLayout {
             name = modelId;
         }
         if (modelId.length() == 0 || name.length() == 0) {
-            Toast.makeText(context, "请填写名称和模型 ID", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.screen_model_add_require_name_id, Toast.LENGTH_SHORT).show();
             return null;
         }
         if (apiKey.length() == 0) {
-            Toast.makeText(context, "请填写 API Key", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.screen_model_add_require_api_key, Toast.LENGTH_SHORT).show();
             return null;
         }
         if (toolCallLimit == null) {
-            Toast.makeText(context, "工具调用次数限制只能是 -1 或大于等于 0 的整数", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.screen_model_add_tool_call_range_invalid, Toast.LENGTH_SHORT).show();
             return null;
         }
         if (compressionEnabled && !compressionAuto && compressionModelId.length() == 0) {
-            Toast.makeText(context, "请选择或填写压缩模型 ID", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.screen_model_add_require_compaction_id, Toast.LENGTH_SHORT).show();
             return null;
         }
         String label = providerLabel != null ? providerLabel : protocolType[0].getLabel();
@@ -834,9 +839,10 @@ public final class ModelAddScreenView extends LinearLayout {
         if (local || queryButton == null) {
             return;
         }
+        Context context = getContext();
         boolean canQuery = canQuery() && !fetchingModels;
         if (queryText != null) {
-            queryText.setText(fetchingModels ? "查询中" : "查询");
+            queryText.setText(fetchingModels ? context.getString(R.string.screen_model_add_query_button_loading) : context.getString(R.string.screen_model_add_query_button));
             queryText.setTextColor((canQuery || fetchingModels) ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT_TERTIARY);
         }
         if (queryIcon != null) {
@@ -881,9 +887,10 @@ public final class ModelAddScreenView extends LinearLayout {
         if (local || compressionQueryButton == null) {
             return;
         }
+        Context context = getContext();
         boolean canQuery = canCompressionQuery() && !fetchingCompressionModels;
         if (compressionQueryText != null) {
-            compressionQueryText.setText(fetchingCompressionModels ? "查询中" : "查询");
+            compressionQueryText.setText(fetchingCompressionModels ? context.getString(R.string.screen_model_add_query_button_loading) : context.getString(R.string.screen_model_add_query_button));
             compressionQueryText.setTextColor((canQuery || fetchingCompressionModels) ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT_TERTIARY);
         }
         if (compressionQueryIcon != null) {
@@ -993,26 +1000,28 @@ public final class ModelAddScreenView extends LinearLayout {
     }
 
     private String hintFor(ModelProviderPreset preset) {
+        Context context = getContext();
         if (preset != null) {
             return preset.getHint();
         }
         if (protocolType[0] == ModelProtocolType.CODEX_RESPONSES) {
-            return "Codex 使用 Responses API，也必须填到 /v1 结尾，例如 https://api.example.com/v1；不要加 /responses。";
+            return context.getString(R.string.screen_model_add_url_codex);
         }
         if (protocolType[0] == ModelProtocolType.ANTHROPIC_MESSAGES) {
-            return "Anthropic 协议必须填到 /anthropic 结尾，例如 https://api.example.com/anthropic；不要加 /v1/messages。";
+            return context.getString(R.string.screen_model_add_url_anthropic);
         }
-        return "OpenAI 兼容协议必须填到 /v1 结尾，例如 https://api.example.com/v1；不要只填域名，也不要加 /chat/completions。";
+        return context.getString(R.string.screen_model_add_url_openai);
     }
 
     private String providerTitle() {
+        Context context = getContext();
         if (providerLabel != null && providerLabel.length() > 0) {
-            return "提供商：" + providerLabel;
+            return context.getString(R.string.screen_model_add_provider_label) + providerLabel;
         }
         if (lockedPreset) {
-            return "提供商：" + protocolType[0].getLabel();
+            return context.getString(R.string.screen_model_add_provider_label) + protocolType[0].getLabel();
         }
-        return "提供商";
+        return context.getString(R.string.screen_model_add_provider_title);
     }
 
     private String cleanProviderLabel(String label) {

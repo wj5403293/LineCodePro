@@ -9,6 +9,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -33,7 +34,7 @@ public final class MarkdownCodeBlockView extends LinearLayout {
         header.addView(label, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         IconButtonView copyButton = new IconButtonView(context, IconButtonView.COPY);
-        copyButton.setContentDescription("复制代码");
+        copyButton.setContentDescription(getContext().getString(R.string.markdown_code_copy_desc));
         copyButton.setIconColor(LineTheme.TEXT_TERTIARY);
         copyButton.setIconPaddingDp(5, 4, 5, 4);
         copyButton.setOnClickListener(v -> copyCode(safeCode));
@@ -64,7 +65,7 @@ public final class MarkdownCodeBlockView extends LinearLayout {
         ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
             clipboard.setPrimaryClip(ClipData.newPlainText("LineCode code", code == null ? "" : code));
-            Toast.makeText(getContext(), "已复制", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.markdown_code_copied), Toast.LENGTH_SHORT).show();
         }
     }
 }

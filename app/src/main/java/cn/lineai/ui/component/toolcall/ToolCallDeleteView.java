@@ -7,6 +7,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
@@ -39,7 +40,7 @@ public final class ToolCallDeleteView extends LinearLayout {
         ArrayList<String> paths = paths(input);
         String reason = input.optString("reason").trim();
         if (reason.length() == 0) {
-            reason = "未提供删除原因";
+            reason = getContext().getString(R.string.tool_call_delete_no_reason);
         }
         String state = result == null ? "pending" : result.getReviewState();
         boolean pending = result == null || state.length() == 0 || "pending".equals(state);
@@ -53,9 +54,9 @@ public final class ToolCallDeleteView extends LinearLayout {
         if (pending) {
             addActions(toolCall, reason, paths);
         } else if (accepted && result != null && result.getContent().length() == 0) {
-            addStateMessage("已确认删除，等待执行。", LineTheme.WARNING);
+            addStateMessage(getContext().getString(R.string.tool_call_delete_pending), LineTheme.WARNING);
         } else if (rejected) {
-            addStateMessage(result == null || result.getContent().length() == 0 ? "已拒绝删除。" : result.getContent(), LineTheme.DANGER);
+            addStateMessage(result == null || result.getContent().length() == 0 ? getContext().getString(R.string.tool_call_delete_rejected) : result.getContent(), LineTheme.DANGER);
         } else if (result != null && result.getContent().length() > 0) {
             addStateMessage(result.getContent(), error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY);
         }
@@ -100,7 +101,7 @@ public final class ToolCallDeleteView extends LinearLayout {
         list.setOrientation(VERTICAL);
         LineTheme.padding(list, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
         if (paths.isEmpty()) {
-            list.addView(pathRow("未指定删除路径"), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            list.addView(pathRow(getContext().getString(R.string.tool_call_delete_no_path)), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         } else {
             for (String path : paths) {
                 list.addView(pathRow(path), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -128,7 +129,7 @@ public final class ToolCallDeleteView extends LinearLayout {
         row.setGravity(Gravity.CENTER_VERTICAL);
         LineTheme.padding(row, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
 
-        LinearLayout reject = button(IconButtonView.CLOSE, "拒绝", LineTheme.DANGER, LineTheme.SURFACE_LIGHT, LineTheme.DANGER_MUTED_2);
+        LinearLayout reject = button(IconButtonView.CLOSE, getContext().getString(R.string.tool_call_delete_reject), LineTheme.DANGER, LineTheme.SURFACE_LIGHT, LineTheme.DANGER_MUTED_2);
         reject.setOnClickListener(v -> {
             if (toolReviewListener != null) {
                 toolReviewListener.onToolReview(toolCall == null ? "" : toolCall.getId(), "rejected", "");
@@ -139,7 +140,7 @@ public final class ToolCallDeleteView extends LinearLayout {
         View spacer = new View(getContext());
         row.addView(spacer, new LayoutParams(0, 1, 1f));
 
-        LinearLayout accept = button(IconButtonView.TRASH_2, "确认删除", LineTheme.TEXT_ON_COLOR, LineTheme.DANGER, LineTheme.DANGER);
+        LinearLayout accept = button(IconButtonView.TRASH_2, getContext().getString(R.string.tool_call_delete_confirm), LineTheme.TEXT_ON_COLOR, LineTheme.DANGER, LineTheme.DANGER);
         accept.setOnClickListener(v -> showConfirmDialog(toolCall, reason, paths));
         row.addView(accept, new LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(getContext(), 32)));
         addView(row, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -171,10 +172,10 @@ public final class ToolCallDeleteView extends LinearLayout {
             message.append("- ").append(displayPath(path)).append('\n');
         }
         new AlertDialog.Builder(getContext())
-                .setTitle("确认删除")
+                .setTitle(getContext().getString(R.string.tool_call_delete_confirm_title))
                 .setMessage(message.toString().trim())
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确认删除", (dialog, which) -> {
+                .setNegativeButton(getContext().getString(R.string.common_cancel), null)
+                .setPositiveButton(getContext().getString(R.string.tool_call_delete_confirm_title), (dialog, which) -> {
                     if (toolReviewListener != null) {
                         toolReviewListener.onToolReview(toolCall == null ? "" : toolCall.getId(), "accepted", "");
                     }
@@ -193,8 +194,8 @@ public final class ToolCallDeleteView extends LinearLayout {
     }
 
     private String description(int count, boolean pending, boolean accepted, boolean rejected, boolean complete, boolean error) {
-        String status = error ? "执行失败" : pending ? "等待确认" : rejected ? "已拒绝" : complete ? "已执行" : accepted ? "已确认" : "删除";
-        return status + " · " + count + " 项";
+        String status = error ? getContext().getString(R.string.tool_call_shell_failed) : pending ? getContext().getString(R.string.tool_call_delete_status_pending) : rejected ? getContext().getString(R.string.tool_call_delete_status_rejected) : complete ? getContext().getString(R.string.tool_call_delete_status_executed) : accepted ? getContext().getString(R.string.tool_call_delete_status_accepted) : getContext().getString(R.string.common_delete);
+        return status + getContext().getString(R.string.tool_call_delete_count_suffix, count);
     }
 
     private String displayPath(String path) {

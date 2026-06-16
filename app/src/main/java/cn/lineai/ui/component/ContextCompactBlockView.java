@@ -6,6 +6,7 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -29,7 +30,7 @@ public final class ContextCompactBlockView extends LinearLayout {
         icon.setIconSizeDp(18, 14);
         addView(icon, new LayoutParams(LineTheme.dp(context, 18), LineTheme.dp(context, 18)));
 
-        label = LineTheme.text(context, "压缩", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        label = LineTheme.text(context, context.getString(R.string.context_compact_label), LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         label.setTypeface(Typeface.MONOSPACE);
         LayoutParams labelParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.leftMargin = LineTheme.dp(context, 6);

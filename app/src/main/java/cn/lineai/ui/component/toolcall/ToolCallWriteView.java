@@ -8,6 +8,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.data.repository.DiffRecord;
 import cn.lineai.data.repository.DiffRepository;
 import cn.lineai.tool.ToolCall;
@@ -43,7 +44,7 @@ public final class ToolCallWriteView extends LinearLayout {
         JSONObject input = ToolCallUtils.parseInput(toolCall);
         String filePath = input.optString("file_path");
         String fileName = fileName(filePath);
-        String displayName = fileName.length() == 0 ? "未命名文件" : fileName;
+        String displayName = fileName.length() == 0 ? getContext().getString(R.string.tool_call_write_unnamed) : fileName;
         String lang = langLabel(displayName);
         boolean complete = result != null;
         boolean error = result != null && result.isError();
@@ -56,7 +57,7 @@ public final class ToolCallWriteView extends LinearLayout {
         String targetPath = diffRecord != null && diffRecord.getFilePath().length() > 0 ? diffRecord.getFilePath() : filePath;
         if (fileName.length() == 0 && targetPath.length() > 0) {
             fileName = fileName(targetPath);
-            displayName = fileName.length() == 0 ? "未命名文件" : fileName;
+            displayName = fileName.length() == 0 ? getContext().getString(R.string.tool_call_write_unnamed) : fileName;
             lang = langLabel(displayName);
         }
         String shownPath = ToolCallUtils.workspaceDisplayPath(projectPath, targetPath);
@@ -131,7 +132,7 @@ public final class ToolCallWriteView extends LinearLayout {
         if (hasDiff && !accepted && !rejected) {
             View spacer = new View(getContext());
             actionRow.addView(spacer, new LayoutParams(0, 1, 1f));
-            LinearLayout rejectButton = reviewButton(IconButtonView.CLOSE, "撤销", LineTheme.DANGER, LineTheme.SURFACE_LIGHT, LineTheme.DANGER_MUTED_2);
+            LinearLayout rejectButton = reviewButton(IconButtonView.CLOSE, getContext().getString(R.string.tool_call_write_revert), LineTheme.DANGER, LineTheme.SURFACE_LIGHT, LineTheme.DANGER_MUTED_2);
             rejectButton.setOnClickListener(v -> {
                 if (toolReviewListener != null) {
                     toolReviewListener.onToolReview(toolCall == null ? "" : toolCall.getId(), "rejected", result.getDiffId());
@@ -139,7 +140,7 @@ public final class ToolCallWriteView extends LinearLayout {
             });
             actionRow.addView(rejectButton, new LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(getContext(), 30)));
 
-            LinearLayout acceptButton = reviewButton(IconButtonView.CHECK, "同意", LineTheme.TEXT_ON_COLOR, LineTheme.ACCENT, LineTheme.ACCENT);
+            LinearLayout acceptButton = reviewButton(IconButtonView.CHECK, getContext().getString(R.string.tool_call_write_accept), LineTheme.TEXT_ON_COLOR, LineTheme.ACCENT, LineTheme.ACCENT);
             acceptButton.setOnClickListener(v -> {
                 if (toolReviewListener != null) {
                     toolReviewListener.onToolReview(toolCall == null ? "" : toolCall.getId(), "accepted", result.getDiffId());
@@ -230,7 +231,7 @@ public final class ToolCallWriteView extends LinearLayout {
         arrow.setClickable(false);
         header.addView(arrow, new LayoutParams(LineTheme.dp(getContext(), 16), LineTheme.dp(getContext(), 16)));
 
-        TextView label = LineTheme.text(getContext(), "查看 Diff", LineTheme.FONT_XS, LineTheme.ACCENT, Typeface.BOLD);
+        TextView label = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_view_diff), LineTheme.FONT_XS, LineTheme.ACCENT, Typeface.BOLD);
         LayoutParams labelParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.leftMargin = LineTheme.dp(getContext(), LineTheme.XS);
         header.addView(label, labelParams);
@@ -281,9 +282,9 @@ public final class ToolCallWriteView extends LinearLayout {
         String name = toolCall == null ? "" : toolCall.getName();
         String resultName = result == null ? "" : result.getToolName();
         if (isEditName(name) || isEditName(resultName) || hasEditShape(input)) {
-            return "编辑";
+            return getContext().getString(R.string.common_edit);
         }
-        return "写入";
+        return getContext().getString(R.string.tool_call_action_write);
     }
 
     private boolean isEditName(String name) {

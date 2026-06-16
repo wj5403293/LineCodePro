@@ -2,6 +2,7 @@ package cn.lineai.ui.component.toolcall;
 
 import android.content.Context;
 import android.widget.LinearLayout;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 
@@ -101,12 +102,12 @@ public final class ToolCallBlockView extends LinearLayout {
             return;
         }
         if (ToolCallUtils.isHttpTool(name)) {
-            ToolCallGenericView view = new ToolCallGenericView(getContext(), "HTTP 服务");
+            ToolCallGenericView view = new ToolCallGenericView(getContext(), getContext().getString(R.string.tool_call_block_http));
             view.bind(toolCall, result);
             addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
-        ToolCallGenericView view = new ToolCallGenericView(getContext(), "MCP 调用");
+        ToolCallGenericView view = new ToolCallGenericView(getContext(), getContext().getString(R.string.tool_call_block_mcp));
         view.bind(toolCall, result);
         addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }

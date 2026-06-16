@@ -14,6 +14,7 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
@@ -50,7 +51,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
     private final Listener listener;
 
     public ExtensionDetailScreenView(Context context, String kind, ExtensionOverviewState state, Listener listener) {
-        super(context, titleFor(kind), listener::onBack, addButton(context, kind, listener));
+        super(context, titleFor(context, kind), listener::onBack, addButton(context, kind, listener));
         this.kind = kind == null ? "" : kind;
         this.state = state == null ? new ExtensionOverviewState(null, null, null) : state;
         this.listener = listener;
@@ -58,11 +59,11 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         LinearLayout content = getContent();
         LineTheme.padding(content, 0, 0, 0, 100);
 
-        SettingsSectionView add = new SettingsSectionView(context, isSkills() ? "安装与创建" : "添加");
-        add.addRow(new ActionRowView(context, iconFor(this.kind), inlineTitle(this.kind), inlineDesc(this.kind), false, true, this::handleAdd), false);
+        SettingsSectionView add = new SettingsSectionView(context, isSkills() ? context.getString(R.string.screen_extension_detail_section_install_skills) : context.getString(R.string.screen_extension_detail_section_install_other));
+        add.addRow(new ActionRowView(context, iconFor(this.kind), inlineTitle(context, this.kind), inlineDesc(context, this.kind), false, true, this::handleAdd), false);
         content.addView(add, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView installed = new SettingsSectionView(context, "已安装");
+        SettingsSectionView installed = new SettingsSectionView(context, context.getString(R.string.screen_extension_detail_section_installed));
         renderInstalled(installed);
         content.addView(installed, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
@@ -75,7 +76,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         } else if ("skills".equals(kind)) {
             showSkillActions();
         } else {
-            Toast.makeText(getContext(), "LineCode 扩展后续接入。", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_extension_detail_empty_linecode), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -83,7 +84,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         if ("agent".equals(kind)) {
             List<ExtensionAgentConfig> agents = state.getAgents();
             if (agents.isEmpty()) {
-                installed.addRow(empty("还没有添加 Agent。"), false);
+                installed.addRow(empty(getContext().getString(R.string.screen_extension_detail_empty_agent)), false);
                 return;
             }
             for (int i = 0; i < agents.size(); i++) {
@@ -97,7 +98,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         if ("mcp".equals(kind)) {
             List<ExtensionMcpConfig> mcps = state.getMcps();
             if (mcps.isEmpty()) {
-                installed.addRow(empty("还没有添加 MCP。"), false);
+                installed.addRow(empty(getContext().getString(R.string.screen_extension_detail_empty_mcp)), false);
                 return;
             }
             for (int i = 0; i < mcps.size(); i++) {
@@ -111,7 +112,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         if ("skills".equals(kind)) {
             List<SkillRecord> skills = state.getSkills();
             if (skills.isEmpty()) {
-                installed.addRow(empty("还没有发现 Skills。可以创建或安装 SKILL.md。"), false);
+                installed.addRow(empty(getContext().getString(R.string.screen_extension_detail_empty_skills)), false);
                 return;
             }
             for (int i = 0; i < skills.size(); i++) {
@@ -122,7 +123,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
             }
             return;
         }
-        installed.addRow(empty("LineCode 扩展后续接入。"), false);
+        installed.addRow(empty(getContext().getString(R.string.screen_extension_detail_empty_linecode)), false);
     }
 
     private LinearLayout extensionRow(String rowKind, String id, int iconType, String title, String desc, boolean enabled) {
@@ -146,17 +147,17 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         Dialog dialog = createBottomDialog();
         LinearLayout panel = createBottomPanel();
         addHandle(panel);
-        addSheetTitle(panel, "Skills");
+        addSheetTitle(panel, getContext().getString(R.string.screen_extension_detail_sheet_title_skills));
         addDivider(panel);
-        addActionRow(panel, "选择 ZIP/SKILL.md 安装", "选择后再选择项目或全局安装位置", () -> {
+        addActionRow(panel, getContext().getString(R.string.screen_extension_detail_install_zip), getContext().getString(R.string.screen_extension_detail_install_zip_desc), () -> {
             dialog.dismiss();
             chooseSkillDocument();
         });
-        addActionRow(panel, "创建 SKILL", "新建 SKILL.md 到项目或全局 Skills 目录", () -> {
+        addActionRow(panel, getContext().getString(R.string.screen_extension_detail_create_skill), getContext().getString(R.string.screen_extension_detail_create_skill_desc), () -> {
             dialog.dismiss();
             showCreateSkillDialog();
         });
-        addActionRow(panel, "从本地路径安装", "手动输入目录、SKILL.md 或 .zip 路径", () -> {
+        addActionRow(panel, getContext().getString(R.string.screen_extension_detail_install_path), getContext().getString(R.string.screen_extension_detail_install_path_desc), () -> {
             dialog.dismiss();
             showInstallSkillDialog();
         });
@@ -175,7 +176,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
             public void onDocumentPicked(String uri, String displayName) {
                 String lower = (displayName == null ? "" : displayName).toLowerCase(java.util.Locale.ROOT);
                 if (!lower.endsWith(".zip") && !lower.endsWith(".md")) {
-                    Toast.makeText(getContext(), "请选择 .zip 或 SKILL.md", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), getContext().getString(R.string.screen_extension_detail_pick_error), Toast.LENGTH_SHORT).show();
                     return;
                 }
                 showInstallTargetDialog(uri, displayName);
@@ -191,13 +192,13 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         Dialog dialog = createBottomDialog();
         LinearLayout panel = createBottomPanel();
         addHandle(panel);
-        addSheetTitle(panel, "安装到");
+        addSheetTitle(panel, getContext().getString(R.string.screen_extension_detail_sheet_title_install_target));
         addDivider(panel);
-        addActionRow(panel, "当前工作区 .linecode/skills", "随当前项目保存和导出", () -> {
+        addActionRow(panel, getContext().getString(R.string.screen_extension_detail_target_project), getContext().getString(R.string.screen_extension_detail_target_project_desc), () -> {
             dialog.dismiss();
             listener.onInstallSkillFromUri(SkillRecord.LOCATION_PROJECT, uri, displayName);
         });
-        addActionRow(panel, "应用全局 .linecode/skills", "保存到 LineCode 应用私有全局目录", () -> {
+        addActionRow(panel, getContext().getString(R.string.screen_extension_detail_target_global), getContext().getString(R.string.screen_extension_detail_target_global_desc), () -> {
             dialog.dismiss();
             listener.onInstallSkillFromUri(SkillRecord.LOCATION_APP, uri, displayName);
         });
@@ -207,16 +208,16 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
 
     private void showCreateSkillDialog() {
         Dialog dialog = createDialog();
-        LinearLayout panel = panel("创建 SKILL");
-        FormTextFieldView name = new FormTextFieldView(getContext(), "名称", "", "android-native-view", null, false, false);
-        FormTextFieldView desc = new FormTextFieldView(getContext(), "描述", "", "当前项目原生 Android View 规范", null, false, false);
-        FormTextFieldView body = new FormTextFieldView(getContext(), "内容", "", "# Skill\n\n## 触发条件\n- ...", null, true, false);
+        LinearLayout panel = panel(getContext().getString(R.string.screen_extension_detail_create_skill));
+        FormTextFieldView name = new FormTextFieldView(getContext(), getContext().getString(R.string.screen_extension_detail_field_name), "", "android-native-view", null, false, false);
+        FormTextFieldView desc = new FormTextFieldView(getContext(), getContext().getString(R.string.screen_extension_detail_field_desc), "", getContext().getString(R.string.screen_extension_detail_hint_skill_desc), null, false, false);
+        FormTextFieldView body = new FormTextFieldView(getContext(), getContext().getString(R.string.screen_extension_detail_field_content), "", getContext().getString(R.string.screen_extension_detail_hint_content), null, true, false);
         RadioGroup scope = locationGroup();
         panel.addView(name);
         panel.addView(desc, top());
         panel.addView(body, top());
         panel.addView(scope, top());
-        panel.addView(actionButton("创建", () -> {
+        panel.addView(actionButton(getContext().getString(R.string.common_create), () -> {
             listener.onCreateSkill(checkedLocation(scope), value(name), value(desc), value(body));
             dialog.dismiss();
         }), top());
@@ -225,15 +226,15 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
 
     private void showInstallSkillDialog() {
         Dialog dialog = createDialog();
-        LinearLayout panel = panel("安装 SKILL");
+        LinearLayout panel = panel(getContext().getString(R.string.screen_extension_detail_dialog_install_skill));
         String downloadExample = Environment.getExternalStorageDirectory().getPath() + "/Download/skill.zip";
-        FormTextFieldView path = new FormTextFieldView(getContext(), "来源路径", "", downloadExample, "支持目录、SKILL.md 或 .zip。", false, false);
-        FormTextFieldView name = new FormTextFieldView(getContext(), "名称（可选）", "", "skill-name", null, false, false);
+        FormTextFieldView path = new FormTextFieldView(getContext(), getContext().getString(R.string.screen_extension_detail_field_source_path), "", downloadExample, getContext().getString(R.string.screen_extension_detail_helper_source_path), false, false);
+        FormTextFieldView name = new FormTextFieldView(getContext(), getContext().getString(R.string.screen_extension_detail_field_name_optional), "", getContext().getString(R.string.screen_extension_detail_hint_optional_name), null, false, false);
         RadioGroup scope = locationGroup();
         panel.addView(path);
         panel.addView(name, top());
         panel.addView(scope, top());
-        panel.addView(actionButton("安装", () -> {
+        panel.addView(actionButton(getContext().getString(R.string.common_install), () -> {
             listener.onInstallSkill(checkedLocation(scope), value(path), value(name));
             dialog.dismiss();
         }), top());
@@ -243,8 +244,8 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
     private RadioGroup locationGroup() {
         RadioGroup group = new RadioGroup(getContext());
         group.setOrientation(RadioGroup.HORIZONTAL);
-        RadioButton project = locationButton("项目", SkillRecord.LOCATION_PROJECT);
-        RadioButton app = locationButton("全局", SkillRecord.LOCATION_APP);
+        RadioButton project = locationButton(getContext().getString(R.string.screen_extension_detail_position_project), SkillRecord.LOCATION_PROJECT);
+        RadioButton app = locationButton(getContext().getString(R.string.screen_extension_detail_position_global), SkillRecord.LOCATION_APP);
         group.addView(project, new RadioGroup.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         group.addView(app, new RadioGroup.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         project.setChecked(true);
@@ -283,7 +284,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
             addHandle(panel);
             addSheetTitle(panel, title);
             addDivider(panel);
-            addActionRow(panel, "修改", "编辑配置、提示词、请求头或 tools 列表", () -> {
+            addActionRow(panel, getContext().getString(R.string.screen_extension_detail_modify), getContext().getString(R.string.screen_extension_detail_modify_desc), () -> {
                 dialog.dismiss();
                 if ("agent".equals(rowKind)) {
                     listener.onEditAgent(id);
@@ -291,7 +292,7 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
                     listener.onEditMcp(id);
                 }
             });
-            addActionRow(panel, "删除", "从已安装扩展列表移除", () -> {
+            addActionRow(panel, getContext().getString(R.string.screen_extension_detail_delete), getContext().getString(R.string.screen_extension_detail_delete_desc), () -> {
                 dialog.dismiss();
                 confirmDeleteOnly(rowKind, id, title);
             }, LineTheme.DANGER);
@@ -306,13 +307,13 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         Dialog dialog = createBottomDialog();
         LinearLayout panel = createBottomPanel();
         addHandle(panel);
-        addSheetTitle(panel, "删除扩展");
-        TextView desc = LineTheme.text(getContext(), "确定删除「" + title + "」？", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        addSheetTitle(panel, getContext().getString(R.string.screen_extension_detail_delete_title));
+        TextView desc = LineTheme.text(getContext(), getContext().getString(R.string.screen_extension_detail_delete_confirm, title), LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LineTheme.padding(desc, LineTheme.LG, 0, LineTheme.LG, LineTheme.MD);
         panel.addView(desc, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         addDivider(panel);
-        addActionRow(panel, "取消", "", dialog::dismiss);
-        addActionRow(panel, "删除", "删除后需要重新添加或安装才能使用", () -> {
+        addActionRow(panel, getContext().getString(R.string.common_cancel), "", dialog::dismiss);
+        addActionRow(panel, getContext().getString(R.string.common_delete), getContext().getString(R.string.screen_extension_detail_delete_confirm_desc), () -> {
             dialog.dismiss();
             listener.onDelete(rowKind, id);
         }, LineTheme.DANGER);
@@ -459,17 +460,17 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
             } else if ("mcp".equals(kind)) {
                 listener.onAddMcp();
             } else if ("skills".equals(kind)) {
-                Toast.makeText(context, "点击安装与创建入口", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, context.getString(R.string.screen_extension_detail_add_button_toast), Toast.LENGTH_SHORT).show();
             }
         });
         return button;
     }
 
-    private static String titleFor(String kind) {
-        if ("agent".equals(kind)) return "Agent 扩展";
-        if ("mcp".equals(kind)) return "MCP 扩展";
-        if ("skills".equals(kind)) return "Skills 扩展";
-        return "LineCode 扩展";
+    private static String titleFor(Context context, String kind) {
+        if ("agent".equals(kind)) return context.getString(R.string.screen_extensions_section_agent);
+        if ("mcp".equals(kind)) return context.getString(R.string.screen_extensions_section_mcp);
+        if ("skills".equals(kind)) return context.getString(R.string.screen_extensions_section_skills);
+        return context.getString(R.string.screen_extensions_section_linecode);
     }
 
     private static int iconFor(String kind) {
@@ -479,18 +480,18 @@ public final class ExtensionDetailScreenView extends ScreenScaffoldView {
         return IconButtonView.PACKAGE;
     }
 
-    private static String inlineTitle(String kind) {
-        if ("skills".equals(kind)) return "创建或安装 SKILL";
-        if ("linecode".equals(kind)) return "导入 LIP 扩展";
-        if ("agent".equals(kind)) return "添加 Agent";
-        return "添加 HTTP/S MCP";
+    private static String inlineTitle(Context context, String kind) {
+        if ("skills".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_title_skills);
+        if ("linecode".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_title_linecode);
+        if ("agent".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_title_agent);
+        return context.getString(R.string.screen_extension_detail_inline_title_mcp);
     }
 
-    private static String inlineDesc(String kind) {
-        if ("skills".equals(kind)) return "创建 SKILL.md，或从本地目录、SKILL.md、ZIP 安装到项目/全局 Skills 目录。";
-        if ("linecode".equals(kind)) return "LineCode 原生扩展后续接入。";
-        if ("agent".equals(kind)) return "自定义 Agent 可按需启停，关闭后不会参与提示词和工具调用。";
-        return "自定义 MCP 可查询 tools/list，保存后作为扩展工具暴露给 AI。";
+    private static String inlineDesc(Context context, String kind) {
+        if ("skills".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_desc_skills);
+        if ("linecode".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_desc_linecode);
+        if ("agent".equals(kind)) return context.getString(R.string.screen_extension_detail_inline_desc_agent);
+        return context.getString(R.string.screen_extension_detail_inline_desc_mcp);
     }
 
     private static String count(int value, String suffix) {

@@ -6,6 +6,7 @@ import android.view.Gravity;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class DiffView extends HorizontalScrollView {
             content.addView(lineView(lines.get(i)), new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
         if (lines.size() > MAX_LINES) {
-            TextView truncated = LineTheme.text(getContext(), "... (diff 已截断，共 " + lines.size() + " 行)",
+            TextView truncated = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_diff_truncated, lines.size()),
                     LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.ITALIC);
             truncated.setTypeface(Typeface.MONOSPACE, Typeface.ITALIC);
             LineTheme.padding(truncated, LineTheme.SM, LineTheme.SM, LineTheme.SM, LineTheme.SM);

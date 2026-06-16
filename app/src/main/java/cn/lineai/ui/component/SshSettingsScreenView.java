@@ -33,7 +33,7 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
     private final LinearLayout testButton;
 
     public SshSettingsScreenView(Context context, Listener listener) {
-        super(context, "SSH 连接", listener::onBack, null);
+        super(context, context.getString(R.string.screen_ssh_title), listener::onBack, null);
         sshService = new SshService(context);
         SshConfig config = sshService.getConfig();
 
@@ -41,26 +41,26 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, 100);
 
         LinearLayout intro = card(context);
-        intro.addView(title(context, "远程 Linux / 服务器"));
-        TextView desc = desc(context, "SSH Shell 可以连接桌面开发机、云服务器、NAS 或 Termux。远程服务器填写真实 Host 和端口；Termux 请走单独的“Termux 对接”页面自动配置。");
+        intro.addView(title(context, context.getString(R.string.screen_ssh_section_server)));
+        TextView desc = desc(context, context.getString(R.string.screen_ssh_server_desc));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         intro.addView(desc, descParams);
-        LinearLayout openTermux = button(context, "Termux 对接", IconButtonView.SMARTPHONE, false, v -> listener.onOpenTermuxIntegration());
+        LinearLayout openTermux = button(context, context.getString(R.string.screen_ssh_termux), IconButtonView.SMARTPHONE, false, v -> listener.onOpenTermuxIntegration());
         LinearLayout.LayoutParams termuxParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         termuxParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         intro.addView(openTermux, termuxParams);
         addCard(content, intro);
 
         LinearLayout form = card(context);
-        form.addView(title(context, "连接配置"));
-        hostField = new FormTextFieldView(context, "Host", config.getHost(), "服务器 IP 或域名", null, false, false);
-        portField = new FormTextFieldView(context, "Port", String.valueOf(config.getPort()), "22 或 8022", null, false, false);
+        form.addView(title(context, context.getString(R.string.screen_ssh_form_title)));
+        hostField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_host), config.getHost(), context.getString(R.string.screen_ssh_hint_host), null, false, false);
+        portField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_port), String.valueOf(config.getPort()), context.getString(R.string.screen_ssh_hint_port), null, false, false);
         portField.getInput().setInputType(InputType.TYPE_CLASS_NUMBER);
-        usernameField = new FormTextFieldView(context, "Username", config.getUsername(), "用户名", null, false, false);
-        passwordField = new FormTextFieldView(context, "Password (可选)", config.getPassword(), "密码登录时填写", null, false, true);
-        privateKeyField = new FormTextFieldView(context, "Private key (无密码登录)", config.getPrivateKey(), "-----BEGIN OPENSSH PRIVATE KEY-----", null, true, false);
-        passphraseField = new FormTextFieldView(context, "Key passphrase (可选)", config.getPassphrase(), "私钥口令", null, false, true);
+        usernameField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_username), config.getUsername(), context.getString(R.string.screen_ssh_hint_username), null, false, false);
+        passwordField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_password_optional), config.getPassword(), context.getString(R.string.screen_ssh_hint_password), null, false, true);
+        privateKeyField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_private_key), config.getPrivateKey(), context.getString(R.string.screen_ssh_hint_private_key), null, true, false);
+        passphraseField = new FormTextFieldView(context, context.getString(R.string.screen_ssh_field_key_passphrase_optional), config.getPassphrase(), context.getString(R.string.screen_ssh_hint_passphrase), null, false, true);
         form.addView(hostField, formParams(context));
         form.addView(portField, formParams(context));
         form.addView(usernameField, formParams(context));
@@ -70,11 +70,11 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
 
         LinearLayout actions = new LinearLayout(context);
         actions.setOrientation(HORIZONTAL);
-        LinearLayout saveButton = button(context, "保存配置", IconButtonView.SAVE, false, v -> {
+        LinearLayout saveButton = button(context, context.getString(R.string.screen_ssh_save), IconButtonView.SAVE, false, v -> {
             sshService.saveConfig(readConfig());
-            setStatus("已保存", "SSH 配置已保存。", false);
+            setStatus(context.getString(R.string.screen_ssh_status_saved_title), context.getString(R.string.screen_ssh_status_saved_message), false);
         });
-        testButton = button(context, "测试连接", IconButtonView.TERMINAL, true, v -> testConnection());
+        testButton = button(context, context.getString(R.string.screen_ssh_test), IconButtonView.TERMINAL, true, v -> testConnection());
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f);
         saveParams.rightMargin = LineTheme.dp(context, LineTheme.SM);
         actions.addView(saveButton, saveParams);
@@ -97,8 +97,9 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
     }
 
     private void testConnection() {
+        Context context = getContext();
         setTesting(true);
-        setStatus("连接中", "正在测试 SSH 连接...", false);
+        setStatus(context.getString(R.string.screen_ssh_status_testing_title), context.getString(R.string.screen_ssh_status_testing_message), false);
         SshConfig config = readConfig();
         sshService.saveConfig(config);
         new Thread(() -> {
@@ -106,12 +107,12 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
                 String output = sshService.testConnection(config);
                 mainHandler.post(() -> {
                     setTesting(false);
-                    setStatus("连接成功", output.trim().length() == 0 ? "连接正常" : output.trim(), false);
+                    setStatus(context.getString(R.string.screen_ssh_status_success_title), output.trim().length() == 0 ? context.getString(R.string.screen_ssh_status_success_message) : output.trim(), false);
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     setTesting(false);
-                    setStatus("连接失败", e.getMessage(), true);
+                    setStatus(context.getString(R.string.screen_ssh_status_failed_title), e.getMessage(), true);
                 });
             }
         }, "linecode-ssh-test").start();

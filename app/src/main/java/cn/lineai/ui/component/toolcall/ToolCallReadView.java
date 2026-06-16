@@ -8,6 +8,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
@@ -84,13 +85,13 @@ public final class ToolCallReadView extends LinearLayout {
     }
 
     private String actionLabel(String name) {
-        if ("image_generation".equals(name)) return "图片生成";
-        if ("image_understanding".equals(name)) return "图片理解";
-        if ("web_search".equals(name)) return "搜索";
-        if ("web_fetch".equals(name)) return "抓取";
-        if ("glob".equals(name)) return "匹配";
-        if ("list_dir".equals(name)) return "列目录";
-        return "读取";
+        if ("image_generation".equals(name)) return getContext().getString(R.string.tool_call_image_generation);
+        if ("image_understanding".equals(name)) return getContext().getString(R.string.tool_call_image_understanding);
+        if ("web_search".equals(name)) return getContext().getString(R.string.tool_call_action_search);
+        if ("web_fetch".equals(name)) return getContext().getString(R.string.tool_call_action_fetch);
+        if ("glob".equals(name)) return getContext().getString(R.string.tool_call_action_match);
+        if ("list_dir".equals(name)) return getContext().getString(R.string.tool_call_action_list_dir);
+        return getContext().getString(R.string.tool_call_action_read);
     }
 
     private int iconFor(String name) {

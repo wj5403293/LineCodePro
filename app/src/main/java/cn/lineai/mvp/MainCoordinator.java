@@ -2,6 +2,7 @@ package cn.lineai.mvp;
 
 import android.content.Context;
 import android.os.SystemClock;
+import cn.lineai.R;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionException;
@@ -804,7 +805,7 @@ public final class MainCoordinator implements MainUiController {
                     @Override
                     public void showPermissionSheet(ArrayList<SheetOption> options) {
                         if (view != null) {
-                            view.showSheet("权限设置", options);
+                            view.showSheet(context.getString(R.string.sheet_title_permissions), options);
                         }
                     }
                 }
@@ -907,7 +908,7 @@ public final class MainCoordinator implements MainUiController {
                             view.showConfirmationDialog(
                                     "覆盖导入 .linecode",
                                     "将从「" + sourceName + "」恢复数据库、聊天记录、配置和 .linecode 工作区文件。当前本机数据会被覆盖。",
-                                    "覆盖导入",
+                                    context.getString(R.string.common_confirm),
                                     true,
                                     "data:import_linecode"
                             );
@@ -1193,7 +1194,7 @@ public final class MainCoordinator implements MainUiController {
         }
         ArrayList<SheetOption> options = new ArrayList<>();
         options.add(new SheetOption("tutorial", "教程", "打开初学者教程", false));
-        options.add(new SheetOption("settings", "设置", "模型、主题、数据与实验功能", false));
+        options.add(new SheetOption("settings", context.getString(R.string.screen_settings_title), "模型、主题、数据与实验功能", false));
         options.add(new SheetOption("compact", "压缩上下文", "将早期上下文总结为隐藏摘要", false));
         options.add(new SheetOption("clear", "清空对话", "清空当前对话消息", false));
         view.showSheet("更多", options);
@@ -1445,7 +1446,7 @@ public final class MainCoordinator implements MainUiController {
         ArrayList<SheetOption> options = new ArrayList<>();
         options.add(new SheetOption("compact:confirm", "确认压缩",
                 "把早期上下文总结成隐藏摘要，旧消息仍保留在历史中。", false));
-        options.add(new SheetOption("compact:cancel", "取消", "返回当前对话", false));
+        options.add(new SheetOption("compact:cancel", context.getString(R.string.common_cancel), "返回当前对话", false));
         view.showSheet("压缩上下文", options);
     }
 
@@ -2810,7 +2811,7 @@ public final class MainCoordinator implements MainUiController {
         requestSshFileTreeLoad(true);
         render();
         if (view != null) {
-            view.showConfirmationDialog(title, message, "知道了", false, "project:missing_notice");
+            view.showConfirmationDialog(title, message, context.getString(R.string.common_confirm), false, "project:missing_notice");
         }
     }
 
@@ -4795,7 +4796,7 @@ public final class MainCoordinator implements MainUiController {
                 return firstLine.length() > 28 ? firstLine.substring(0, 28) + "..." : firstLine;
             }
         }
-        return "新对话";
+        return context.getString(R.string.drawer_new_conversation);
     }
 
     private String nextId() {

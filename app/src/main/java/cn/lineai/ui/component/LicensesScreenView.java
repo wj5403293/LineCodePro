@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Typeface;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class LicensesScreenView extends ScreenScaffoldView {
@@ -12,18 +13,18 @@ public final class LicensesScreenView extends ScreenScaffoldView {
     }
 
     public LicensesScreenView(Context context, Listener listener) {
-        super(context, "开源许可", listener::onBack, null);
+        super(context, context.getString(R.string.screen_licenses_title), listener::onBack, null);
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.MD, LineTheme.MD, LineTheme.MD, 100);
 
-        addLicense(content, "commonmark-java core", "org.commonmark:commonmark:0.28.0 · BSD-2-Clause",
-                "Markdown 块级与行内语法解析。POM 声明许可为 BSD-2-Clause。");
-        addLicense(content, "commonmark-java GFM tables", "org.commonmark:commonmark-ext-gfm-tables:0.28.0 · BSD-2-Clause",
-                "GitHub Flavored Markdown 表格扩展，继承 commonmark-java 的 BSD-2-Clause 许可。");
-        addLicense(content, "JSch", "com.github.mwiede:jsch:2.28.2 · Revised BSD / ISC",
-                "SSH2 Java 实现。POM 声明 JSch 与 JZlib 为 Revised BSD，jBCrypt 部分为 ISC。");
-        addLicense(content, "Lucide Icons", "lucide-react-native:1.14.0 · ISC / MIT",
-                "应用内 vector drawable 图标由 LineAI node_modules 中的 Lucide SVG 转换而来；Lucide 为 ISC，部分源自 Feather 的图标按 MIT 许可。");
+        addLicense(content, context.getString(R.string.screen_licenses_commonmark_core), "org.commonmark:commonmark:0.28.0 · BSD-2-Clause",
+                context.getString(R.string.screen_licenses_commonmark_core_desc));
+        addLicense(content, context.getString(R.string.screen_licenses_commonmark_gfm), "org.commonmark:commonmark-ext-gfm-tables:0.28.0 · BSD-2-Clause",
+                context.getString(R.string.screen_licenses_commonmark_gfm_desc));
+        addLicense(content, context.getString(R.string.screen_licenses_jsch), "com.github.mwiede:jsch:2.28.2 · Revised BSD / ISC",
+                context.getString(R.string.screen_licenses_jsch_desc));
+        addLicense(content, context.getString(R.string.screen_licenses_lucide), "lucide-react-native:1.14.0 · ISC / MIT",
+                context.getString(R.string.screen_licenses_lucide_desc));
     }
 
     private void addLicense(LinearLayout content, String name, String meta, String text) {

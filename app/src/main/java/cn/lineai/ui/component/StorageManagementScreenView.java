@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.data.repository.StorageStatsRepository;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -33,7 +34,7 @@ public final class StorageManagementScreenView extends ScreenScaffoldView {
     private TextView homeCountView;
 
     public StorageManagementScreenView(Context context, Listener listener) {
-        super(context, "存储管理", listener::onBack, refreshButton(context, listener));
+        super(context, context.getString(R.string.screen_storage_title), listener::onBack, refreshButton(context, listener));
         this.context = context;
         this.repository = new StorageStatsRepository(context);
         this.handler = new Handler(Looper.getMainLooper());
@@ -44,13 +45,13 @@ public final class StorageManagementScreenView extends ScreenScaffoldView {
         summary.setOrientation(VERTICAL);
         summary.setBackground(LineTheme.rounded(context, LineTheme.SURFACE_ELEVATED, 12));
         LineTheme.padding(summary, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
-        TextView label = LineTheme.textMedium(context, "已统计使用量", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY);
+        TextView label = LineTheme.textMedium(context, context.getString(R.string.screen_storage_counted), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY);
         summary.addView(label, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        totalSizeView = LineTheme.text(context, "计算中...", LineTheme.FONT_XXL, LineTheme.TEXT, Typeface.BOLD);
+        totalSizeView = LineTheme.text(context, context.getString(R.string.screen_storage_calculating), LineTheme.FONT_XXL, LineTheme.TEXT, Typeface.BOLD);
         LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         valueParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         summary.addView(totalSizeView, valueParams);
-        TextView time = LineTheme.text(context, "实时统计应用数据占用", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView time = LineTheme.text(context, context.getString(R.string.screen_storage_summary), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         timeParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         summary.addView(time, timeParams);
@@ -58,22 +59,22 @@ public final class StorageManagementScreenView extends ScreenScaffoldView {
         summaryParams.bottomMargin = LineTheme.dp(context, LineTheme.MD);
         content.addView(summary, summaryParams);
 
-        LinearLayout diffRow = createStorageRow(IconButtonView.GIT_COMPARE, "Diff 缓存", "工具调用生成的补丁和比较结果");
+        LinearLayout diffRow = createStorageRow(IconButtonView.GIT_COMPARE, context.getString(R.string.screen_storage_row_diff_cache), context.getString(R.string.screen_storage_desc_diff));
         diffSizeView = (TextView) ((LinearLayout) diffRow.getChildAt(2)).getChildAt(0);
         diffCountView = (TextView) ((LinearLayout) diffRow.getChildAt(2)).getChildAt(1);
         content.addView(diffRow, createRowParams());
 
-        LinearLayout chatRow = createStorageRow(IconButtonView.MESSAGE_SQUARE, "聊天记录", "对话、消息和索引摘要");
+        LinearLayout chatRow = createStorageRow(IconButtonView.MESSAGE_SQUARE, context.getString(R.string.screen_storage_row_chat), context.getString(R.string.screen_storage_desc_chat));
         chatSizeView = (TextView) ((LinearLayout) chatRow.getChildAt(2)).getChildAt(0);
         chatCountView = (TextView) ((LinearLayout) chatRow.getChildAt(2)).getChildAt(1);
         content.addView(chatRow, createRowParams());
 
-        LinearLayout configRow = createStorageRow(IconButtonView.SETTINGS, "配置文件", "模型、主题、MCP 和系统设置");
+        LinearLayout configRow = createStorageRow(IconButtonView.SETTINGS, context.getString(R.string.screen_storage_row_config), context.getString(R.string.screen_storage_desc_config));
         configSizeView = (TextView) ((LinearLayout) configRow.getChildAt(2)).getChildAt(0);
         configCountView = (TextView) ((LinearLayout) configRow.getChildAt(2)).getChildAt(1);
         content.addView(configRow, createRowParams());
 
-        LinearLayout homeRow = createStorageRow(IconButtonView.FOLDER, "Home 目录", "项目文件、Skills 和扩展数据");
+        LinearLayout homeRow = createStorageRow(IconButtonView.FOLDER, context.getString(R.string.screen_storage_row_home), context.getString(R.string.screen_storage_desc_home));
         homeSizeView = (TextView) ((LinearLayout) homeRow.getChildAt(2)).getChildAt(0);
         homeCountView = (TextView) ((LinearLayout) homeRow.getChildAt(2)).getChildAt(1);
         content.addView(homeRow, createRowParams());
@@ -145,13 +146,13 @@ public final class StorageManagementScreenView extends ScreenScaffoldView {
     private void updateViews(StorageStatsRepository.StorageStats stats) {
         totalSizeView.setText(stats.formatTotalSize());
         diffSizeView.setText(stats.formatDiffCacheSize());
-        diffCountView.setText(stats.diffCacheCount + " 项");
+        diffCountView.setText(stats.diffCacheCount + context.getString(R.string.screen_storage_unit_items));
         chatSizeView.setText(stats.formatChatSize());
-        chatCountView.setText(stats.chatCount + " 项");
+        chatCountView.setText(stats.chatCount + context.getString(R.string.screen_storage_unit_items));
         configSizeView.setText(stats.formatConfigSize());
-        configCountView.setText(stats.configCount + " 项");
+        configCountView.setText(stats.configCount + context.getString(R.string.screen_storage_unit_items));
         homeSizeView.setText(stats.formatHomeSize());
-        homeCountView.setText(stats.homeCount + " 项");
+        homeCountView.setText(stats.homeCount + context.getString(R.string.screen_storage_unit_items));
     }
 
     public void refresh() {

@@ -16,6 +16,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.data.repository.ConversationRecord;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.ui.theme.LineTheme;
@@ -56,7 +57,7 @@ public final class DrawerView extends FrameLayout {
     private final LinearLayout tabs;
     private List<ConversationRecord> conversations;
     private String currentConversationId = "";
-    private String projectLabel = "LineCode";
+    private String projectLabel = "";
     private String projectPath = "";
     private boolean projectRemovable;
     private FileTreeNode fileTree;
@@ -93,7 +94,7 @@ public final class DrawerView extends FrameLayout {
         LineTheme.padding(header, LineTheme.LG, 50, LineTheme.LG, LineTheme.MD);
         sidebar.addView(header, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        headerTitle = LineTheme.text(context, "对话历史", LineTheme.FONT_LG, LineTheme.TEXT, Typeface.BOLD);
+        headerTitle = LineTheme.text(context, context.getString(R.string.drawer_title_conversations), LineTheme.FONT_LG, LineTheme.TEXT, Typeface.BOLD);
         header.addView(headerTitle, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         headerActions = new LinearLayout(context);
@@ -141,7 +142,9 @@ public final class DrawerView extends FrameLayout {
         );
         this.conversations = conversations;
         this.currentConversationId = currentConversationId == null ? "" : currentConversationId;
-        this.projectLabel = projectLabel == null ? "LineCode" : projectLabel;
+        this.projectLabel = projectLabel == null || projectLabel.length() == 0
+                ? getContext().getString(R.string.header_project_default)
+                : projectLabel;
         this.projectPath = projectPath == null ? "" : projectPath;
         this.projectRemovable = projectRemovable;
         this.fileTree = fileTree;
@@ -194,7 +197,9 @@ public final class DrawerView extends FrameLayout {
 
     private void renderChrome() {
         Context context = getContext();
-        headerTitle.setText(activeTab == TAB_CONVERSATIONS ? "对话历史" : "文件管理器");
+        headerTitle.setText(activeTab == TAB_CONVERSATIONS
+                ? context.getString(R.string.drawer_title_conversations)
+                : context.getString(R.string.drawer_title_files));
         headerActions.removeAllViews();
 
         if (activeTab == TAB_FILES) {
@@ -208,9 +213,9 @@ public final class DrawerView extends FrameLayout {
         }
 
         tabs.removeAllViews();
-        tabs.addView(tabButton(context, IconButtonView.MESSAGE_SQUARE, "对话", activeTab == TAB_CONVERSATIONS, () -> setActiveTab(TAB_CONVERSATIONS)),
+        tabs.addView(tabButton(context, IconButtonView.MESSAGE_SQUARE, context.getString(R.string.drawer_tab_conversations), activeTab == TAB_CONVERSATIONS, () -> setActiveTab(TAB_CONVERSATIONS)),
                 new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        tabs.addView(tabButton(context, IconButtonView.FOLDER_OPEN, "文件", activeTab == TAB_FILES, () -> setActiveTab(TAB_FILES)),
+        tabs.addView(tabButton(context, IconButtonView.FOLDER_OPEN, context.getString(R.string.drawer_tab_files), activeTab == TAB_FILES, () -> setActiveTab(TAB_FILES)),
                 new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
     }
 
@@ -244,7 +249,9 @@ public final class DrawerView extends FrameLayout {
         if (activeTab == TAB_FILES) {
             return renderedFileTree == nextFileTree
                     && renderedProjectRemovable == nextProjectRemovable
-                    && same(renderedProjectLabel, nextProjectLabel == null ? "LineCode" : nextProjectLabel)
+                    && same(renderedProjectLabel, nextProjectLabel == null || nextProjectLabel.length() == 0
+                            ? getContext().getString(R.string.header_project_default)
+                            : nextProjectLabel)
                     && same(renderedProjectPath, nextProjectPath == null ? "" : nextProjectPath);
         }
         return renderedConversations == nextConversations
@@ -272,7 +279,7 @@ public final class DrawerView extends FrameLayout {
         });
         IconButtonView plus = inlineIcon(context, IconButtonView.PLUS, android.graphics.Color.BLACK, 18);
         newButton.addView(plus, new LinearLayout.LayoutParams(LineTheme.dp(context, 18), LineTheme.dp(context, 18)));
-        TextView label = LineTheme.text(context, "新建对话", LineTheme.FONT_MD, android.graphics.Color.BLACK, Typeface.BOLD);
+        TextView label = LineTheme.text(context, context.getString(R.string.drawer_new_conversation), LineTheme.FONT_MD, android.graphics.Color.BLACK, Typeface.BOLD);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
         newButton.addView(label, labelParams);
@@ -290,7 +297,7 @@ public final class DrawerView extends FrameLayout {
         body.addView(scrollView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (conversations == null || conversations.isEmpty()) {
-            TextView empty = LineTheme.text(context, "暂无对话记录", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            TextView empty = LineTheme.text(context, context.getString(R.string.drawer_empty_conversations), LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             empty.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
             emptyParams.topMargin = LineTheme.dp(context, 80);
@@ -346,7 +353,7 @@ public final class DrawerView extends FrameLayout {
         body.addView(scrollView, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (fileTree == null) {
-            TextView empty = LineTheme.text(context, "正在准备目录...", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            TextView empty = LineTheme.text(context, context.getString(R.string.drawer_files_preparing), LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             empty.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
             emptyParams.topMargin = LineTheme.dp(context, 80);
@@ -357,11 +364,12 @@ public final class DrawerView extends FrameLayout {
     }
 
     private void showRemoveProjectDialog() {
-        AlertDialog dialog = new AlertDialog.Builder(getContext())
-                .setTitle("移除工作区")
-                .setMessage("从已打开目录中移除「" + projectLabel + "」？\n\n不会删除真实目录。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("删除", (d, which) -> {
+        Context context = getContext();
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setTitle(context.getString(R.string.drawer_project_remove_title))
+                .setMessage(context.getString(R.string.drawer_project_remove_message, projectLabel))
+                .setNegativeButton(context.getString(R.string.common_cancel), null)
+                .setPositiveButton(context.getString(R.string.common_delete), (d, which) -> {
                     if (listener != null) {
                         listener.onCurrentProjectRemoveRequested();
                     }

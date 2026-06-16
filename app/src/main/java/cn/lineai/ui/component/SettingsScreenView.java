@@ -8,6 +8,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class SettingsScreenView extends LinearLayout {
@@ -25,7 +26,7 @@ public final class SettingsScreenView extends LinearLayout {
         setOrientation(VERTICAL);
         setBackgroundColor(LineTheme.BG);
 
-        addView(new ScreenHeaderView(context, "设置", listener::onBack, null), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(new ScreenHeaderView(context, context.getString(R.string.screen_settings_title), listener::onBack, null), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         ScrollView scrollView = new ScrollView(context);
         scrollView.setFillViewport(false);
@@ -35,29 +36,29 @@ public final class SettingsScreenView extends LinearLayout {
         scrollView.addView(content, new ScrollView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         addView(scrollView, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
-        addSection(content, "AI 与模型", new RowSpec[] {
-                new RowSpec("models", "模型管理", "供应商、密钥、模型 ID 和默认模型", IconButtonView.BOX),
-                new RowSpec("llm", "AI 行为", "思考强度、交流语气、提示词和 reasoning 保留", IconButtonView.BRAIN),
+        addSection(content, context.getString(R.string.screen_settings_section_ai), new RowSpec[] {
+                new RowSpec("models", context.getString(R.string.settings_row_models_title), context.getString(R.string.settings_row_models_desc), IconButtonView.BOX),
+                new RowSpec("llm", context.getString(R.string.screen_llm_title), context.getString(R.string.settings_row_llm_desc), IconButtonView.BRAIN),
         });
-        addSection(content, "工具与执行", new RowSpec[] {
-                new RowSpec("mcp", "工具与执行", "工作区工具开关、SSH 执行和本地执行目标", IconButtonView.MCP),
-                new RowSpec("toolSettings", "工具设置", "图片理解模型和搜索 API", IconButtonView.SLIDERS_HORIZONTAL),
-                new RowSpec("extensions", "扩展", "Agent、MCP、Skills 和 LineCode 扩展", IconButtonView.PACKAGE),
+        addSection(content, context.getString(R.string.screen_settings_section_tools), new RowSpec[] {
+                new RowSpec("mcp", context.getString(R.string.settings_row_mcp_title), context.getString(R.string.settings_row_mcp_desc), IconButtonView.MCP),
+                new RowSpec("toolSettings", context.getString(R.string.settings_row_tool_settings_title), context.getString(R.string.settings_row_tool_settings_desc), IconButtonView.SLIDERS_HORIZONTAL),
+                new RowSpec("extensions", context.getString(R.string.settings_row_extensions_title), context.getString(R.string.settings_row_extensions_desc), IconButtonView.PACKAGE),
         });
-        addSection(content, "界面与输出", new RowSpec[] {
-                new RowSpec("input", "输入设置", "回车键发送或换行", IconButtonView.MESSAGE_SQUARE_TEXT),
-                new RowSpec("theme", "主题与外观", "主题模式、自定义颜色和高对比外观", IconButtonView.PALETTE),
-                new RowSpec("output", "输出与浏览", "代码换行、网页打开方式和内置浏览器 JS", IconButtonView.MONITOR),
-                new RowSpec("experimental", "实验性渲染", "仍在验证的消息渲染能力", IconButtonView.FLASK_CONICAL),
+        addSection(content, context.getString(R.string.screen_settings_section_ui), new RowSpec[] {
+                new RowSpec("input", context.getString(R.string.screen_input_title), context.getString(R.string.settings_row_input_desc), IconButtonView.MESSAGE_SQUARE_TEXT),
+                new RowSpec("theme", context.getString(R.string.settings_row_theme_title), context.getString(R.string.settings_row_theme_desc), IconButtonView.PALETTE),
+                new RowSpec("output", context.getString(R.string.settings_row_output_title), context.getString(R.string.settings_row_output_desc), IconButtonView.MONITOR),
+                new RowSpec("experimental", context.getString(R.string.settings_row_experimental_title), context.getString(R.string.settings_row_experimental_desc), IconButtonView.FLASK_CONICAL),
         });
-        addSection(content, "数据与系统", new RowSpec[] {
-                new RowSpec("storage", "存储管理", "聊天、配置、diff 和工作区占用", IconButtonView.DATABASE),
-                new RowSpec("memory", "记忆", "查看和添加长期记忆、项目记忆、短期记忆", IconButtonView.BOOK_OPEN),
-                new RowSpec("data", "数据管理", "完整导出、.linecode 导入和数据归档", IconButtonView.ARCHIVE),
-                new RowSpec("keepAlive", "后台保活", "Wake Lock、前台服务和电池白名单", IconButtonView.BATTERY_CHARGING),
+        addSection(content, context.getString(R.string.screen_settings_section_data), new RowSpec[] {
+                new RowSpec("storage", context.getString(R.string.settings_row_storage_title), context.getString(R.string.settings_row_storage_desc), IconButtonView.DATABASE),
+                new RowSpec("memory", context.getString(R.string.settings_row_memory_title), context.getString(R.string.settings_row_memory_desc), IconButtonView.BOOK_OPEN),
+                new RowSpec("data", context.getString(R.string.settings_row_data_title), context.getString(R.string.settings_row_data_desc), IconButtonView.ARCHIVE),
+                new RowSpec("keepAlive", context.getString(R.string.settings_row_keep_alive_title), context.getString(R.string.settings_row_keep_alive_desc), IconButtonView.BATTERY_CHARGING),
         });
-        addSection(content, "信息", new RowSpec[] {
-                new RowSpec("about", "关于 LineCode", "版本、诊断和开源许可", IconButtonView.CPU),
+        addSection(content, context.getString(R.string.screen_settings_section_info), new RowSpec[] {
+                new RowSpec("about", context.getString(R.string.settings_row_about_title), context.getString(R.string.settings_row_about_desc), IconButtonView.CPU),
         });
     }
 

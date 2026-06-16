@@ -32,29 +32,29 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
     private final LinearLayout setupButton;
 
     public TermuxIntegrationScreenView(Context context, Listener listener) {
-        super(context, "Termux 对接", listener::onBack, null);
+        super(context, context.getString(R.string.screen_termux_title), listener::onBack, null);
         sshService = new SshService(context);
 
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, 100);
 
         LinearLayout intro = card(context);
-        intro.addView(title(context, "把 Termux 作为 SSH Shell"));
-        TextView desc = desc(context, "Termux 是手机本机 Linux 环境。这里会通过 Termux RUN_COMMAND 自动安装 openssh、生成 LineCode 专用密钥、写入 authorized_keys 并启动 sshd。远程 Linux 服务器请回到 SSH 连接页填写服务器地址。");
+        intro.addView(title(context, context.getString(R.string.screen_termux_section_use)));
+        TextView desc = desc(context, context.getString(R.string.screen_termux_use_desc));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         intro.addView(desc, descParams);
         addCard(content, intro);
 
         LinearLayout steps = card(context);
-        steps.addView(title(context, "对接步骤"));
-        steps.addView(step(context, "1", "复制授权指令，到 Termux 粘贴执行。"));
-        steps.addView(step(context, "2", "授权 LineCode 的 Termux RUN_COMMAND 权限。"));
-        steps.addView(step(context, "3", "点击自动配置 OpenSSH，完成后会保存 SSH 配置。"));
+        steps.addView(title(context, context.getString(R.string.screen_termux_section_steps)));
+        steps.addView(step(context, "1", context.getString(R.string.screen_termux_step_1)));
+        steps.addView(step(context, "2", context.getString(R.string.screen_termux_step_2)));
+        steps.addView(step(context, "3", context.getString(R.string.screen_termux_step_3)));
         addCard(content, steps);
 
         LinearLayout commandCard = card(context);
-        commandCard.addView(title(context, "Termux intent 授权指令"));
+        commandCard.addView(title(context, context.getString(R.string.screen_termux_section_intent)));
         TextView command = LineTheme.text(context, SshService.TERMUX_ALLOW_EXTERNAL_APPS_COMMAND, LineTheme.FONT_XS, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         command.setTypeface(Typeface.MONOSPACE);
         command.setTextIsSelectable(true);
@@ -67,12 +67,12 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
         addCard(content, commandCard);
 
         LinearLayout actions = card(context);
-        actions.addView(title(context, "操作"));
+        actions.addView(title(context, context.getString(R.string.screen_termux_actions_title)));
         GridLikeActions actionGrid = new GridLikeActions(context);
-        actionGrid.addAction(button(context, "复制授权指令", IconButtonView.COPY, false, v -> copyCommand()));
-        actionGrid.addAction(button(context, "RUN_COMMAND 权限", IconButtonView.SHIELD_CHECK, false, v -> requestRunCommandPermission()));
-        actionGrid.addAction(button(context, "打开 Termux", IconButtonView.EXTERNAL_LINK, false, v -> openTermux()));
-        setupButton = button(context, "自动配置 OpenSSH", IconButtonView.DOWNLOAD, true, v -> setupOpenSsh());
+        actionGrid.addAction(button(context, context.getString(R.string.screen_termux_copy_intent), IconButtonView.COPY, false, v -> copyCommand()));
+        actionGrid.addAction(button(context, context.getString(R.string.screen_termux_run_command_perm), IconButtonView.SHIELD_CHECK, false, v -> requestRunCommandPermission()));
+        actionGrid.addAction(button(context, context.getString(R.string.screen_termux_open_termux), IconButtonView.EXTERNAL_LINK, false, v -> openTermux()));
+        setupButton = button(context, context.getString(R.string.screen_termux_auto_ssh), IconButtonView.DOWNLOAD, true, v -> setupOpenSsh());
         actionGrid.addAction(setupButton);
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         gridParams.topMargin = LineTheme.dp(context, LineTheme.SM);
@@ -91,49 +91,54 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
     }
 
     private void copyCommand() {
-        ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+        Context context = getContext();
+        ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("Termux allow external apps", SshService.TERMUX_ALLOW_EXTERNAL_APPS_COMMAND));
+            clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.screen_termux_clip_label), SshService.TERMUX_ALLOW_EXTERNAL_APPS_COMMAND));
         }
-        setStatus("已复制", "打开 Termux 粘贴执行授权指令，然后回来继续授权 RUN_COMMAND。", false);
+        setStatus(context.getString(R.string.screen_termux_status_copied_title), context.getString(R.string.screen_termux_status_copied_message), false);
     }
 
     private void requestRunCommandPermission() {
         Context context = getContext();
         if (!(context instanceof Activity)) {
-            setStatus("无法授权", "当前 Context 不是 Activity，请从应用主界面打开此页面。", true);
+            setStatus(context.getString(R.string.screen_termux_status_unable_title), context.getString(R.string.screen_termux_status_unable_message), true);
             return;
         }
         ((Activity) context).requestPermissions(new String[] {SshService.TERMUX_RUN_COMMAND_PERMISSION}, REQUEST_TERMUX_RUN_COMMAND);
-        setStatus("已请求授权", "如果系统没有弹窗，请到应用权限里允许“Run commands in Termux environment”。", false);
+        setStatus(context.getString(R.string.screen_termux_status_requested_title), context.getString(R.string.screen_termux_status_requested_message), false);
     }
 
     private void openTermux() {
+        Context context = getContext();
         try {
             sshService.openTermux();
-            setStatus("已打开 Termux", "请确认已执行授权指令，并保持 Termux 可运行。", false);
+            setStatus(context.getString(R.string.screen_termux_status_opened_title), context.getString(R.string.screen_termux_status_opened_message), false);
         } catch (Exception e) {
-            setStatus("打开失败", e.getMessage(), true);
+            setStatus(context.getString(R.string.screen_termux_status_open_failed_title), e.getMessage(), true);
         }
     }
 
     private void setupOpenSsh() {
+        Context context = getContext();
         setSetupRunning(true);
-        setStatus("配置中", "正在通过 Termux RUN_COMMAND 安装 openssh、生成密钥并启动 sshd，首次运行可能需要较长时间。", false);
+        setStatus(context.getString(R.string.screen_termux_status_setup_title), context.getString(R.string.screen_termux_status_setup_message), false);
         new Thread(() -> {
             try {
                 SshService.TermuxSetupResult setup = sshService.setupTermuxOpenSsh(15 * 60 * 1000);
                 String testOutput = sshService.testConnection(setup.getConfig());
                 mainHandler.post(() -> {
                     setSetupRunning(false);
-                    setStatus("Termux OpenSSH 已配置", "shell: " + valueOrUnknown(setup.getShell())
-                            + "\nrc: " + valueOrUnknown(setup.getRcPath())
-                            + "\n" + redact(testOutput), false);
+                    String doneMessage = context.getString(R.string.screen_termux_status_setup_done_message,
+                            valueOrUnknown(setup.getShell()),
+                            valueOrUnknown(setup.getRcPath()),
+                            redact(testOutput));
+                    setStatus(context.getString(R.string.screen_termux_status_setup_done_title), doneMessage, false);
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     setSetupRunning(false);
-                    setStatus("配置失败", redact(e.getMessage()), true);
+                    setStatus(context.getString(R.string.screen_termux_status_setup_failed_title), redact(e.getMessage()), true);
                 });
             }
         }, "linecode-termux-setup").start();
@@ -145,7 +150,7 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
 
     private String redact(String value) {
         return PRIVATE_KEY_PATTERN.matcher(value == null ? "" : value)
-                .replaceAll("LINEAI_PRIVATE_KEY=[已保存到 SSH Private key]");
+                .replaceAll(getContext().getString(R.string.screen_termux_redact_replacement));
     }
 
     private void setSetupRunning(boolean running) {

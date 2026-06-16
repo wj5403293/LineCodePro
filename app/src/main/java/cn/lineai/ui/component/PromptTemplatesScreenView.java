@@ -8,6 +8,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.PromptTemplateItem;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
@@ -22,12 +23,12 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
     }
 
     public PromptTemplatesScreenView(Context context, List<PromptTemplateItem> templates, Listener listener) {
-        super(context, "自定义提示词", listener::onBack, null);
+        super(context, context.getString(R.string.screen_prompt_templates_title), listener::onBack, null);
         LinearLayout content = getContent();
         List<PromptTemplateItem> values = templates == null ? java.util.Collections.emptyList() : templates;
 
-        SettingsSectionView intro = new SettingsSectionView(context, "模板说明");
-        TextView introText = LineTheme.text(context, introText(values), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        SettingsSectionView intro = new SettingsSectionView(context, context.getString(R.string.screen_prompt_templates_section));
+        TextView introText = LineTheme.text(context, introText(context, values), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         introText.setLineSpacing(LineTheme.dp(context, 4), 1f);
         LineTheme.padding(introText, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
         intro.addRow(introText, false);
@@ -40,17 +41,17 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
         }
     }
 
-    private static String introText(List<PromptTemplateItem> templates) {
+    private static String introText(Context context, List<PromptTemplateItem> templates) {
         StringBuilder builder = new StringBuilder();
-        builder.append("模板变量使用 {{变量名}} 形式，保存后下一次模型请求立即生效。重置会恢复内置模板。\n");
+        builder.append(context.getString(R.string.screen_prompt_templates_variables)).append("\n");
         for (PromptTemplateItem item : templates) {
             builder.append("\n- ")
                     .append(item.getTitle())
-                    .append("：")
+                    .append(context.getString(R.string.screen_prompt_templates_item_separator))
                     .append(item.getDescription());
             String variables = variablesText(item);
             if (variables.length() > 0) {
-                builder.append("\n  变量：").append(variables);
+                builder.append(context.getString(R.string.screen_prompt_templates_item_variables, variables));
             }
         }
         return builder.toString().trim();
@@ -59,7 +60,7 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
     private static String variablesText(PromptTemplateItem item) {
         String[] variables = item.getVariables();
         if (variables.length == 0) {
-            return "无";
+            return "";
         }
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < variables.length; i++) {
@@ -87,7 +88,7 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
             addView(description, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
             TextView meta = LineTheme.text(context,
-                    item.getSourceLabel() + "\n变量：" + variablesText(item),
+                    context.getString(R.string.screen_prompt_templates_source, item.getSourceLabel(), variablesText(item)),
                     LineTheme.FONT_XS,
                     LineTheme.TEXT_TERTIARY,
                     Typeface.NORMAL);
@@ -129,21 +130,21 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
             updateStatus(item.isCustomized());
             actions.addView(statusView, new LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
 
-            LinearLayout reset = actionButton(context, IconButtonView.ROTATE_CCW, "重置");
+            LinearLayout reset = actionButton(context, IconButtonView.ROTATE_CCW, context.getString(R.string.common_reset));
             reset.setOnClickListener(v -> {
                 input.setText(item.getDefaultText());
                 listener.onPromptTemplateReset(item.getId());
                 updateStatus(false);
-                Toast.makeText(getContext(), "已重置", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), getContext().getString(R.string.screen_prompt_templates_toast_reset), Toast.LENGTH_SHORT).show();
             });
             actions.addView(reset, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
 
-            LinearLayout save = actionButton(context, IconButtonView.SAVE, "保存");
+            LinearLayout save = actionButton(context, IconButtonView.SAVE, context.getString(R.string.common_save));
             save.setOnClickListener(v -> {
                 String value = input.getText() == null ? "" : input.getText().toString();
                 listener.onPromptTemplateSaved(item.getId(), value);
                 updateStatus(!item.getDefaultText().equals(value));
-                Toast.makeText(getContext(), "已保存", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), getContext().getString(R.string.screen_prompt_templates_toast_saved), Toast.LENGTH_SHORT).show();
             });
             LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
             saveParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
@@ -151,7 +152,7 @@ public final class PromptTemplatesScreenView extends ScreenScaffoldView {
         }
 
         private void updateStatus(boolean customized) {
-            statusView.setText(customized ? "已自定义" : "使用内置模板");
+            statusView.setText(customized ? getContext().getString(R.string.screen_prompt_templates_status_custom) : getContext().getString(R.string.screen_prompt_templates_status_built_in));
             statusView.setTextColor(customized ? LineTheme.ACCENT : LineTheme.TEXT_TERTIARY);
         }
 

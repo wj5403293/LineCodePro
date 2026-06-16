@@ -32,33 +32,33 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
     }
 
     private static final String[][] THEMES = new String[][] {
-            {ThemePalette.MODE_SYSTEM, "跟随系统", "自动匹配系统外观", String.valueOf(IconButtonView.MONITOR)},
-            {ThemePalette.MODE_LIGHT, "亮色模式", "浅色主题，适合白天", String.valueOf(IconButtonView.SUN)},
-            {ThemePalette.MODE_DARK, "暗色模式", "深色主题，适合夜间", String.valueOf(IconButtonView.MOON)},
-            {ThemePalette.MODE_COFFEE, "咖啡纸", "类似 Claude 的纸张和咖啡色调", String.valueOf(IconButtonView.COFFEE)},
-            {ThemePalette.MODE_VSCODE, "VS Code", "熟悉的编辑器深色蓝调", String.valueOf(IconButtonView.CODE)},
-            {ThemePalette.MODE_GITHUB_DARK, "GitHub Dark", "接近 GitHub 的暗色代码界面", String.valueOf(IconButtonView.GIT_BRANCH)},
-            {ThemePalette.MODE_GRUVBOX, "Gruvbox", "复古暖色终端风格", String.valueOf(IconButtonView.CODE)},
-            {ThemePalette.MODE_HIGH_CONTRAST, "高对比", "黑底高亮，提升辨识度", String.valueOf(IconButtonView.CONTRAST)},
-            {ThemePalette.MODE_CUSTOM, "自定义", "编辑并保存自己的颜色主题", String.valueOf(IconButtonView.PAINTBRUSH)}
+            {ThemePalette.MODE_SYSTEM, "system", "system_desc", String.valueOf(IconButtonView.MONITOR)},
+            {ThemePalette.MODE_LIGHT, "light", "light_desc", String.valueOf(IconButtonView.SUN)},
+            {ThemePalette.MODE_DARK, "dark", "dark_desc", String.valueOf(IconButtonView.MOON)},
+            {ThemePalette.MODE_COFFEE, "coffee", "coffee_desc", String.valueOf(IconButtonView.COFFEE)},
+            {ThemePalette.MODE_VSCODE, "vscode", "vscode_desc", String.valueOf(IconButtonView.CODE)},
+            {ThemePalette.MODE_GITHUB_DARK, "github_dark", "github_dark_desc", String.valueOf(IconButtonView.GIT_BRANCH)},
+            {ThemePalette.MODE_GRUVBOX, "gruvbox", "gruvbox_desc", String.valueOf(IconButtonView.CODE)},
+            {ThemePalette.MODE_HIGH_CONTRAST, "high_contrast", "high_contrast_desc", String.valueOf(IconButtonView.CONTRAST)},
+            {ThemePalette.MODE_CUSTOM, "custom", "custom_desc", String.valueOf(IconButtonView.PAINTBRUSH)}
     };
 
     private static final String[][] COLOR_FIELDS = new String[][] {
-            {ThemePalette.KEY_BG, "背景", "页面底色"},
-            {ThemePalette.KEY_SURFACE_ELEVATED, "面板", "卡片和弹层背景"},
-            {ThemePalette.KEY_SURFACE_LIGHT, "浅面板", "按钮和次级区域"},
-            {ThemePalette.KEY_INPUT_BG, "输入框", "输入栏背景"},
-            {ThemePalette.KEY_TEXT, "正文", "主要文字"},
-            {ThemePalette.KEY_TEXT_SECONDARY, "次级文字", "说明文字"},
-            {ThemePalette.KEY_TEXT_TERTIARY, "弱文字", "占位和辅助文字"},
-            {ThemePalette.KEY_ACCENT, "强调色", "选中、按钮、链接"},
-            {ThemePalette.KEY_USER_BUBBLE, "用户气泡", "用户消息背景"},
-            {ThemePalette.KEY_AI_BUBBLE, "AI 气泡", "AI 消息背景"},
-            {ThemePalette.KEY_BORDER, "边框", "主分割线"},
-            {ThemePalette.KEY_CODE_BG, "代码背景", "代码块背景"},
-            {ThemePalette.KEY_DANGER, "危险", "删除和错误"},
-            {ThemePalette.KEY_WARNING, "警告", "提醒状态"},
-            {ThemePalette.KEY_SUCCESS, "成功", "完成状态"}
+            {ThemePalette.KEY_BG, "color_background", "color_background_desc"},
+            {ThemePalette.KEY_SURFACE_ELEVATED, "color_panel", "color_panel_desc"},
+            {ThemePalette.KEY_SURFACE_LIGHT, "color_panel_light", "color_panel_light_desc"},
+            {ThemePalette.KEY_INPUT_BG, "color_input", "color_input_desc"},
+            {ThemePalette.KEY_TEXT, "color_text", "color_text_desc"},
+            {ThemePalette.KEY_TEXT_SECONDARY, "color_text_secondary", "color_text_secondary_desc"},
+            {ThemePalette.KEY_TEXT_TERTIARY, "color_text_tertiary", "color_text_tertiary_desc"},
+            {ThemePalette.KEY_ACCENT, "color_accent", "color_accent_desc"},
+            {ThemePalette.KEY_USER_BUBBLE, "color_user_bubble", "color_user_bubble_desc"},
+            {ThemePalette.KEY_AI_BUBBLE, "color_ai_bubble", "color_ai_bubble_desc"},
+            {ThemePalette.KEY_BORDER, "color_border", "color_border_desc"},
+            {ThemePalette.KEY_CODE_BG, "color_code_background", "color_code_background_desc"},
+            {ThemePalette.KEY_DANGER, "color_danger", "color_danger_desc"},
+            {ThemePalette.KEY_WARNING, "color_warning", "color_warning_desc"},
+            {ThemePalette.KEY_SUCCESS, "color_success", "color_success_desc"}
     };
 
     private static final String[] SWATCHES = new String[] {
@@ -91,7 +91,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
     private String activeStarter = "default";
 
     public ThemeSettingsScreenView(Context context, ThemeSettingsState state, Listener listener) {
-        super(context, "主题设置", listener::onBack, null);
+        super(context, context.getString(R.string.screen_theme_section_themes), listener::onBack, null);
         this.listener = listener;
         ThemeSettingsState safeState = state == null
                 ? new ThemeSettingsState(ThemePalette.MODE_SYSTEM, ThemePalette.MODE_DARK, null, ThemePalette.forMode(ThemePalette.MODE_DARK))
@@ -111,14 +111,14 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         previewBubble = new LinearLayout(context);
         previewBubble.setOrientation(LinearLayout.VERTICAL);
         LineTheme.padding(previewBubble, LineTheme.MD, LineTheme.MD, LineTheme.MD, LineTheme.MD);
-        previewTitle = LineTheme.text(context, "主题预览", LineTheme.FONT_MD, LineTheme.TEXT, Typeface.BOLD);
-        previewText = LineTheme.text(context, "保存后会应用到自定义主题。", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        previewTitle = LineTheme.text(context, getResources().getString(R.string.screen_theme_section_preview), LineTheme.FONT_MD, LineTheme.TEXT, Typeface.BOLD);
+        previewText = LineTheme.text(context, getResources().getString(R.string.screen_theme_section_preview_desc), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams previewTextParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         previewTextParams.topMargin = LineTheme.dp(context, 4);
         previewBubble.addView(previewTitle, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         previewBubble.addView(previewText, previewTextParams);
         previewBox.addView(previewBubble, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        previewPill = LineTheme.text(context, "Accent", LineTheme.FONT_XS, LineTheme.TEXT_ON_COLOR, Typeface.BOLD);
+        previewPill = LineTheme.text(context, getResources().getString(R.string.screen_theme_color_accent), LineTheme.FONT_XS, LineTheme.TEXT_ON_COLOR, Typeface.BOLD);
         previewPill.setGravity(Gravity.CENTER);
         LineTheme.padding(previewPill, LineTheme.MD, LineTheme.XS, LineTheme.MD, LineTheme.XS);
         LinearLayout.LayoutParams pillParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -150,15 +150,17 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
 
     private void addThemeModes(LinearLayout content, String themeMode) {
         Context context = content.getContext();
-        SettingsSectionView themes = new SettingsSectionView(context, "主题");
+        SettingsSectionView themes = new SettingsSectionView(context, getResources().getString(R.string.screen_theme_section_themes));
         String currentMode = ThemePalette.normalizeMode(themeMode);
         for (int i = 0; i < THEMES.length; i++) {
             String mode = THEMES[i][0];
+            String label = themeString(THEMES[i][1]);
+            String desc = themeString(THEMES[i][2]);
             themes.addRow(new OptionRowView(
                     context,
                     Integer.parseInt(THEMES[i][3]),
-                    THEMES[i][1],
-                    THEMES[i][2],
+                    label,
+                    desc,
                     mode.equals(currentMode),
                     () -> listener.onThemeModeChanged(mode)
             ), i < THEMES.length - 1);
@@ -166,12 +168,20 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         content.addView(themes, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
+    private String themeString(String key) {
+        int resId = getResources().getIdentifier("screen_theme_" + key, "string", getContext().getPackageName());
+        if (resId == 0) {
+            return key;
+        }
+        return getResources().getString(resId);
+    }
+
     private void addCustomHeader(LinearLayout content) {
         Context context = content.getContext();
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        SectionHeaderView title = new SectionHeaderView(context, "自定义颜色");
+        SectionHeaderView title = new SectionHeaderView(context, getResources().getString(R.string.screen_theme_custom_colors));
         header.addView(title, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
         IconButtonView reset = new IconButtonView(context, IconButtonView.ROTATE_CCW);
@@ -193,7 +203,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         LineTheme.padding(saveAction, LineTheme.MD, 0, LineTheme.MD, 0);
         saveAction.setOnClickListener(v -> {
             if (hasInvalidColor()) {
-                Toast.makeText(getContext(), "颜色格式必须是 #RRGGBB", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), getResources().getString(R.string.screen_theme_color_invalid), Toast.LENGTH_SHORT).show();
                 return;
             }
             listener.onCustomThemeColorsSaved(new LinkedHashMap<>(draft));
@@ -203,7 +213,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         saveIcon.setIconSizeDp(15, 15);
         saveIcon.setClickable(false);
         saveAction.addView(saveIcon, new LinearLayout.LayoutParams(LineTheme.dp(context, 15), LineTheme.dp(context, 15)));
-        saveText = LineTheme.text(context, "保存", LineTheme.FONT_SM, LineTheme.TEXT_ON_COLOR, Typeface.BOLD);
+        saveText = LineTheme.text(context, getResources().getString(R.string.screen_theme_color_save), LineTheme.FONT_SM, LineTheme.TEXT_ON_COLOR, Typeface.BOLD);
         LinearLayout.LayoutParams saveTextParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         saveTextParams.leftMargin = LineTheme.dp(context, LineTheme.XS);
         saveAction.addView(saveText, saveTextParams);
@@ -230,19 +240,19 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         }
         Context context = starterPanel.getContext();
         starterPanel.removeAllViews();
-        starterPanel.addView(LineTheme.textMedium(context, "创作起点", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        starterPanel.addView(LineTheme.textMedium(context, getResources().getString(R.string.screen_theme_starter_section), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         GridLayout grid = new GridLayout(context);
         grid.setColumnCount(3);
-        addStarter(grid, "default", "默认", IconButtonView.PAINTBRUSH, ThemePalette.forMode(ThemePalette.MODE_CUSTOM));
-        addStarter(grid, ThemePalette.MODE_LIGHT, "亮色", IconButtonView.SUN, ThemePalette.forMode(ThemePalette.MODE_LIGHT));
-        addStarter(grid, ThemePalette.MODE_DARK, "暗色", IconButtonView.MOON, ThemePalette.forMode(ThemePalette.MODE_DARK));
-        addStarter(grid, ThemePalette.MODE_COFFEE, "咖啡纸", IconButtonView.COFFEE, ThemePalette.forMode(ThemePalette.MODE_COFFEE));
-        addStarter(grid, ThemePalette.MODE_VSCODE, "VS Code", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_VSCODE));
-        addStarter(grid, ThemePalette.MODE_GITHUB_DARK, "GitHub", IconButtonView.GIT_BRANCH, ThemePalette.forMode(ThemePalette.MODE_GITHUB_DARK));
-        addStarter(grid, ThemePalette.MODE_GRUVBOX, "Gruvbox", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_GRUVBOX));
-        addStarter(grid, ThemePalette.MODE_HIGH_CONTRAST, "高对比", IconButtonView.CONTRAST, ThemePalette.forMode(ThemePalette.MODE_HIGH_CONTRAST));
+        addStarter(grid, "default", "starter_default", IconButtonView.PAINTBRUSH, ThemePalette.forMode(ThemePalette.MODE_CUSTOM));
+        addStarter(grid, ThemePalette.MODE_LIGHT, "starter_light", IconButtonView.SUN, ThemePalette.forMode(ThemePalette.MODE_LIGHT));
+        addStarter(grid, ThemePalette.MODE_DARK, "starter_dark", IconButtonView.MOON, ThemePalette.forMode(ThemePalette.MODE_DARK));
+        addStarter(grid, ThemePalette.MODE_COFFEE, "starter_coffee", IconButtonView.COFFEE, ThemePalette.forMode(ThemePalette.MODE_COFFEE));
+        addStarter(grid, ThemePalette.MODE_VSCODE, "starter_vscode", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_VSCODE));
+        addStarter(grid, ThemePalette.MODE_GITHUB_DARK, "starter_github", IconButtonView.GIT_BRANCH, ThemePalette.forMode(ThemePalette.MODE_GITHUB_DARK));
+        addStarter(grid, ThemePalette.MODE_GRUVBOX, "starter_gruvbox", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_GRUVBOX));
+        addStarter(grid, ThemePalette.MODE_HIGH_CONTRAST, "starter_high_contrast", IconButtonView.CONTRAST, ThemePalette.forMode(ThemePalette.MODE_HIGH_CONTRAST));
         if (!savedCustomColors.isEmpty()) {
-            addStarter(grid, "saved", "已保存", IconButtonView.SAVE, ThemePalette.forMode(ThemePalette.MODE_CUSTOM).withCustomColors(savedCustomColors));
+            addStarter(grid, "saved", "starter_saved", IconButtonView.SAVE, ThemePalette.forMode(ThemePalette.MODE_CUSTOM).withCustomColors(savedCustomColors));
         }
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         gridParams.topMargin = LineTheme.dp(context, LineTheme.SM);
@@ -285,7 +295,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 14), LineTheme.dp(context, 14));
         iconParams.topMargin = LineTheme.dp(context, 6);
         button.addView(starterIcon, iconParams);
-        TextView text = LineTheme.text(context, label, LineTheme.FONT_XS,
+        TextView text = LineTheme.text(context, themeString(label), LineTheme.FONT_XS,
                 active ? LineTheme.ACCENT : LineTheme.TEXT_SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         textParams.topMargin = LineTheme.dp(context, 4);
@@ -354,7 +364,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         Context context = getContext();
         editorGroup.removeAllViews();
         for (int i = 0; i < COLOR_FIELDS.length; i++) {
-            editorGroup.addView(colorRow(context, COLOR_FIELDS[i][0], COLOR_FIELDS[i][1], COLOR_FIELDS[i][2], i < COLOR_FIELDS.length - 1),
+            editorGroup.addView(colorRow(context, COLOR_FIELDS[i][0], themeString(COLOR_FIELDS[i][1]), themeString(COLOR_FIELDS[i][2]), i < COLOR_FIELDS.length - 1),
                     new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
     }
@@ -386,7 +396,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         metaParams.leftMargin = LineTheme.dp(context, LineTheme.MD);
         row.addView(meta, metaParams);
         meta.addView(LineTheme.textMedium(context, label, LineTheme.FONT_MD, LineTheme.TEXT));
-        TextView descView = LineTheme.text(context, valid ? desc : "请输入 #RRGGBB", LineTheme.FONT_XS,
+        TextView descView = LineTheme.text(context, valid ? desc : getResources().getString(R.string.screen_theme_color_hex_hint), LineTheme.FONT_XS,
                 valid ? LineTheme.TEXT_TERTIARY : LineTheme.DANGER, Typeface.NORMAL);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
@@ -400,7 +410,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         input.setTypeface(Typeface.MONOSPACE);
         input.setFilters(new InputFilter[] {new InputFilter.LengthFilter(9)});
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setHint("#RRGGBB");
+        input.setHint(getResources().getString(R.string.screen_theme_color_hex_placeholder));
         input.setHintTextColor(LineTheme.TEXT_TERTIARY);
         input.setSelectAllOnFocus(false);
         input.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_LIGHT, 8, valid ? LineTheme.BORDER_LIGHT : LineTheme.DANGER));
@@ -429,7 +439,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
                 input.setTextColor(nextValid ? LineTheme.TEXT : LineTheme.DANGER);
                 input.setBackground(LineTheme.roundedStroke(getContext(), LineTheme.SURFACE_LIGHT, 8, nextValid ? LineTheme.BORDER_LIGHT : LineTheme.DANGER));
                 preview.setBackground(LineTheme.roundedStroke(getContext(), nextValid ? Color.parseColor(next) : LineTheme.SURFACE_LIGHT, 15, LineTheme.BORDER_LIGHT));
-                descView.setText(nextValid ? desc : "请输入 #RRGGBB");
+                descView.setText(nextValid ? desc : getResources().getString(R.string.screen_theme_color_hex_hint));
                 descView.setTextColor(nextValid ? LineTheme.TEXT_TERTIARY : LineTheme.DANGER);
                 updatePreviewOnly();
             }

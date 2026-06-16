@@ -2,6 +2,7 @@ package cn.lineai.ui.component;
 
 import android.content.Context;
 import android.widget.LinearLayout;
+import cn.lineai.R;
 import cn.lineai.model.AiBehaviorSettings;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,69 +30,69 @@ public final class LLMSettingsScreenView extends ScreenScaffoldView {
     private final List<ToneRow> toneRows = new ArrayList<>();
 
     public LLMSettingsScreenView(Context context, AiBehaviorSettings settings, Listener listener) {
-        super(context, "AI 行为", listener::onBack, null);
+        super(context, context.getString(R.string.screen_llm_title), listener::onBack, null);
         LinearLayout content = getContent();
         AiBehaviorSettings value = settings == null
                 ? new AiBehaviorSettings(null, true, false, null, false, false)
                 : settings;
 
-        SettingsSectionView reasoning = new SettingsSectionView(context, "思考深度");
-        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_OFF, "关闭", "不启用思考模式，响应更快", value.getReasoningEffort(), true);
-        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_LOW, "低", "简短思考，适合简单任务", value.getReasoningEffort(), true);
-        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_MEDIUM, "中", "标准思考深度，平衡速度和质量", value.getReasoningEffort(), true);
-        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_HIGH, "高", "深度思考，适合复杂任务", value.getReasoningEffort(), true);
-        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_MAX, "最高", "最深度思考，适合极难问题", value.getReasoningEffort(), false);
+        SettingsSectionView reasoning = new SettingsSectionView(context, context.getString(R.string.screen_llm_section_thinking));
+        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_OFF, context.getString(R.string.screen_llm_thinking_off_label), context.getString(R.string.screen_llm_thinking_off_desc), value.getReasoningEffort(), true);
+        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_LOW, context.getString(R.string.screen_llm_thinking_low_label), context.getString(R.string.screen_llm_thinking_low), value.getReasoningEffort(), true);
+        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_MEDIUM, context.getString(R.string.screen_llm_thinking_medium_label), context.getString(R.string.screen_llm_thinking_medium), value.getReasoningEffort(), true);
+        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_HIGH, context.getString(R.string.screen_llm_thinking_high_label), context.getString(R.string.screen_llm_thinking_high), value.getReasoningEffort(), true);
+        addReasoningRow(reasoning, listener, AiBehaviorSettings.REASONING_MAX, context.getString(R.string.screen_llm_thinking_max_label), context.getString(R.string.screen_llm_thinking_max), value.getReasoningEffort(), false);
         content.addView(reasoning, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView learning = new SettingsSectionView(context, "学习与记忆");
+        SettingsSectionView learning = new SettingsSectionView(context, context.getString(R.string.screen_llm_section_learning));
         learning.addRow(new SwitchRowView(
                 context,
                 IconButtonView.BRAIN,
-                "学习模式",
-                "启用自动 Skills、长期记忆、项目记忆、短期记忆和聊天记录检索",
+                context.getString(R.string.screen_llm_learning_label),
+                context.getString(R.string.screen_llm_learning_desc),
                 value.isLearningModeEnabled(),
                 (buttonView, isChecked) -> listener.onLearningModeChanged(isChecked)
         ), false);
         content.addView(learning, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView tone = new SettingsSectionView(context, "交流语气");
-        addToneRow(tone, listener, AiBehaviorSettings.TONE_CODING, "编程模式", "严谨专业，代码优先，不使用 emoji", IconButtonView.ZAP, value.getToneMode(), true);
-        addToneRow(tone, listener, AiBehaviorSettings.TONE_CHAT, "聊天模式", "亲切温柔，像朋友聊天，可以使用 emoji", IconButtonView.SMILE, value.getToneMode(), false);
+        SettingsSectionView tone = new SettingsSectionView(context, context.getString(R.string.screen_llm_section_tone));
+        addToneRow(tone, listener, AiBehaviorSettings.TONE_CODING, context.getString(R.string.screen_llm_tone_coding), context.getString(R.string.screen_llm_tone_coding_desc), IconButtonView.ZAP, value.getToneMode(), true);
+        addToneRow(tone, listener, AiBehaviorSettings.TONE_CHAT, context.getString(R.string.screen_llm_tone_chat), context.getString(R.string.screen_llm_tone_chat_desc), IconButtonView.SMILE, value.getToneMode(), false);
         content.addView(tone, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView prompts = new SettingsSectionView(context, "提示词");
+        SettingsSectionView prompts = new SettingsSectionView(context, context.getString(R.string.screen_llm_section_prompts));
         prompts.addRow(new OptionRowView(
                 context,
                 IconButtonView.FILE_PEN_LINE,
-                "自定义提示词",
-                "编辑 system、语气模式、会话模式、学习记忆和上下文压缩模板",
+                context.getString(R.string.screen_llm_prompts_label),
+                context.getString(R.string.screen_llm_prompts_desc),
                 false,
                 listener::onOpenPromptTemplates
         ), false);
         content.addView(prompts, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView thinking = new SettingsSectionView(context, "思考过程");
+        SettingsSectionView thinking = new SettingsSectionView(context, context.getString(R.string.screen_llm_section_thinking_display));
         thinking.addRow(new SwitchRowView(
                 context,
                 IconButtonView.SCROLL_TEXT,
-                "滚动显示",
-                "关闭后直接完全展开显示",
+                context.getString(R.string.screen_llm_scroll_label),
+                context.getString(R.string.screen_llm_scroll_desc),
                 value.isThinkingScrollEnabled(),
                 (buttonView, isChecked) -> listener.onThinkingScrollChanged(isChecked)
         ), true);
         thinking.addRow(new SwitchRowView(
                 context,
                 IconButtonView.EXPAND,
-                "自动展开",
-                "收到思考内容时自动展开",
+                context.getString(R.string.screen_llm_auto_expand_label),
+                context.getString(R.string.screen_llm_auto_expand_desc),
                 value.isThinkingAutoExpandEnabled(),
                 (buttonView, isChecked) -> listener.onThinkingAutoExpandChanged(isChecked)
         ), true);
         thinking.addRow(new SwitchRowView(
                 context,
                 IconButtonView.BRAIN,
-                "保留完整 reasoning",
-                "将历史思考发回兼容模型，适合多轮工具调用",
+                context.getString(R.string.screen_llm_keep_reasoning_label),
+                context.getString(R.string.screen_llm_keep_reasoning_desc),
                 value.isPreserveReasoningEnabled(),
                 (buttonView, isChecked) -> listener.onPreserveReasoningChanged(isChecked)
         ), false);

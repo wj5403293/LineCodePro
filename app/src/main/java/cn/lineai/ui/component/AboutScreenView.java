@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class AboutScreenView extends ScreenScaffoldView {
@@ -19,7 +20,7 @@ public final class AboutScreenView extends ScreenScaffoldView {
     }
 
     public AboutScreenView(Context context, Listener listener) {
-        super(context, "关于 LineCode", listener::onBack, null);
+        super(context, context.getString(R.string.screen_about_title), listener::onBack, null);
         VersionInfo versionInfo = readVersionInfo(context);
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, 100);
@@ -42,23 +43,23 @@ public final class AboutScreenView extends ScreenScaffoldView {
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         nameParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         header.addView(name, nameParams);
-        TextView version = LineTheme.text(context, "APK " + versionInfo.versionName + " (" + versionInfo.versionCode + ")", LineTheme.FONT_MD, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        TextView version = LineTheme.text(context, context.getString(R.string.screen_about_apk_label, versionInfo.versionName, versionInfo.versionCode), LineTheme.FONT_MD, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         versionParams.topMargin = LineTheme.dp(context, LineTheme.XS);
         header.addView(version, versionParams);
         content.addView(header, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        addGroupTitle(content, "版本");
-        addItem(content, IconButtonView.PACKAGE, "APK 版本", versionInfo.versionName + " (" + versionInfo.versionCode + ")", null);
+        addGroupTitle(content, context.getString(R.string.screen_about_section_version));
+        addItem(content, IconButtonView.PACKAGE, context.getString(R.string.screen_about_apk_version), context.getString(R.string.screen_about_version_value, versionInfo.versionName, versionInfo.versionCode), null);
 
-        addGroupTitle(content, "开发者");
-        addItem(content, IconButtonView.USER, "作者", "LangLang03", null);
-        addItem(content, IconButtonView.MESSAGE_CIRCLE, "QQ", "3772548978", null);
+        addGroupTitle(content, context.getString(R.string.screen_about_section_developer));
+        addItem(content, IconButtonView.USER, context.getString(R.string.screen_about_developer_label), context.getString(R.string.screen_about_developer_value), null);
+        addItem(content, IconButtonView.MESSAGE_CIRCLE, context.getString(R.string.screen_about_qq_label), context.getString(R.string.screen_about_qq_value), null);
 
-        addGroupTitle(content, "法律信息");
-        addItem(content, IconButtonView.FILE_TEXT, "开源许可列表", "", listener::onOpenLicenses);
+        addGroupTitle(content, context.getString(R.string.screen_about_section_legal));
+        addItem(content, IconButtonView.FILE_TEXT, context.getString(R.string.screen_about_open_source_licenses), context.getString(R.string.screen_about_legal_value), listener::onOpenLicenses);
 
-        TextView footer = LineTheme.text(context, "Copyright 2025 LangLang. All rights reserved.", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView footer = LineTheme.text(context, context.getString(R.string.screen_about_copyright), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         footer.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         footerParams.topMargin = LineTheme.dp(context, LineTheme.XL);

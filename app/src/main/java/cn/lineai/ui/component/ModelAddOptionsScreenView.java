@@ -6,6 +6,7 @@ import android.view.Gravity;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ModelProviderPreset;
 import cn.lineai.model.ModelProviderPresets;
 import cn.lineai.ui.theme.LineTheme;
@@ -22,14 +23,14 @@ public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
     }
 
     public ModelAddOptionsScreenView(Context context, Listener listener) {
-        super(context, "添加模型", listener::onBack, null);
+        super(context, context.getString(R.string.screen_model_add_options_title), listener::onBack, null);
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
 
-        addLargeCard(content, IconButtonView.SLIDERS_HORIZONTAL, "自定义模型",
-                "进入原添加页，手动选择协议并填写 Base URL、模型 ID 和密钥", listener::onCustom);
-        addLargeCard(content, IconButtonView.FILE_UP, "加载本地模型",
-                "通过系统文件选择器导入 GGUF 文件，并在支持的 Android 设备上启用 NPU", listener::onLocal);
+        addLargeCard(content, IconButtonView.SLIDERS_HORIZONTAL, context.getString(R.string.screen_model_add_options_custom),
+                context.getString(R.string.screen_model_add_options_custom_desc), listener::onCustom);
+        addLargeCard(content, IconButtonView.FILE_UP, context.getString(R.string.screen_model_add_options_local),
+                context.getString(R.string.screen_model_add_options_local_desc), listener::onLocal);
 
         LinearLayout sectionHeader = new LinearLayout(context);
         sectionHeader.setOrientation(HORIZONTAL);
@@ -39,7 +40,7 @@ public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
         boxes.setIconSizeDp(16, 16);
         boxes.setClickable(false);
         sectionHeader.addView(boxes, new LinearLayout.LayoutParams(LineTheme.dp(context, 16), LineTheme.dp(context, 16)));
-        TextView sectionTitle = LineTheme.text(context, "预置提供商", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.BOLD);
+        TextView sectionTitle = LineTheme.text(context, context.getString(R.string.screen_model_add_options_section_presets), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         titleParams.leftMargin = LineTheme.dp(context, LineTheme.XS);
         sectionHeader.addView(sectionTitle, titleParams);
@@ -146,10 +147,10 @@ public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
             case ANTHROPIC_MESSAGES:
                 return "Anthropic";
             case LOCAL_GGUF:
-                return "本地 GGUF";
+                return getContext().getString(R.string.model_provider_local_gguf);
             case OPENAI_COMPATIBLE:
             default:
-                return "OpenAI 兼容";
+                return getContext().getString(R.string.model_provider_openai_compatible);
         }
     }
 }

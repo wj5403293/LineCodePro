@@ -82,7 +82,7 @@ public final class ToolCallShellView extends LinearLayout {
         viewCommandButton = smallActionButton(
                 context,
                 IconButtonView.EXTERNAL_LINK,
-                "完整",
+                getContext().getString(R.string.tool_call_shell_full),
                 LineTheme.SURFACE_LIGHT,
                 LineTheme.BORDER_LIGHT,
                 LineTheme.TEXT_SECONDARY,
@@ -171,7 +171,7 @@ public final class ToolCallShellView extends LinearLayout {
         boolean streaming = "running".equals(reviewState);
         boolean error = result != null && result.isError();
         String content = result == null ? "" : result.getContent();
-        String displayResult = streaming ? (content.length() == 0 ? "正在执行..." : content) : content;
+        String displayResult = streaming ? (content.length() == 0 ? getContext().getString(R.string.tool_call_shell_executing) : content) : content;
 
         if (streaming && !autoExpanded) {
             expanded = true;
@@ -204,7 +204,7 @@ public final class ToolCallShellView extends LinearLayout {
         section.setGravity(Gravity.CENTER_VERTICAL);
         LineTheme.padding(section, 0, LineTheme.XS, 0, 0);
 
-        LinearLayout auto = smallActionButton(context, IconButtonView.ZAP, "自动运行",
+        LinearLayout auto = smallActionButton(context, IconButtonView.ZAP, getContext().getString(R.string.tool_call_shell_auto_run),
                 LineTheme.SURFACE_LIGHT, LineTheme.BORDER_LIGHT, LineTheme.TEXT_SECONDARY, true);
         auto.setMinimumWidth(LineTheme.dp(context, 78));
         auto.setOnClickListener(v -> review("session_auto"));
@@ -213,7 +213,7 @@ public final class ToolCallShellView extends LinearLayout {
         View spacer = new View(context);
         section.addView(spacer, new LayoutParams(0, 1, 1f));
 
-        LinearLayout cancel = smallActionButton(context, IconButtonView.CLOSE, "跳过",
+        LinearLayout cancel = smallActionButton(context, IconButtonView.CLOSE, getContext().getString(R.string.tool_call_shell_skip),
                 LineTheme.CODE_BORDER, LineTheme.CODE_BORDER, LineTheme.TEXT_SECONDARY, false);
         LayoutParams cancelParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(context, 30));
         cancelParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
@@ -221,7 +221,7 @@ public final class ToolCallShellView extends LinearLayout {
         cancel.setOnClickListener(v -> review("rejected"));
         section.addView(cancel, cancelParams);
 
-        LinearLayout run = smallActionButton(context, IconButtonView.PLAY, "运行",
+        LinearLayout run = smallActionButton(context, IconButtonView.PLAY, getContext().getString(R.string.tool_call_shell_run),
                 LineTheme.ACCENT, LineTheme.ACCENT, LineTheme.TEXT_ON_COLOR, false);
         LayoutParams runParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(context, 30));
         runParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
@@ -239,7 +239,7 @@ public final class ToolCallShellView extends LinearLayout {
         outputTitle.setVisibility(streaming ? GONE : VISIBLE);
         statusIcon.setIconType(error ? IconButtonView.CIRCLE_ALERT : IconButtonView.CHECK);
         statusIcon.setIconColor(statusColor);
-        outputTitle.setText(error ? "执行失败" : "执行完成");
+        outputTitle.setText(error ? getContext().getString(R.string.tool_call_shell_failed) : getContext().getString(R.string.tool_call_shell_completed));
         outputTitle.setTextColor(statusColor);
         outputMeta.setText(getResources().getString(R.string.shell_output_line_count, lineCount));
         expandIcon.setVisibility(canExpand ? VISIBLE : GONE);
@@ -349,7 +349,7 @@ public final class ToolCallShellView extends LinearLayout {
         String head = value.substring(0, EXPANDED_HEAD_LIMIT);
         String tail = value.substring(value.length() - EXPANDED_TAIL_LIMIT);
         int folded = value.length() - head.length() - tail.length();
-        return head + "\n\n[LineCode 已折叠 " + folded + " 个字符的 shell 输出]\n\n" + tail;
+        return head + "\n\n" + getContext().getString(R.string.tool_call_shell_folded, folded) + "\n\n" + tail;
     }
 
     private static final class BoundedScrollView extends ScrollView {

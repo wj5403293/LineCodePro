@@ -9,6 +9,7 @@ import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.McpToolConfig;
@@ -31,7 +32,7 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
     private final McpSettingsState state;
 
     public MCPSettingsScreenView(Context context, McpSettingsState state, Listener listener) {
-        super(context, "工具与执行", listener::onBack, null);
+        super(context, context.getString(R.string.screen_mcp_title), listener::onBack, null);
         this.listener = listener;
         this.state = state == null ? new McpSettingsState(ToolSettingsRepository.EXECUTION_LOCAL, null) : state;
         LinearLayout content = getContent();
@@ -47,19 +48,19 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
     private void addExecutionTarget(LinearLayout content) {
         Context context = content.getContext();
         LinearLayout card = card(context);
-        card.addView(title(context, "执行目标"));
+        card.addView(title(context, context.getString(R.string.screen_mcp_section_execution)));
         LinearLayout segment = new LinearLayout(context);
         segment.setOrientation(HORIZONTAL);
         segment.setBackground(LineTheme.rounded(context, LineTheme.SURFACE_LIGHT, 8));
         LineTheme.padding(segment, 3, 3, 3, 3);
-        addModeButton(segment, "本地工作区", ToolSettingsRepository.EXECUTION_LOCAL);
-        addModeButton(segment, "SSH Shell", ToolSettingsRepository.EXECUTION_SSH);
+        addModeButton(segment, context.getString(R.string.screen_mcp_execution_local), ToolSettingsRepository.EXECUTION_LOCAL);
+        addModeButton(segment, context.getString(R.string.screen_mcp_execution_ssh), ToolSettingsRepository.EXECUTION_SSH);
         LinearLayout.LayoutParams segmentParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         segmentParams.topMargin = LineTheme.dp(context, LineTheme.SM);
         card.addView(segment, segmentParams);
         String executionDesc = ToolSettingsRepository.EXECUTION_LOCAL.equals(state.getExecutionMode())
-                ? "本地工作区会在当前工作区路径内执行文件读写、文件搜索、Agent、HTTP 服务器、网页搜索、图片理解和图片生成。搜索 API 与图片模型在工具设置中配置。"
-                : "SSH Shell 模式会禁用本地文件读写、文件搜索和 HTTP 服务器；Agent、Agent Pipeline、任务清单、网页搜索、图片理解和图片生成仍可用，文件相关操作请通过 shell 命令在 SSH 环境内完成。";
+                ? context.getString(R.string.screen_mcp_execution_local_desc)
+                : context.getString(R.string.screen_mcp_execution_ssh_desc);
         TextView desc = desc(context, executionDesc);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, LineTheme.SM);
@@ -70,16 +71,16 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
     private void addSshConnection(LinearLayout content) {
         Context context = content.getContext();
         LinearLayout card = card(context);
-        card.addView(title(context, "SSH 连接"));
-        TextView desc = desc(context, "SSH Shell 可以连接远程 Linux 服务器、桌面开发机、NAS，也可以连接手机本机 Termux。Termux 是一个单独选项，不等于只能连接手机。");
+        card.addView(title(context, context.getString(R.string.screen_mcp_section_ssh)));
+        TextView desc = desc(context, context.getString(R.string.screen_mcp_ssh_overview));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
         card.addView(desc, descParams);
 
         LinearLayout actions = new LinearLayout(context);
         actions.setOrientation(HORIZONTAL);
-        LinearLayout ssh = actionButton(context, "SSH 连接设置", IconButtonView.SERVER, true, v -> listener.onOpenSshSettings());
-        LinearLayout termux = actionButton(context, "Termux 对接", IconButtonView.SMARTPHONE, false, v -> listener.onOpenTermuxIntegration());
+        LinearLayout ssh = actionButton(context, context.getString(R.string.screen_mcp_ssh_settings), IconButtonView.SERVER, true, v -> listener.onOpenSshSettings());
+        LinearLayout termux = actionButton(context, context.getString(R.string.screen_mcp_termux_integration), IconButtonView.SMARTPHONE, false, v -> listener.onOpenTermuxIntegration());
         LinearLayout.LayoutParams sshParams = new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f);
         sshParams.rightMargin = LineTheme.dp(context, LineTheme.SM);
         actions.addView(ssh, sshParams);

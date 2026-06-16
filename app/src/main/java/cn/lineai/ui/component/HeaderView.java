@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.ui.theme.LineTheme;
 
@@ -38,7 +39,7 @@ public final class HeaderView extends LinearLayout {
         setMinimumHeight(LineTheme.dp(context, 58));
 
         IconButtonView menu = icon(context, IconButtonView.MENU, LineTheme.TEXT, 20);
-        menu.setContentDescription("Menu");
+        menu.setContentDescription(context.getString(R.string.header_menu_desc));
         menu.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onMenuClick();
@@ -66,7 +67,7 @@ public final class HeaderView extends LinearLayout {
         LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 7), LineTheme.dp(context, 7));
         projectButton.addView(dot, dotParams);
 
-        projectText = LineTheme.textMedium(context, "LineCode", LineTheme.FONT_MD, LineTheme.TEXT);
+        projectText = LineTheme.textMedium(context, context.getString(R.string.header_project_default), LineTheme.FONT_MD, LineTheme.TEXT);
         projectText.setSingleLine(true);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.leftMargin = LineTheme.dp(context, 6);
@@ -77,7 +78,7 @@ public final class HeaderView extends LinearLayout {
         projectButton.addView(chevron, new LinearLayout.LayoutParams(LineTheme.dp(context, 20), LineTheme.dp(context, 20)));
 
         IconButtonView shield = icon(context, IconButtonView.SHIELD, LineTheme.TEXT_SECONDARY, 18);
-        shield.setContentDescription("Permission");
+        shield.setContentDescription(context.getString(R.string.header_permission_desc));
         shield.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onPermissionClick();
@@ -86,7 +87,7 @@ public final class HeaderView extends LinearLayout {
         addView(shield);
 
         IconButtonView plus = icon(context, IconButtonView.PLUS, LineTheme.TEXT_SECONDARY, 20);
-        plus.setContentDescription("New conversation");
+        plus.setContentDescription(context.getString(R.string.header_new_conversation_desc));
         plus.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onNewConversationClick();
@@ -95,7 +96,7 @@ public final class HeaderView extends LinearLayout {
         addView(plus);
 
         IconButtonView more = icon(context, IconButtonView.MORE, LineTheme.TEXT_SECONDARY, 18);
-        more.setContentDescription("More");
+        more.setContentDescription(context.getString(R.string.header_more_desc));
         more.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onMoreClick();

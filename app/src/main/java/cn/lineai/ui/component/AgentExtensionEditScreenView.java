@@ -14,6 +14,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpToolConfig;
@@ -58,7 +59,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
             List<ExtensionMcpConfig> customMcps,
             Listener listener
     ) {
-        super(context, editingAgent == null ? "添加 Agent" : "修改 Agent", listener::onBack, saveAction(context));
+        super(context, context.getString(R.string.screen_agent_add_title), listener::onBack, saveAction(context));
         this.listener = listener;
         this.editingAgent = editingAgent;
         this.availableTools = availableTools == null ? new ArrayList<>() : availableTools;
@@ -66,24 +67,24 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
         this.customMcps = customMcps == null ? new ArrayList<>() : customMcps;
         LinearLayout content = getContent();
 
-        SettingsSectionView quick = new SettingsSectionView(context, "快速创建");
-        quick.addRow(new ActionRowView(context, IconButtonView.SPARKLES, "让 AI 写",
-                "直接描述所需 Agent，自动填写名称、提示词、触发条件和权限。",
+        SettingsSectionView quick = new SettingsSectionView(context, context.getString(R.string.screen_agent_quick_create));
+        quick.addRow(new ActionRowView(context, IconButtonView.SPARKLES, context.getString(R.string.screen_agent_let_ai_write),
+                context.getString(R.string.screen_agent_let_ai_write_desc),
                 false, true, this::showAiWriterDialog), false);
         content.addView(quick, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        nameField = new FormTextFieldView(context, "名字", "", "例如：测试修复 Agent", null, false, false);
-        slugField = new FormTextFieldView(context, "英文标识", "", "test-fixer",
-                "用于触发和识别自定义 Agent，保存时会规范成小写英文标识。", false, false);
-        addForm(content, "基础信息", nameField, slugField);
+        nameField = new FormTextFieldView(context, context.getString(R.string.screen_agent_field_name), "", context.getString(R.string.screen_agent_hint_name), null, false, false);
+        slugField = new FormTextFieldView(context, context.getString(R.string.screen_agent_field_identifier), "", context.getString(R.string.screen_agent_hint_slug),
+                context.getString(R.string.screen_agent_helper_slug), false, false);
+        addForm(content, context.getString(R.string.screen_agent_form_basic), nameField, slugField);
 
-        promptField = new FormTextFieldView(context, "提示词", "", "描述这个 Agent 的角色、边界、输出格式和验收方式", null, true, false);
-        triggerField = new FormTextFieldView(context, "触发条件", "", "例如：用户要求修复测试、分析性能、重构组件时触发", null, true, false);
-        addForm(content, "行为定义", promptField, triggerField);
+        promptField = new FormTextFieldView(context, context.getString(R.string.screen_agent_field_prompt), "", context.getString(R.string.screen_agent_hint_prompt), null, true, false);
+        triggerField = new FormTextFieldView(context, context.getString(R.string.screen_agent_field_trigger), "", context.getString(R.string.screen_agent_hint_trigger), null, true, false);
+        addForm(content, context.getString(R.string.screen_agent_form_behavior), promptField, triggerField);
 
-        toolsSection = new SettingsSectionView(context, "可使用的工具");
+        toolsSection = new SettingsSectionView(context, context.getString(R.string.screen_agent_section_tools));
         content.addView(toolsSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        mcpSection = new SettingsSectionView(context, "可使用的 MCP");
+        mcpSection = new SettingsSectionView(context, context.getString(R.string.screen_agent_section_mcps));
         content.addView(mcpSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         applyConfig(editingAgent);
@@ -123,9 +124,12 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
 
     private void renderToolRows() {
         toolsSection.removeAllRows();
-        toolsSection.setTitle("可使用的工具 · 已选 " + selectedTools.size());
+        toolsSection.setTitle(getContext().getString(R.string.screen_agent_tools_count,
+                getContext().getString(R.string.screen_agent_section_tools),
+                getContext().getString(R.string.screen_agent_let_ai_button),
+                selectedTools.size()));
         if (availableTools.isEmpty()) {
-            toolsSection.addRow(empty("暂无可选工具。"), false);
+            toolsSection.addRow(empty(getContext().getString(R.string.screen_agent_tools_empty)), false);
             return;
         }
         for (int i = 0; i < availableTools.size(); i++) {
@@ -142,10 +146,13 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
 
     private void renderMcpRows() {
         mcpSection.removeAllRows();
-        mcpSection.setTitle("可使用的 MCP · 已选 " + selectedMcps.size());
+        mcpSection.setTitle(getContext().getString(R.string.screen_agent_tools_count,
+                getContext().getString(R.string.screen_agent_section_mcps),
+                getContext().getString(R.string.screen_agent_let_ai_button),
+                selectedMcps.size()));
         ArrayList<McpOption> options = mcpOptions();
         if (options.isEmpty()) {
-            mcpSection.addRow(empty("暂无 MCP 可选。"), false);
+            mcpSection.addRow(empty(getContext().getString(R.string.screen_agent_mcps_empty)), false);
             return;
         }
         for (int i = 0; i < options.size(); i++) {
@@ -192,8 +199,8 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
         header.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout titleWrap = new LinearLayout(getContext());
         titleWrap.setOrientation(LinearLayout.VERTICAL);
-        titleWrap.addView(LineTheme.textMedium(getContext(), "让 AI 写 Agent", LineTheme.FONT_LG, LineTheme.TEXT));
-        TextView desc = LineTheme.text(getContext(), "描述目标后会自动填入当前表单。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        titleWrap.addView(LineTheme.textMedium(getContext(), getContext().getString(R.string.screen_agent_let_ai_dialog_title), LineTheme.FONT_LG, LineTheme.TEXT));
+        TextView desc = LineTheme.text(getContext(), getContext().getString(R.string.screen_agent_ai_dialog_desc), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(getContext(), 2);
         titleWrap.addView(desc, descParams);
@@ -210,7 +217,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
 
         EditText input = aiPromptInput(getContext());
         panel.addView(input, top());
-        GenerateButtonView button = new GenerateButtonView(getContext(), "生成并填写");
+        GenerateButtonView button = new GenerateButtonView(getContext(), getContext().getString(R.string.screen_agent_let_ai_button));
         button.setOnClickListener(v -> generateDraft(dialog, input, button, close));
         panel.addView(button, top());
         dialog.setContentView(panel);
@@ -232,7 +239,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
     private void generateDraft(Dialog dialog, EditText input, GenerateButtonView button, View closeButton) {
         String description = textValue(input);
         if (description.length() == 0) {
-            Toast.makeText(getContext(), "请先描述 Agent 需求", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_agent_require_description), Toast.LENGTH_SHORT).show();
             return;
         }
         button.setBusy(true);
@@ -247,7 +254,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
                     renderToolRows();
                     renderMcpRows();
                     dialog.dismiss();
-                    Toast.makeText(getContext(), "已生成并填写", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), getContext().getString(R.string.screen_agent_ai_filled), Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
@@ -267,7 +274,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
         String prompt = value(promptField);
         String trigger = value(triggerField);
         if (name.length() == 0 || slug.length() == 0 || prompt.length() == 0) {
-            Toast.makeText(getContext(), "请填写名字、英文标识和提示词", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_agent_save_require), Toast.LENGTH_SHORT).show();
             return;
         }
         listener.onSave(new ExtensionAgentConfig(
@@ -309,7 +316,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
 
     private EditText aiPromptInput(Context context) {
         EditText input = new EditText(context);
-        input.setHint("例如：我想要一个专门帮我分析 Android 原生 View 性能问题的 Agent，会先读相关 View 和 Presenter，定位性能瓶颈，然后给出修复建议。");
+        input.setHint(getContext().getString(R.string.screen_agent_ai_hint));
         input.setHintTextColor(LineTheme.TEXT_TERTIARY);
         input.setTextColor(LineTheme.TEXT);
         input.setTextSize(LineTheme.FONT_MD);
@@ -325,7 +332,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
     }
 
     private static TextView saveAction(Context context) {
-        TextView save = LineTheme.textMedium(context, "保存", LineTheme.FONT_MD, LineTheme.ACCENT);
+        TextView save = LineTheme.textMedium(context, context.getString(R.string.screen_agent_save), LineTheme.FONT_MD, LineTheme.ACCENT);
         save.setGravity(Gravity.CENTER);
         return save;
     }
@@ -368,7 +375,7 @@ public final class AgentExtensionEditScreenView extends ScreenScaffoldView {
                 builder.append(value);
             }
         }
-        return builder.length() == 0 ? "无工具" : builder.toString();
+        return builder.length() == 0 ? getContext().getString(R.string.screen_agent_join_empty) : builder.toString();
     }
 
     private String normalizeSlug(String value) {

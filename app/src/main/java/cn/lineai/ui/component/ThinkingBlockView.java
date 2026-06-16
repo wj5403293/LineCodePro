@@ -9,6 +9,7 @@ import android.view.ViewParent;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +37,7 @@ public final class ThinkingBlockView extends LinearLayout {
         TextView mark = LineTheme.text(context, "✦", 10, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         header.addView(mark, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
 
-        labelView = LineTheme.text(context, "思考中...", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        labelView = LineTheme.text(context, context.getString(R.string.thinking_label), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         labelParams.leftMargin = LineTheme.dp(context, 4);
         header.addView(labelView, labelParams);
@@ -76,7 +77,9 @@ public final class ThinkingBlockView extends LinearLayout {
         messageId = id == null ? "" : id;
         Boolean savedExpanded = EXPANDED_BY_ID.get(messageId);
         expanded = savedExpanded == null ? autoExpand : savedExpanded;
-        labelView.setText(streaming ? "思考中..." : "思考完毕");
+        labelView.setText(streaming
+                ? getContext().getString(R.string.thinking_label)
+                : getContext().getString(R.string.thinking_done_label));
         contentView.setText(content == null ? "" : content);
         contentView.setMaxLines(Integer.MAX_VALUE);
         contentScrollView.setMaxHeightDp(scrollable ? 180 : 0);

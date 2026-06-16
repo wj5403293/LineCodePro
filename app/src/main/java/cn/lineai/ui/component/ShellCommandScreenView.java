@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 
 public final class ShellCommandScreenView extends LinearLayout {
@@ -47,11 +48,11 @@ public final class ShellCommandScreenView extends LinearLayout {
         chevron.setIconSizeDp(22, 22);
         chevron.setClickable(false);
         back.addView(chevron, new LinearLayout.LayoutParams(LineTheme.dp(context, 22), LineTheme.dp(context, 22)));
-        TextView exit = LineTheme.text(context, "退出", LineTheme.FONT_MD, LineTheme.TEXT, Typeface.NORMAL);
+        TextView exit = LineTheme.text(context, context.getString(R.string.in_app_browser_exit), LineTheme.FONT_MD, LineTheme.TEXT, Typeface.NORMAL);
         back.addView(exit, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         header.addView(back, new LinearLayout.LayoutParams(LineTheme.dp(context, 68), LayoutParams.WRAP_CONTENT));
 
-        TextView title = LineTheme.textMedium(context, "完整命令", LineTheme.FONT_MD, LineTheme.TEXT);
+        TextView title = LineTheme.textMedium(context, context.getString(R.string.shell_command_title), LineTheme.FONT_MD, LineTheme.TEXT);
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         header.addView(new LinearLayout(context), new LinearLayout.LayoutParams(LineTheme.dp(context, 68), 1));
@@ -61,7 +62,7 @@ public final class ShellCommandScreenView extends LinearLayout {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(VERTICAL);
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
-        TextView commandBox = LineTheme.text(context, command == null || command.length() == 0 ? "(空命令)" : command, LineTheme.FONT_SM, LineTheme.TEXT, Typeface.NORMAL);
+        TextView commandBox = LineTheme.text(context, command == null || command.length() == 0 ? context.getString(R.string.shell_command_empty) : command, LineTheme.FONT_SM, LineTheme.TEXT, Typeface.NORMAL);
         commandBox.setTypeface(Typeface.MONOSPACE);
         commandBox.setTextIsSelectable(true);
         commandBox.setLineSpacing(LineTheme.dp(context, 4), 1f);

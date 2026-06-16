@@ -11,6 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpRequestHeader;
 import cn.lineai.model.McpToolSummary;
@@ -43,17 +44,17 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
     private boolean queried;
 
     public McpExtensionEditScreenView(Context context, ExtensionMcpConfig editingMcp, Listener listener) {
-        super(context, editingMcp == null ? "添加 MCP" : "修改 MCP", listener::onBack, saveAction(context));
+        super(context, context.getString(R.string.screen_mcp_add_title), listener::onBack, saveAction(context));
         this.listener = listener;
         this.editingMcp = editingMcp;
         LinearLayout content = getContent();
-        nameField = new FormTextFieldView(context, "名称", value(editingMcp == null ? "" : editingMcp.getName()),
-                "例如：公司 MCP 服务", null, false, false);
-        urlField = new FormTextFieldView(context, "HTTP/S 地址", value(editingMcp == null ? "" : editingMcp.getUrl()),
-                "https://example.com/mcp", "查询会请求 tools/list 并展示 MCP 工具列表。", false, false);
-        addForm(content, "连接信息", nameField, urlField);
+        nameField = new FormTextFieldView(context, context.getString(R.string.screen_mcp_field_name), value(editingMcp == null ? "" : editingMcp.getName()),
+                context.getString(R.string.screen_mcp_hint_name), null, false, false);
+        urlField = new FormTextFieldView(context, context.getString(R.string.screen_mcp_field_http_url), value(editingMcp == null ? "" : editingMcp.getUrl()),
+                context.getString(R.string.screen_mcp_hint_url), context.getString(R.string.screen_mcp_helper_url), false, false);
+        addForm(content, context.getString(R.string.screen_mcp_form_title), nameField, urlField);
 
-        headersSection = new SettingsSectionView(context, "自定义请求头");
+        headersSection = new SettingsSectionView(context, context.getString(R.string.screen_mcp_section_headers));
         content.addView(headersSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         if (editingMcp != null) {
             for (McpRequestHeader header : editingMcp.getRequestHeaders()) {
@@ -64,11 +65,11 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         }
         renderHeaders();
 
-        querySection = new SettingsSectionView(context, "查询");
+        querySection = new SettingsSectionView(context, context.getString(R.string.screen_mcp_query_section_title));
         content.addView(querySection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         renderQuery();
 
-        toolsSection = new SettingsSectionView(context, "TOOLS 列表");
+        toolsSection = new SettingsSectionView(context, context.getString(R.string.screen_mcp_tools_count, 0));
         content.addView(toolsSection, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         renderTools();
         getRightAction().setOnClickListener(v -> save());
@@ -76,8 +77,8 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
 
     private void renderHeaders() {
         headersSection.removeAllRows();
-        headersSection.addRow(new ActionRowView(getContext(), IconButtonView.PLUS, "添加请求头",
-                "查询和调用 MCP tools 时会附带这些请求头。", false, false, () -> {
+        headersSection.addRow(new ActionRowView(getContext(), IconButtonView.PLUS, getContext().getString(R.string.screen_mcp_add_header),
+                getContext().getString(R.string.screen_mcp_add_header_desc), false, false, () -> {
                     headerRows.add(new HeaderRow(getContext(), null, headerRows, this::renderHeaders));
                     renderHeaders();
                 }), !headerRows.isEmpty());
@@ -92,7 +93,7 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         }
         String url = fieldValue(urlField);
         if (!validUrl(url)) {
-            Toast.makeText(getContext(), "MCP 地址必须以 http:// 或 https:// 开头", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_mcp_url_invalid), Toast.LENGTH_SHORT).show();
             return;
         }
         querying = true;
@@ -107,7 +108,7 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
                     queriedTools = new ArrayList<>(tools);
                     renderQuery();
                     renderTools();
-                    Toast.makeText(getContext(), "已查询到 " + queriedTools.size() + " 个 tools", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), getContext().getString(R.string.screen_mcp_query_done_toast, queriedTools.size()), Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
@@ -128,9 +129,9 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
             return;
         }
         String desc = queriedTools.isEmpty()
-                ? "填写地址后查询服务暴露的 tools。"
-                : "已查询到 " + queriedTools.size() + " 个 tools。";
-        querySection.addRow(new ActionRowView(getContext(), IconButtonView.SEARCH, "查询 MCP 列表",
+                ? getContext().getString(R.string.screen_mcp_query_empty_desc)
+                : getContext().getString(R.string.screen_mcp_query_done_desc, queriedTools.size());
+        querySection.addRow(new ActionRowView(getContext(), IconButtonView.SEARCH, getContext().getString(R.string.screen_mcp_query_tools),
                 desc, false, true, this::queryTools), false);
     }
 
@@ -142,19 +143,19 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
                 enabledCount++;
             }
         }
-        toolsSection.setTitle("TOOLS 列表 · 已启用 " + enabledCount + "/" + queriedTools.size());
+        toolsSection.setTitle(getContext().getString(R.string.screen_mcp_tools_count, enabledCount));
         if (querying) {
-            toolsSection.addRow(stateRow("正在查询 MCP tools...", true), false);
+            toolsSection.addRow(stateRow(getContext().getString(R.string.screen_mcp_query_busy), true), false);
             return;
         }
         if (queriedTools.isEmpty()) {
-            toolsSection.addRow(stateRow(queried ? "没有查询到 tools。" : "查询后会在这里显示 tools 列表，可单独开启或关闭。", false), false);
+            toolsSection.addRow(stateRow(queried ? getContext().getString(R.string.screen_mcp_query_no_tools) : getContext().getString(R.string.screen_mcp_query_pending), false), false);
             return;
         }
         for (int i = 0; i < queriedTools.size(); i++) {
             McpToolSummary tool = queriedTools.get(i);
             toolsSection.addRow(new SwitchRowView(getContext(), IconButtonView.MCP, tool.getName(),
-                    tool.getDescription().length() == 0 ? "MCP tool" : tool.getDescription(),
+                    tool.getDescription().length() == 0 ? getContext().getString(R.string.screen_mcp_tool_default_desc) : tool.getDescription(),
                     tool.isEnabled(), (button, checked) -> {
                         setToolEnabled(tool.getName(), checked);
                         renderTools();
@@ -180,8 +181,8 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         textParams.leftMargin = LineTheme.dp(getContext(), LineTheme.MD);
         row.addView(textWrap, textParams);
 
-        textWrap.addView(LineTheme.textMedium(getContext(), "查询 MCP 列表", LineTheme.FONT_MD, LineTheme.TEXT));
-        TextView desc = LineTheme.text(getContext(), "正在查询服务暴露的 tools。", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        textWrap.addView(LineTheme.textMedium(getContext(), getContext().getString(R.string.screen_mcp_query_tools), LineTheme.FONT_MD, LineTheme.TEXT));
+        TextView desc = LineTheme.text(getContext(), getContext().getString(R.string.screen_mcp_query_busy_desc), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(getContext(), 2);
         textWrap.addView(desc, descParams);
@@ -225,13 +226,13 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         String name = fieldValue(nameField);
         String url = fieldValue(urlField);
         if (name.length() == 0 || !validUrl(url)) {
-            Toast.makeText(getContext(), "请填写名称和有效 MCP 地址", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_mcp_save_require_name_url), Toast.LENGTH_SHORT).show();
             return;
         }
         String trimmedUrl = trimTrailingSlash(url);
         boolean urlChanged = editingMcp != null && !trimmedUrl.equals(editingMcp.getUrl());
         if (!queried || queriedTools.isEmpty() || urlChanged) {
-            Toast.makeText(getContext(), "请先点击「查询 MCP 列表」获取 tools 后再保存", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), getContext().getString(R.string.screen_mcp_save_require_query), Toast.LENGTH_SHORT).show();
             return;
         }
         listener.onSave(new ExtensionMcpConfig(
@@ -258,7 +259,7 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
     }
 
     private static TextView saveAction(Context context) {
-        TextView save = LineTheme.textMedium(context, "保存", LineTheme.FONT_MD, LineTheme.ACCENT);
+        TextView save = LineTheme.textMedium(context, context.getString(R.string.screen_agent_save), LineTheme.FONT_MD, LineTheme.ACCENT);
         save.setGravity(Gravity.CENTER);
         return save;
     }
@@ -315,8 +316,8 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
             setOrientation(HORIZONTAL);
             setGravity(Gravity.CENTER_VERTICAL);
             LineTheme.padding(this, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
-            nameInput = input(context, "名字", header == null ? "" : header.getName());
-            valueInput = input(context, "值", header == null ? "" : header.getValue());
+            nameInput = input(context, context.getString(R.string.screen_extension_detail_field_name), header == null ? "" : header.getName());
+            valueInput = input(context, context.getString(R.string.screen_mcp_header_value_hint), header == null ? "" : header.getValue());
             addView(nameInput, new LayoutParams(0, LineTheme.dp(context, 42), 1f));
             LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(0, LineTheme.dp(context, 42), 1f);
             valueParams.leftMargin = LineTheme.dp(context, LineTheme.SM);

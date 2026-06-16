@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.WebSearchConfig;
@@ -37,7 +38,7 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
             String imageGenerationModelLabel,
             Listener listener
     ) {
-        super(context, "工具设置", listener::onBack, null);
+        super(context, context.getString(R.string.screen_tools_title), listener::onBack, null);
         this.listener = listener;
         this.state = state == null ? new McpSettingsState(ToolSettingsRepository.EXECUTION_LOCAL, null) : state;
         this.imageUnderstandingModelLabel = imageUnderstandingModelLabel == null ? "" : imageUnderstandingModelLabel.trim();
@@ -45,25 +46,25 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
         LinearLayout content = getContent();
         LineTheme.padding(content, LineTheme.LG, LineTheme.LG, LineTheme.LG, 100);
 
-        addSectionHeader(content, "图片操作");
+        addSectionHeader(content, context.getString(R.string.screen_tools_section_images));
         addImageUnderstanding(content);
         addImageGeneration(content);
 
-        addSectionHeader(content, "搜索");
+        addSectionHeader(content, context.getString(R.string.screen_tools_section_search));
         addWebSearch(content);
     }
 
     private void addImageUnderstanding(LinearLayout content) {
         Context context = content.getContext();
         LinearLayout card = card(context);
-        card.addView(title(context, "图片理解模型"));
-        TextView desc = desc(context, "image_understanding 工具会读取本地或 SSH 工作区图片，并用这里选择的模型根据提示词返回图片内容。支持 OpenAI 兼容、Codex Responses 和 Anthropic Messages 协议。");
+        card.addView(title(context, context.getString(R.string.screen_tools_image_understanding_label)));
+        TextView desc = desc(context, context.getString(R.string.screen_tools_image_understanding_desc));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
         card.addView(desc, descParams);
 
         TextView selected = LineTheme.text(context,
-                imageUnderstandingModelLabel.length() == 0 ? "未选择模型" : imageUnderstandingModelLabel,
+                imageUnderstandingModelLabel.length() == 0 ? context.getString(R.string.screen_tools_no_model_selected) : imageUnderstandingModelLabel,
                 LineTheme.FONT_SM,
                 imageUnderstandingModelLabel.length() == 0 ? LineTheme.TEXT_TERTIARY : LineTheme.TEXT,
                 Typeface.BOLD);
@@ -72,7 +73,7 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
         selectedParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(selected, selectedParams);
 
-        LinearLayout button = actionButton(context, "选择模型", IconButtonView.PAINTBRUSH, true, v -> listener.onOpenImageUnderstandingModelPicker());
+        LinearLayout button = actionButton(context, context.getString(R.string.screen_tools_pick_model), IconButtonView.PAINTBRUSH, true, v -> listener.onOpenImageUnderstandingModelPicker());
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         buttonParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(button, buttonParams);
@@ -82,14 +83,14 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
     private void addImageGeneration(LinearLayout content) {
         Context context = content.getContext();
         LinearLayout card = card(context);
-        card.addView(title(context, "图片生成模型"));
-        TextView desc = desc(context, "image_generation 工具会调用这里选择的生图模型生成图片。生成结果以内联 Markdown 图片返回，并直接显示在聊天内容里。");
+        card.addView(title(context, context.getString(R.string.screen_tools_image_generation_label)));
+        TextView desc = desc(context, context.getString(R.string.screen_tools_image_generation_desc));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
         card.addView(desc, descParams);
 
         TextView selected = LineTheme.text(context,
-                imageGenerationModelLabel.length() == 0 ? "未选择模型" : imageGenerationModelLabel,
+                imageGenerationModelLabel.length() == 0 ? context.getString(R.string.screen_tools_no_model_selected) : imageGenerationModelLabel,
                 LineTheme.FONT_SM,
                 imageGenerationModelLabel.length() == 0 ? LineTheme.TEXT_TERTIARY : LineTheme.TEXT,
                 Typeface.BOLD);
@@ -98,7 +99,7 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
         selectedParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(selected, selectedParams);
 
-        LinearLayout button = actionButton(context, "选择模型", IconButtonView.SPARKLES, true, v -> listener.onOpenImageGenerationModelPicker());
+        LinearLayout button = actionButton(context, context.getString(R.string.screen_tools_pick_model), IconButtonView.SPARKLES, true, v -> listener.onOpenImageGenerationModelPicker());
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         buttonParams.topMargin = LineTheme.dp(context, LineTheme.MD);
         card.addView(button, buttonParams);
@@ -112,30 +113,30 @@ public final class ToolSettingsScreenView extends ScreenScaffoldView {
         boolean[] suppressChange = new boolean[] {false};
 
         LinearLayout card = card(context);
-        card.addView(title(context, "网页搜索 API"));
-        TextView desc = desc(context, "web_search 和 web_fetch 共用这组搜索 API、模型/搜索源和密钥。本地与 SSH 模式都使用应用侧网络配置。");
+        card.addView(title(context, context.getString(R.string.screen_tools_web_search_label)));
+        TextView desc = desc(context, context.getString(R.string.screen_tools_web_search_desc));
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, 2);
         card.addView(desc, descParams);
 
-        FormTextFieldView baseUrlField = new FormTextFieldView(context, "Search API URL", config.getBaseUrl(), "https://api.example.com/search", null, false, false);
-        FormTextFieldView apiKeyField = new FormTextFieldView(context, "API Key", config.getApiKey(), "搜索服务密钥", null, false, true);
-        FormTextFieldView modelField = new FormTextFieldView(context, "模型 / 搜索源", config.getModel(), "如 basic、advanced、google，可留空", null, false, false);
-        FormTextFieldView queryParamField = new FormTextFieldView(context, "查询参数名", config.getQueryParam(), "q", null, false, false);
-        FormTextFieldView apiKeyHeaderField = new FormTextFieldView(context, "密钥 Header", config.getApiKeyHeader(), "Authorization，可留空", null, false, false);
-        FormTextFieldView apiKeyParamField = new FormTextFieldView(context, "密钥 Query 参数", config.getApiKeyParam(), "api_key，可留空", null, false, false);
+        FormTextFieldView baseUrlField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_search_url), config.getBaseUrl(), "https://api.example.com/search", null, false, false);
+        FormTextFieldView apiKeyField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_api_key), config.getApiKey(), context.getString(R.string.screen_tools_hint_api_key), null, false, true);
+        FormTextFieldView modelField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_search_model), config.getModel(), context.getString(R.string.screen_tools_hint_model), null, false, false);
+        FormTextFieldView queryParamField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_query_param), config.getQueryParam(), "q", null, false, false);
+        FormTextFieldView apiKeyHeaderField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_key_header), config.getApiKeyHeader(), context.getString(R.string.screen_tools_hint_key_header), null, false, false);
+        FormTextFieldView apiKeyParamField = new FormTextFieldView(context, context.getString(R.string.screen_tools_field_key_query), config.getApiKeyParam(), context.getString(R.string.screen_tools_hint_key_query), null, false, false);
 
         GridLayout providers = new GridLayout(context);
         providers.setColumnCount(3);
-        addProviderButton(providers, "Tavily", WebSearchConfig.PROVIDER_TAVILY, selectedProvider, suppressChange,
+        addProviderButton(providers, context.getString(R.string.screen_tools_provider_tavily), WebSearchConfig.PROVIDER_TAVILY, selectedProvider, suppressChange,
                 baseUrlField, apiKeyField, modelField, queryParamField, apiKeyHeaderField, apiKeyParamField);
-        addProviderButton(providers, "Brave Search", WebSearchConfig.PROVIDER_BRAVE, selectedProvider, suppressChange,
+        addProviderButton(providers, context.getString(R.string.screen_tools_provider_brave), WebSearchConfig.PROVIDER_BRAVE, selectedProvider, suppressChange,
                 baseUrlField, apiKeyField, modelField, queryParamField, apiKeyHeaderField, apiKeyParamField);
-        addProviderButton(providers, "SerpAPI", WebSearchConfig.PROVIDER_SERPAPI, selectedProvider, suppressChange,
+        addProviderButton(providers, context.getString(R.string.screen_tools_provider_serpapi), WebSearchConfig.PROVIDER_SERPAPI, selectedProvider, suppressChange,
                 baseUrlField, apiKeyField, modelField, queryParamField, apiKeyHeaderField, apiKeyParamField);
-        addProviderButton(providers, "Bing Search", WebSearchConfig.PROVIDER_BING, selectedProvider, suppressChange,
+        addProviderButton(providers, context.getString(R.string.screen_tools_provider_bing), WebSearchConfig.PROVIDER_BING, selectedProvider, suppressChange,
                 baseUrlField, apiKeyField, modelField, queryParamField, apiKeyHeaderField, apiKeyParamField);
-        addProviderButton(providers, "自定义", WebSearchConfig.PROVIDER_CUSTOM, selectedProvider, suppressChange,
+        addProviderButton(providers, context.getString(R.string.screen_tools_provider_custom), WebSearchConfig.PROVIDER_CUSTOM, selectedProvider, suppressChange,
                 baseUrlField, apiKeyField, modelField, queryParamField, apiKeyHeaderField, apiKeyParamField);
         LinearLayout.LayoutParams providerParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         providerParams.topMargin = LineTheme.dp(context, LineTheme.MD);

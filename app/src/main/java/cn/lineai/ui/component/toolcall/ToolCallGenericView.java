@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
@@ -19,7 +20,7 @@ public final class ToolCallGenericView extends LinearLayout {
 
     public ToolCallGenericView(Context context, String label) {
         super(context);
-        this.label = label == null || label.length() == 0 ? "MCP 调用" : label;
+        this.label = label == null || label.length() == 0 ? getContext().getString(R.string.tool_call_generic_mcp) : label;
         setOrientation(VERTICAL);
         setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 8, LineTheme.CODE_BORDER));
     }
@@ -76,10 +77,10 @@ public final class ToolCallGenericView extends LinearLayout {
 
         String inputText = ToolCallUtils.prettyJson(input);
         if (!"{}".equals(inputText)) {
-            addSection("输入", inputText, LineTheme.TEXT_SECONDARY, 2);
+            addSection(getContext().getString(R.string.tool_call_input), inputText, LineTheme.TEXT_SECONDARY, 2);
         }
         if (hasResult) {
-            addSection(running ? "进度" : "返回值", result.getContent(), error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY, running ? 3 : 8);
+            addSection(running ? getContext().getString(R.string.tool_call_progress) : getContext().getString(R.string.tool_call_output), result.getContent(), error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY, running ? 3 : 8);
         }
     }
 

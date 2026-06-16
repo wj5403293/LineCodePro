@@ -9,6 +9,7 @@ import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
 import android.text.style.TypefaceSpan;
 import android.text.style.URLSpan;
+import cn.lineai.R;
 import cn.lineai.ui.theme.LineTheme;
 import org.commonmark.node.Code;
 import org.commonmark.node.Emphasis;
@@ -101,7 +102,8 @@ public final class MarkdownInlineRenderer {
             appendChildren(builder, node);
             String alt = builder.subSequence(start, builder.length()).toString();
             builder.delete(start, builder.length());
-            builder.append("[图片");
+            String imageLabel = context.getString(R.string.markdown_image_label);
+            builder.append(imageLabel, 0, imageLabel.length() - 1);
             if (alt.trim().length() > 0) {
                 builder.append(": ").append(alt.trim());
             }

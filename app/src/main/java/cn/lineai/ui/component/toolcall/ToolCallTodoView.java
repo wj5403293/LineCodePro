@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import cn.lineai.R;
 import cn.lineai.model.TodoItem;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolResult;
@@ -63,7 +64,7 @@ public final class ToolCallTodoView extends LinearLayout {
 
     private void addEmptyState() {
         TextView empty = LineTheme.text(getContext(),
-                "暂无 TODO 项。可通过调用 todo_update 工具维护任务列表。",
+                getContext().getString(R.string.tool_call_todo_empty),
                 LineTheme.FONT_XS,
                 LineTheme.TEXT_TERTIARY,
                 Typeface.NORMAL);

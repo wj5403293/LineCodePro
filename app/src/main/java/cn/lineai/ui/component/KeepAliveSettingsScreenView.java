@@ -8,6 +8,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import cn.lineai.R;
 import cn.lineai.data.repository.KeepAliveRepository;
 import cn.lineai.service.KeepAliveService;
 
@@ -21,30 +22,30 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
     private final Context context;
 
     public KeepAliveSettingsScreenView(Context context, Listener listener) {
-        super(context, "保活设置", listener::onBack, null);
+        super(context, context.getString(R.string.screen_keep_alive_title), listener::onBack, null);
         this.context = context;
         this.repository = new KeepAliveRepository(context);
         LinearLayout content = getContent();
 
         KeepAliveRepository.KeepAliveSettings settings = repository.getSettings();
 
-        SettingsSectionView coding = new SettingsSectionView(context, "编码任务保活");
+        SettingsSectionView coding = new SettingsSectionView(context, context.getString(R.string.screen_keep_alive_section_coding));
 
-        SwitchRowView wakeLockSwitch = new SwitchRowView(context, IconButtonView.ZAP, "Wake Lock", "对话生成和压缩时保持 CPU 与屏幕唤醒", settings.wakeLockEnabled, (buttonView, enabled) -> {
+        SwitchRowView wakeLockSwitch = new SwitchRowView(context, IconButtonView.ZAP, context.getString(R.string.screen_keep_alive_wake_lock_label), context.getString(R.string.screen_keep_alive_wake_lock_desc), settings.wakeLockEnabled, (buttonView, enabled) -> {
             repository.setWakeLockEnabled(enabled);
             updateService();
             listener.onSettingsChanged();
         });
         coding.addRow(wakeLockSwitch, true);
 
-        SwitchRowView foregroundSwitch = new SwitchRowView(context, IconButtonView.BELL, "前台服务通知", "开启后常驻显示正在编码通知", settings.foregroundEnabled, (buttonView, enabled) -> {
+        SwitchRowView foregroundSwitch = new SwitchRowView(context, IconButtonView.BELL, context.getString(R.string.screen_keep_alive_foreground_label), context.getString(R.string.screen_keep_alive_foreground_desc), settings.foregroundEnabled, (buttonView, enabled) -> {
             repository.setForegroundEnabled(enabled);
             updateService();
             listener.onSettingsChanged();
         });
         coding.addRow(foregroundSwitch, true);
 
-        SwitchRowView fakeAudioSwitch = new SwitchRowView(context, IconButtonView.MUSIC, "假音乐播放", "后台任务期间启动静音 AudioTrack", settings.fakeAudioEnabled, (buttonView, enabled) -> {
+        SwitchRowView fakeAudioSwitch = new SwitchRowView(context, IconButtonView.MUSIC, context.getString(R.string.screen_keep_alive_fake_music_label), context.getString(R.string.screen_keep_alive_fake_music_desc), settings.fakeAudioEnabled, (buttonView, enabled) -> {
             repository.setFakeAudioEnabled(enabled);
             updateService();
             listener.onSettingsChanged();
@@ -52,8 +53,8 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
         coding.addRow(fakeAudioSwitch, false);
         content.addView(coding, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        SettingsSectionView system = new SettingsSectionView(context, "系统白名单");
-        SwitchRowView batterySwitch = new SwitchRowView(context, IconButtonView.BATTERY_CHARGING, "忽略电池优化", "打开 Android 白名单申请页面", isIgnoringBatteryOptimizations(), (buttonView, enabled) -> {
+        SettingsSectionView system = new SettingsSectionView(context, context.getString(R.string.screen_keep_alive_section_system));
+        SwitchRowView batterySwitch = new SwitchRowView(context, IconButtonView.BATTERY_CHARGING, context.getString(R.string.screen_keep_alive_ignore_battery_label), context.getString(R.string.screen_keep_alive_ignore_battery_desc), isIgnoringBatteryOptimizations(), (buttonView, enabled) -> {
             if (enabled && !isIgnoringBatteryOptimizations()) {
                 openBatteryOptimizationSettings();
             }

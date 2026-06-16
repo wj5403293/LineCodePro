@@ -17,6 +17,7 @@ import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import cn.lineai.R;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.ui.theme.LineTheme;
 import java.text.DateFormat;
@@ -39,7 +40,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
     private MemoryOverviewState overview;
 
     public MemorySettingsScreenView(Context context, Listener listener) {
-        super(context, "记忆", listener::onBack, addButton(context));
+        super(context, context.getString(R.string.screen_memory_title), listener::onBack, addButton(context));
         this.listener = listener;
         View rightAction = getRightAction();
         if (rightAction != null) {
@@ -60,17 +61,21 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         LinearLayout content = getContent();
         content.removeAllViews();
         addProjectHint(content);
-        addMemorySection("长期记忆", IconButtonView.DATABASE, overview.getLongTerm());
-        addMemorySection("项目记忆", IconButtonView.FOLDER_OPEN, overview.getProject());
-        addMemorySection("环境记忆", IconButtonView.GLOBE, overview.getEnvironment());
+        addMemorySection(getContext().getString(R.string.screen_memory_section_long_term), IconButtonView.DATABASE, overview.getLongTerm());
+        addMemorySection(getContext().getString(R.string.screen_memory_section_project), IconButtonView.FOLDER_OPEN, overview.getProject());
+        addMemorySection(getContext().getString(R.string.screen_memory_section_environment), IconButtonView.GLOBE, overview.getEnvironment());
         addWorkingMemorySection();
         addHistorySection();
     }
 
     private void addProjectHint(LinearLayout content) {
         Context context = content.getContext();
-        String project = overview == null || overview.getProjectId().length() == 0 ? "未选择项目" : overview.getProjectId();
-        TextView hint = LineTheme.text(context, "当前项目: " + project, LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        String project = overview == null || overview.getProjectId().length() == 0
+                ? context.getString(R.string.screen_memory_project_unselected)
+                : overview.getProjectId();
+        TextView hint = LineTheme.text(context,
+                context.getString(R.string.screen_memory_current_project_prefix) + project,
+                LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         hintParams.leftMargin = LineTheme.dp(context, LineTheme.LG);
         hintParams.rightMargin = LineTheme.dp(context, LineTheme.LG);
@@ -106,7 +111,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
 
     private void addWorkingMemorySection() {
         List<MemoryOverviewState.WorkingMemory> rows = overview.getShortTerm();
-        SettingsSectionView section = new SettingsSectionView(getContext(), "短期记忆（" + rows.size() + "）");
+        SettingsSectionView section = new SettingsSectionView(getContext(), getContext().getString(R.string.screen_memory_section_short_term) + "（" + rows.size() + "）");
         if (rows.isEmpty()) {
             section.addRow(emptyView(), false);
         } else {
@@ -119,7 +124,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
                         time(memory.getUpdatedAt()),
                         false,
                         true,
-                        () -> showTextDialog("短期记忆", workingMemoryDetail(memory))
+                        () -> showTextDialog(getContext().getString(R.string.screen_memory_section_short_term), workingMemoryDetail(memory))
                 );
                 section.addRow(row, i < rows.size() - 1);
             }
@@ -129,7 +134,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
 
     private void addHistorySection() {
         List<MemoryOverviewState.HistoryEntry> rows = overview.getHistory();
-        SettingsSectionView section = new SettingsSectionView(getContext(), "聊天索引（" + rows.size() + "）");
+        SettingsSectionView section = new SettingsSectionView(getContext(), getContext().getString(R.string.screen_memory_section_chat_index) + "（" + rows.size() + "）");
         if (rows.isEmpty()) {
             section.addRow(emptyView(), false);
         } else {
@@ -142,7 +147,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
                         historyDesc(entry),
                         false,
                         true,
-                        () -> showTextDialog("聊天索引", historyDetail(entry))
+                        () -> showTextDialog(getContext().getString(R.string.screen_memory_section_chat_index), historyDetail(entry))
                 );
                 section.addRow(row, i < rows.size() - 1);
             }
@@ -151,7 +156,8 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
     }
 
     private TextView emptyView() {
-        TextView empty = LineTheme.text(getContext(), "暂无内容", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView empty = LineTheme.text(getContext(), getContext().getString(R.string.screen_memory_empty_text),
+                LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         LineTheme.padding(empty, LineTheme.LG, LineTheme.LG, LineTheme.LG, LineTheme.LG);
         return empty;
     }
@@ -159,28 +165,28 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
     private void showMemoryActions(MemoryOverviewState.Memory memory) {
         Dialog dialog = createDialog();
         LinearLayout panel = dialogPanel(getContext());
-        panel.addView(titleView("记忆操作"));
-        panel.addView(actionText("编辑", LineTheme.TEXT, () -> {
+        panel.addView(titleView(getContext().getString(R.string.screen_memory_action_sheet_title)));
+        panel.addView(actionText(getContext().getString(R.string.screen_memory_action_edit), LineTheme.TEXT, () -> {
             dialog.dismiss();
             showEditor(memory);
         }));
-        panel.addView(actionText("删除", LineTheme.DANGER, () -> {
+        panel.addView(actionText(getContext().getString(R.string.screen_memory_action_delete), LineTheme.DANGER, () -> {
             dialog.dismiss();
             showDeleteConfirm(memory);
         }));
-        panel.addView(actionText("取消", LineTheme.TEXT_SECONDARY, dialog::dismiss));
+        panel.addView(actionText(getContext().getString(R.string.common_cancel), LineTheme.TEXT_SECONDARY, dialog::dismiss));
         showPanel(dialog, panel);
     }
 
     private void showDeleteConfirm(MemoryOverviewState.Memory memory) {
         Dialog dialog = createDialog();
         LinearLayout panel = dialogPanel(getContext());
-        panel.addView(titleView("删除记忆"));
-        TextView body = bodyView("确定删除这条记忆？\n\n" + preview(memory.getContent(), 120));
+        panel.addView(titleView(getContext().getString(R.string.screen_memory_delete_title)));
+        TextView body = bodyView(getContext().getString(R.string.screen_memory_action_body, preview(memory.getContent(), 120)));
         panel.addView(body);
         LinearLayout actions = actionRow();
-        actions.addView(dialogButton("取消", LineTheme.TEXT_SECONDARY, dialog::dismiss));
-        actions.addView(dialogButton("删除", LineTheme.DANGER, () -> {
+        actions.addView(dialogButton(getContext().getString(R.string.common_cancel), LineTheme.TEXT_SECONDARY, dialog::dismiss));
+        actions.addView(dialogButton(getContext().getString(R.string.common_delete), LineTheme.DANGER, () -> {
             listener.onMemoryDeleted(memory.getId());
             dialog.dismiss();
             refresh();
@@ -192,14 +198,14 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
     private void showEditor(MemoryOverviewState.Memory memory) {
         Dialog dialog = createDialog();
         LinearLayout panel = dialogPanel(getContext());
-        panel.addView(titleView(memory == null ? "添加记忆" : "编辑记忆"));
+        panel.addView(titleView(memory == null ? getContext().getString(R.string.screen_memory_editor_add) : getContext().getString(R.string.screen_memory_editor_edit)));
 
         RadioGroup scopeGroup = new RadioGroup(getContext());
         scopeGroup.setOrientation(RadioGroup.HORIZONTAL);
         String scope = memory == null ? MemoryOverviewState.Memory.SCOPE_USER : memory.getScope();
-        RadioButton user = scopeButton("user", MemoryOverviewState.Memory.SCOPE_USER);
-        RadioButton project = scopeButton("project", MemoryOverviewState.Memory.SCOPE_PROJECT);
-        RadioButton environment = scopeButton("environment", MemoryOverviewState.Memory.SCOPE_ENVIRONMENT);
+        RadioButton user = scopeButton(getContext().getString(R.string.screen_memory_scope_user), MemoryOverviewState.Memory.SCOPE_USER);
+        RadioButton project = scopeButton(getContext().getString(R.string.screen_memory_scope_project), MemoryOverviewState.Memory.SCOPE_PROJECT);
+        RadioButton environment = scopeButton(getContext().getString(R.string.screen_memory_scope_environment), MemoryOverviewState.Memory.SCOPE_ENVIRONMENT);
         scopeGroup.addView(user);
         scopeGroup.addView(project);
         scopeGroup.addView(environment);
@@ -214,7 +220,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
 
         EditText input = new EditText(getContext());
         input.setText(memory == null ? "" : memory.getContent());
-        input.setHint("输入要保存的记忆");
+        input.setHint(getContext().getString(R.string.screen_memory_hint));
         input.setHintTextColor(LineTheme.TEXT_TERTIARY);
         input.setTextColor(LineTheme.TEXT);
         input.setTextSize(LineTheme.FONT_MD);
@@ -229,11 +235,11 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         panel.addView(input, inputParams);
 
         LinearLayout actions = actionRow();
-        actions.addView(dialogButton("取消", LineTheme.TEXT_SECONDARY, dialog::dismiss));
-        actions.addView(dialogButton("保存", LineTheme.ACCENT, () -> {
+        actions.addView(dialogButton(getContext().getString(R.string.common_cancel), LineTheme.TEXT_SECONDARY, dialog::dismiss));
+        actions.addView(dialogButton(getContext().getString(R.string.common_save), LineTheme.ACCENT, () -> {
             String value = input.getText().toString().trim();
             if (value.length() == 0) {
-                Toast.makeText(getContext(), "记忆内容不能为空", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), getContext().getString(R.string.screen_memory_empty_toast), Toast.LENGTH_SHORT).show();
                 return;
             }
             listener.onMemorySaved(memory == null ? "" : memory.getId(), checkedScope(scopeGroup), value);
@@ -340,36 +346,37 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         panel.addView(titleView(title));
         panel.addView(bodyView(body));
         LinearLayout actions = actionRow();
-        actions.addView(dialogButton("关闭", LineTheme.ACCENT, dialog::dismiss));
+        actions.addView(dialogButton(getContext().getString(R.string.common_close), LineTheme.ACCENT, dialog::dismiss));
         panel.addView(actions);
         showPanel(dialog, panel);
     }
 
     private String memoryDesc(MemoryOverviewState.Memory memory) {
-        return "来源: " + safe(memory.getSource())
-                + " · 使用 " + memory.getUseCount() + " 次"
+        return getContext().getString(R.string.screen_memory_field_source) + safe(memory.getSource())
+                + " · " + getContext().getString(R.string.screen_memory_field_use_count_prefix) + memory.getUseCount()
+                + " " + getContext().getString(R.string.screen_memory_field_use_count_suffix)
                 + " · " + time(memory.getUpdatedAt());
     }
 
     private String memoryDetail(MemoryOverviewState.Memory memory) {
         return memory.getContent()
-                + "\n\n范围: " + memory.getScope()
-                + "\n来源: " + safe(memory.getSource())
-                + "\n项目: " + (memory.getProjectId().length() == 0 ? "全局" : memory.getProjectId())
-                + "\n置信度: " + String.format(Locale.ROOT, "%.2f", memory.getConfidence())
-                + "\n使用次数: " + memory.getUseCount()
-                + "\n创建: " + time(memory.getCreatedAt())
-                + "\n更新: " + time(memory.getUpdatedAt())
-                + "\n上次使用: " + (memory.getLastUsedAt() > 0 ? time(memory.getLastUsedAt()) : "尚未使用");
+                + "\n\n" + getContext().getString(R.string.screen_memory_field_scope) + memory.getScope()
+                + "\n" + getContext().getString(R.string.screen_memory_field_source) + safe(memory.getSource())
+                + "\n" + getContext().getString(R.string.screen_memory_field_project) + (memory.getProjectId().length() == 0 ? getContext().getString(R.string.screen_memory_value_global) : memory.getProjectId())
+                + "\n" + getContext().getString(R.string.screen_memory_field_confidence) + String.format(Locale.ROOT, "%.2f", memory.getConfidence())
+                + "\n" + getContext().getString(R.string.screen_memory_field_use_count) + memory.getUseCount()
+                + "\n" + getContext().getString(R.string.screen_memory_field_created) + time(memory.getCreatedAt())
+                + "\n" + getContext().getString(R.string.screen_memory_field_updated) + time(memory.getUpdatedAt())
+                + "\n" + getContext().getString(R.string.screen_memory_field_last_used) + (memory.getLastUsedAt() > 0 ? time(memory.getLastUsedAt()) : getContext().getString(R.string.screen_memory_value_not_used_yet));
     }
 
     private String workingMemoryDetail(MemoryOverviewState.WorkingMemory memory) {
         return memory.getContent()
-                + "\n\n来源: " + safe(memory.getSource())
-                + "\n项目: " + (memory.getProjectId().length() == 0 ? "全局" : memory.getProjectId())
-                + "\n创建: " + time(memory.getCreatedAt())
-                + "\n更新: " + time(memory.getUpdatedAt())
-                + "\n过期: " + (memory.getExpiresAt() > 0 ? time(memory.getExpiresAt()) : "不过期");
+                + "\n\n" + getContext().getString(R.string.screen_memory_field_source) + safe(memory.getSource())
+                + "\n" + getContext().getString(R.string.screen_memory_field_project) + (memory.getProjectId().length() == 0 ? getContext().getString(R.string.screen_memory_value_global) : memory.getProjectId())
+                + "\n" + getContext().getString(R.string.screen_memory_field_created) + time(memory.getCreatedAt())
+                + "\n" + getContext().getString(R.string.screen_memory_field_updated) + time(memory.getUpdatedAt())
+                + "\n" + getContext().getString(R.string.screen_memory_field_expires) + (memory.getExpiresAt() > 0 ? time(memory.getExpiresAt()) : getContext().getString(R.string.screen_memory_value_no_expiry));
     }
 
     private String historyDesc(MemoryOverviewState.HistoryEntry entry) {
@@ -378,12 +385,12 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
     }
 
     private String historyDetail(MemoryOverviewState.HistoryEntry entry) {
-        return (entry.getTitle().length() == 0 ? "" : "标题: " + entry.getTitle() + "\n")
+        return (entry.getTitle().length() == 0 ? "" : getContext().getString(R.string.screen_memory_field_title) + entry.getTitle() + "\n")
                 + entry.getRole() + ": " + entry.getText()
-                + "\n\n对话: " + entry.getConversationId()
-                + "\n消息: " + (entry.getMessageId().length() == 0 ? "-" : entry.getMessageId())
-                + "\n创建: " + time(entry.getCreatedAt())
-                + "\n更新: " + time(entry.getUpdatedAt());
+                + "\n\n" + getContext().getString(R.string.screen_memory_field_conversation) + entry.getConversationId()
+                + "\n" + getContext().getString(R.string.screen_memory_field_message) + (entry.getMessageId().length() == 0 ? "-" : entry.getMessageId())
+                + "\n" + getContext().getString(R.string.screen_memory_field_created) + time(entry.getCreatedAt())
+                + "\n" + getContext().getString(R.string.screen_memory_field_updated) + time(entry.getUpdatedAt());
     }
 
     private String preview(String text, int maxChars) {
@@ -392,14 +399,14 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
             value = value.replace("  ", " ");
         }
         if (value.length() <= maxChars) {
-            return value.length() == 0 ? "空内容" : value;
+            return value.length() == 0 ? getContext().getString(R.string.screen_memory_value_empty) : value;
         }
         return value.substring(0, Math.max(0, maxChars - 3)) + "...";
     }
 
     private String time(long value) {
         if (value <= 0) {
-            return "未知时间";
+            return getContext().getString(R.string.screen_memory_value_unknown_time);
         }
         return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(new Date(value));
     }

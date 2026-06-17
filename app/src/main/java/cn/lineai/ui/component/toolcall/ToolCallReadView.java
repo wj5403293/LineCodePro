@@ -6,7 +6,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
@@ -15,13 +14,11 @@ import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 import org.json.JSONObject;
 
-public final class ToolCallReadView extends LinearLayout {
+public final class ToolCallReadView extends BaseToolCallView {
     private String projectPath = "";
 
     public ToolCallReadView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
-        setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 8, LineTheme.CODE_BORDER));
     }
 
     public void setProjectPath(String projectPath) {
@@ -69,18 +66,22 @@ public final class ToolCallReadView extends LinearLayout {
         path.setTypeface(Typeface.MONOSPACE);
         path.setSingleLine(true);
         path.setHorizontallyScrolling(true);
-        HorizontalScrollView pathScroll = horizontalPathScroll();
-        pathScroll.addView(path, new HorizontalScrollView.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        HorizontalScrollView pathScroll = horizontalPathScroll(path);
         textBlock.addView(pathScroll, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        View status = statusView(complete, error);
+        View status = statusView(complete);
+        if (complete && error && status instanceof IconButtonView) {
+            IconButtonView statusIcon = (IconButtonView) status;
+            statusIcon.setIconType(IconButtonView.CLOSE);
+            statusIcon.setIconColor(LineTheme.DANGER);
+        }
         header.addView(status, new LayoutParams(LineTheme.dp(getContext(), 18), LineTheme.dp(getContext(), 18)));
         addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         if (running && result != null && result.getContent().length() > 0) {
-            addMessage(result.getContent(), LineTheme.TEXT_SECONDARY, IconButtonView.LOADER);
+            addMessageRow(this, IconButtonView.LOADER, result.getContent(), LineTheme.TEXT_SECONDARY);
         } else if (error && result.getContent().length() > 0) {
-            addError(result.getContent());
+            addMessageRow(this, IconButtonView.CLOSE, result.getContent(), LineTheme.DANGER);
         }
     }
 
@@ -111,49 +112,5 @@ public final class ToolCallReadView extends LinearLayout {
             return IconButtonView.SPARKLES;
         }
         return IconButtonView.EXPAND;
-    }
-
-    private HorizontalScrollView horizontalPathScroll() {
-        HorizontalScrollView scroll = new HorizontalScrollView(getContext());
-        scroll.setHorizontalScrollBarEnabled(false);
-        return scroll;
-    }
-
-    private View statusView(boolean complete, boolean error) {
-        if (!complete) {
-            ProgressBar bar = new ProgressBar(getContext());
-            bar.setIndeterminate(true);
-            return bar;
-        }
-        IconButtonView icon = new IconButtonView(getContext(), error ? IconButtonView.CLOSE : IconButtonView.CHECK);
-        icon.setIconColor(error ? LineTheme.DANGER : LineTheme.SUCCESS);
-        icon.setIconSizeDp(18, 13);
-        icon.setClickable(false);
-        return icon;
-    }
-
-    private void addError(String text) {
-        addMessage(text, LineTheme.DANGER, IconButtonView.CLOSE);
-    }
-
-    private void addMessage(String text, int color, int iconType) {
-        View divider = new View(getContext());
-        divider.setBackgroundColor(LineTheme.CODE_BORDER);
-        addView(divider, new LayoutParams(LayoutParams.MATCH_PARENT, 1));
-
-        LinearLayout row = new LinearLayout(getContext());
-        row.setOrientation(HORIZONTAL);
-        row.setGravity(Gravity.TOP);
-        LineTheme.padding(row, LineTheme.SM, LineTheme.XS, LineTheme.SM, LineTheme.XS);
-        IconButtonView icon = new IconButtonView(getContext(), iconType);
-        icon.setIconColor(color);
-        icon.setIconSizeDp(14, 12);
-        icon.setClickable(false);
-        row.addView(icon, new LayoutParams(LineTheme.dp(getContext(), 14), LineTheme.dp(getContext(), 14)));
-        TextView error = LineTheme.text(getContext(), text, LineTheme.FONT_XS, color, Typeface.NORMAL);
-        LayoutParams params = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
-        params.leftMargin = LineTheme.dp(getContext(), LineTheme.XS);
-        row.addView(error, params);
-        addView(row, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 }

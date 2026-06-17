@@ -1,7 +1,6 @@
 package cn.lineai.mvp;
 
 import cn.lineai.data.repository.ProjectRecord;
-import cn.lineai.data.repository.ProjectRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.model.SheetOption;
 import cn.lineai.workspace.WorkspacePaths;
@@ -44,28 +43,28 @@ public final class ProjectSheetController {
     }
 
     private static final class RepositoryProjectStore implements ProjectStore {
-        private final ProjectRepository repository;
+        private final cn.lineai.data.repository.ProjectStore projectStore;
 
-        RepositoryProjectStore(ProjectRepository repository) {
-            this.repository = repository;
+        RepositoryProjectStore(cn.lineai.data.repository.ProjectStore projectStore) {
+            this.projectStore = projectStore;
         }
 
         @Override
         public ProjectRecord getSelectedProject(String executionMode) {
-            return repository.getSelectedProject(executionMode);
+            return projectStore.getSelectedProject(executionMode);
         }
 
         @Override
         public List<ProjectRecord> getProjects(String executionMode) {
-            return repository.getProjects(executionMode);
+            return projectStore.getProjects(executionMode);
         }
     }
 
     private final ProjectStore projectStore;
     private final Host host;
 
-    public ProjectSheetController(ProjectRepository projectRepository, Host host) {
-        this(new RepositoryProjectStore(projectRepository), host);
+    public ProjectSheetController(cn.lineai.data.repository.ProjectStore projectStore, Host host) {
+        this(new RepositoryProjectStore(projectStore), host);
     }
 
     ProjectSheetController(ProjectStore projectStore, Host host) {

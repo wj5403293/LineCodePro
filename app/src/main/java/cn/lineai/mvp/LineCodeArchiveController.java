@@ -10,8 +10,7 @@ public final class LineCodeArchiveController {
         ImportSummary importArchive(String uri) throws Exception;
     }
 
-    interface BackgroundRunner {
-        void execute(String name, Runnable runnable);
+    interface BackgroundRunner extends cn.lineai.mvp.BackgroundRunner {
     }
 
     interface Clock {
@@ -34,8 +33,7 @@ public final class LineCodeArchiveController {
         void showNotice(String text);
     }
 
-    interface UiDispatcher {
-        void post(Runnable runnable);
+    interface UiDispatcher extends cn.lineai.mvp.UiDispatcher {
     }
 
     static final class ExportSummary {

@@ -1,4 +1,4 @@
-package cn.lineai.data.repository;
+package cn.lineai.context;
 
 import android.content.Context;
 import cn.lineai.ai.ModelClient;
@@ -7,6 +7,9 @@ import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.ai.prompt.StringTemplate;
+import cn.lineai.data.repository.ExtensionRepository;
+import cn.lineai.data.repository.LearningContextRepository;
+import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.ModelConfig;
 import java.util.ArrayList;

@@ -44,6 +44,10 @@ public final class ToolRegistry {
     }
 
     public ToolRegistry(Context context) {
+        this(context, null);
+    }
+
+    public ToolRegistry(Context context, cn.lineai.ipc.IpcProviderManager ipcProviderManager) {
         this.context = context == null ? null : context.getApplicationContext();
         register(new FileReadTool());
         register(new FileWriteTool());
@@ -55,8 +59,8 @@ public final class ToolRegistry {
         register(new AgentTool());
         register(new AgentPipelineTool());
         register(new TodoUpdateTool());
-        register(new ShellExecuteTool(context));
-        register(new ImageUnderstandingTool(context));
+        register(new ShellExecuteTool(context, ipcProviderManager));
+        register(new ImageUnderstandingTool(context, ipcProviderManager));
         register(new ImageGenerationTool(context));
         register(new WebSearchTool(context == null ? null : new WebSearchConfigRepository(context)));
         register(new WebFetchTool());

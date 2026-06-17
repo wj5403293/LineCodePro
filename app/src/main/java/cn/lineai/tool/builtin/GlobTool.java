@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
@@ -29,6 +30,11 @@ public final class GlobTool extends BaseTool {
     }
 
     @Override
+    public boolean isConcurrencySafe() {
+        return true;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -42,9 +48,7 @@ public final class GlobTool extends BaseTool {
     public ToolResult execute(JSONObject input, ToolContext context) {
         try {
             String pattern = input.optString("pattern");
-            if (pattern.trim().length() == 0) {
-                return error("pattern 不能为空");
-            }
+            ToolArgs.requireNonEmpty(pattern, "pattern");
             File root = FileToolPathPolicy.resolve(context, input.optString("path"));
             if (!root.exists() || !root.isDirectory()) {
                 return error("搜索根目录不存在或不是目录: " + input.optString("path", "."));
@@ -117,13 +121,5 @@ public final class GlobTool extends BaseTool {
         }
         regex.append('$');
         return regex.toString();
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

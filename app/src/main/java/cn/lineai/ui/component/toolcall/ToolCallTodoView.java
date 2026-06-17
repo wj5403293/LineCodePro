@@ -20,7 +20,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public final class ToolCallTodoView extends LinearLayout {
+public final class ToolCallTodoView extends BaseToolCallView {
     private final int circleSize;
     private final int circleStroke;
     private final int rowHeight;
@@ -29,8 +29,6 @@ public final class ToolCallTodoView extends LinearLayout {
 
     public ToolCallTodoView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
-        setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 8, LineTheme.CODE_BORDER));
         circleSize = LineTheme.dp(context, 14);
         circleStroke = LineTheme.dp(context, 2);
         rowHeight = LineTheme.dp(context, 28);

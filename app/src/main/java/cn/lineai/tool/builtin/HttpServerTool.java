@@ -4,8 +4,12 @@ import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
+import android.util.Log;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -13,6 +17,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
 public final class HttpServerTool extends BaseTool {
@@ -94,19 +101,18 @@ public final class HttpServerTool extends BaseTool {
         return ok("服务器已停止 (端口 " + port + ")");
     }
 
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
-
     private static final class SimpleFileServer implements Runnable {
+        private static final String TAG = "LineCodeHttpServer";
+        private static final int MAX_WORKERS = 10;
+        private static final int MAX_HEADER_BYTES = 8192;
+        private static final int SOCKET_TIMEOUT_MS = 30_000;
+
         private final File root;
         private final ServerSocket serverSocket;
         private volatile boolean running = true;
         private Thread thread;
+        private final ExecutorService workers =
+                Executors.newFixedThreadPool(MAX_WORKERS);
 
         SimpleFileServer(File root, int port) throws Exception {
             this.root = root.getCanonicalFile();
@@ -123,12 +129,24 @@ public final class HttpServerTool extends BaseTool {
         @Override
         public void run() {
             while (running) {
+                Socket socket = null;
                 try {
-                    Socket socket = serverSocket.accept();
-                    new Thread(() -> handle(socket), "linecode-http-client").start();
-                } catch (Exception ignored) {
+                    socket = serverSocket.accept();
+                    socket.setSoTimeout(SOCKET_TIMEOUT_MS);
+                    final Socket client = socket;
+                    workers.execute(() -> handle(client));
+                    socket = null;
+                } catch (Exception e) {
                     if (running) {
+                        Log.w(TAG, "accept failed, shutting down server", e);
                         running = false;
+                    }
+                    if (socket != null) {
+                        try {
+                            socket.close();
+                        } catch (Exception closeEx) {
+                            Log.w(TAG, "close accepted socket failed", closeEx);
+                        }
                     }
                 }
             }
@@ -150,18 +168,26 @@ public final class HttpServerTool extends BaseTool {
             running = false;
             try {
                 serverSocket.close();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.w(TAG, "close server socket failed", e);
+            }
+            workers.shutdown();
+            try {
+                if (!workers.awaitTermination(2, TimeUnit.SECONDS)) {
+                    workers.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                workers.shutdownNow();
+                Thread.currentThread().interrupt();
             }
         }
 
         private void handle(Socket socket) {
             try {
-                byte[] buffer = new byte[4096];
-                int read = socket.getInputStream().read(buffer);
-                if (read <= 0) {
+                String request = readRequestHeaders(socket.getInputStream());
+                if (request == null || request.length() == 0) {
                     return;
                 }
-                String request = new String(buffer, 0, read, StandardCharsets.UTF_8);
                 String firstLine = request.split("\\r?\\n", 2)[0];
                 String[] parts = firstLine.split(" ");
                 if (parts.length < 2 || !"GET".equals(parts[0])) {
@@ -175,7 +201,7 @@ public final class HttpServerTool extends BaseTool {
                 }
                 path = URLDecoder.decode(path, "UTF-8");
                 File target = new File(root, path.startsWith("/") ? path.substring(1) : path).getCanonicalFile();
-                if (!inside(root, target)) {
+                if (!FileToolPathPolicy.isInside(root, target)) {
                     writeText(socket.getOutputStream(), 403, "Forbidden");
                     return;
                 }
@@ -188,19 +214,52 @@ public final class HttpServerTool extends BaseTool {
                     return;
                 }
                 writeFile(socket.getOutputStream(), target);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.w(TAG, "handle request failed", e);
             } finally {
                 try {
                     socket.close();
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    Log.w(TAG, "close client socket failed", e);
                 }
             }
         }
 
-        private boolean inside(File root, File target) {
-            String rootPath = root.getPath();
-            String targetPath = target.getPath();
-            return targetPath.equals(rootPath) || targetPath.startsWith(rootPath + File.separator);
+        /**
+         * 循环读取请求头，直到遇到 {@code \r\n\r\n} 或达到 {@link #MAX_HEADER_BYTES} 上限。
+         * 返回请求头文本（不含后续 body），读取失败或超时返回 {@code null}。
+         */
+        private String readRequestHeaders(InputStream input) throws IOException {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024);
+            byte[] chunk = new byte[1024];
+            int read;
+            while ((read = input.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
+                if (buffer.size() >= MAX_HEADER_BYTES) {
+                    break;
+                }
+                byte[] collected = buffer.toByteArray();
+                int end = indexOfHeaderEnd(collected, buffer.size());
+                if (end >= 0) {
+                    return new String(collected, 0, end, StandardCharsets.UTF_8);
+                }
+            }
+            byte[] collected = buffer.toByteArray();
+            if (collected.length == 0) {
+                return null;
+            }
+            return new String(collected, 0, Math.min(collected.length, MAX_HEADER_BYTES), StandardCharsets.UTF_8);
+        }
+
+        /** 查找 {@code \r\n\r\n} 在 {@code data} 中的结束位置（含分隔符长度）。 */
+        private static int indexOfHeaderEnd(byte[] data, int length) {
+            for (int i = 0; i + 3 < length; i++) {
+                if (data[i] == '\r' && data[i + 1] == '\n'
+                        && data[i + 2] == '\r' && data[i + 3] == '\n') {
+                    return i + 4;
+                }
+            }
+            return -1;
         }
 
         private String listing(File dir, String path) {

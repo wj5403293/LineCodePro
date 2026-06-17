@@ -42,7 +42,7 @@ public final class ContextCompactionService {
                 new PromptTemplateRepository(context));
     }
 
-    ContextCompactionService(
+    public ContextCompactionService(
             Context context,
             ModelClient modelClient,
             OpenAiResponsesCompactionProtocol responsesCompactionProtocol,

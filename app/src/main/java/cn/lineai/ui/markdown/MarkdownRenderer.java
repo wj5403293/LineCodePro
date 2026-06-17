@@ -21,16 +21,35 @@ import org.commonmark.node.Paragraph;
 import org.commonmark.node.Text;
 import org.commonmark.node.ThematicBreak;
 import org.commonmark.ext.gfm.tables.TableBlock;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class MarkdownRenderer {
     private final Context context;
     private final MarkdownInlineRenderer inlineRenderer;
     private boolean codeWrapEnabled;
     private MarkdownLinkHandler linkHandler;
+    private final Map<Class<? extends Node>, BlockRenderer> renderers = new HashMap<>();
 
     public MarkdownRenderer(Context context) {
         this.context = context;
         inlineRenderer = new MarkdownInlineRenderer(context);
+        registerRenderers();
+    }
+
+    private void registerRenderers() {
+        renderers.put(Document.class, (target, node, depth) -> renderChildren(target, node, depth));
+        renderers.put(LinkReferenceDefinition.class, (target, node, depth) -> { });
+        renderers.put(Heading.class, (target, node, depth) -> renderHeading(target, node, depth));
+        renderers.put(Paragraph.class, (target, node, depth) -> renderParagraph(target, node, depth));
+        renderers.put(FencedCodeBlock.class, (target, node, depth) -> renderFencedCodeBlock(target, node));
+        renderers.put(IndentedCodeBlock.class, (target, node, depth) -> renderIndentedCodeBlock(target, node));
+        renderers.put(BlockQuote.class, (target, node, depth) -> renderBlockQuote(target, node, depth));
+        renderers.put(TableBlock.class, (target, node, depth) -> renderTableBlock(target, node));
+        renderers.put(BulletList.class, (target, node, depth) -> addList(target, (ListBlock) node, depth));
+        renderers.put(OrderedList.class, (target, node, depth) -> addList(target, (ListBlock) node, depth));
+        renderers.put(ThematicBreak.class, (target, node, depth) -> renderThematicBreak(target));
+        renderers.put(HtmlBlock.class, (target, node, depth) -> renderHtmlBlock(target, node));
     }
 
     public void renderInto(LinearLayout target, Node document) {
@@ -55,76 +74,70 @@ public final class MarkdownRenderer {
     }
 
     private void renderBlock(LinearLayout target, Node node, int depth) {
-        if (node instanceof Document) {
-            renderChildren(target, node, depth);
-            return;
-        }
-        if (node instanceof LinkReferenceDefinition) {
-            return;
-        }
-        if (node instanceof Heading) {
-            Heading heading = (Heading) node;
-            addBlock(target, new MarkdownTextBlockView(
-                    context,
-                    inlineRenderer.render(node),
-                    headingSize(heading.getLevel()),
-                    true,
-                    linkHandler
-            ), depth == 0 ? 4 : 2, 6);
-            return;
-        }
-        if (node instanceof Paragraph) {
-            Image image = onlyImage(node);
-            if (image != null) {
-                addBlock(target, new MarkdownImageView(context, image.getDestination(), plainText(image)), depth == 0 ? 2 : 0, 7);
-                return;
-            }
-            if (hasDirectImage(node)) {
-                renderParagraphWithImages(target, node, depth);
-                return;
-            }
-            CharSequence text = inlineRenderer.render(node);
-            if (text.toString().trim().length() > 0) {
-                addBlock(target, new MarkdownTextBlockView(context, text, LineTheme.FONT_MD, false, linkHandler), depth == 0 ? 2 : 0, 7);
-            }
-            return;
-        }
-        if (node instanceof FencedCodeBlock) {
-            FencedCodeBlock block = (FencedCodeBlock) node;
-            addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), languageFromInfo(block.getInfo()), codeWrapEnabled), 4, 8);
-            return;
-        }
-        if (node instanceof IndentedCodeBlock) {
-            IndentedCodeBlock block = (IndentedCodeBlock) node;
-            addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), "", codeWrapEnabled), 4, 8);
-            return;
-        }
-        if (node instanceof BlockQuote) {
-            MarkdownQuoteBlockView quote = new MarkdownQuoteBlockView(context);
-            renderChildren(quote.getContent(), node, depth + 1);
-            addBlock(target, quote, 3, 8);
-            return;
-        }
-        if (node instanceof TableBlock) {
-            addBlock(target, new MarkdownTableView(context, inlineRenderer, linkHandler, (TableBlock) node), 4, 8);
-            return;
-        }
-        if (node instanceof BulletList || node instanceof OrderedList) {
-            addList(target, (ListBlock) node, depth);
-            return;
-        }
-        if (node instanceof ThematicBreak) {
-            addBlock(target, new MarkdownThematicBreakView(context), 8, 8);
-            return;
-        }
-        if (node instanceof HtmlBlock) {
-            HtmlBlock block = (HtmlBlock) node;
-            addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), "html", codeWrapEnabled), 4, 8);
+        BlockRenderer renderer = renderers.get(node.getClass());
+        if (renderer != null) {
+            renderer.render(target, node, depth);
             return;
         }
         if (node.getFirstChild() != null) {
             renderChildren(target, node, depth);
         }
+    }
+
+    private void renderHeading(LinearLayout target, Node node, int depth) {
+        Heading heading = (Heading) node;
+        addBlock(target, new MarkdownTextBlockView(
+                context,
+                inlineRenderer.render(node),
+                headingSize(heading.getLevel()),
+                true,
+                linkHandler
+        ), depth == 0 ? 4 : 2, 6);
+    }
+
+    private void renderParagraph(LinearLayout target, Node node, int depth) {
+        Image image = onlyImage(node);
+        if (image != null) {
+            addBlock(target, new MarkdownImageView(context, image.getDestination(), plainText(image)), depth == 0 ? 2 : 0, 7);
+            return;
+        }
+        if (hasDirectImage(node)) {
+            renderParagraphWithImages(target, node, depth);
+            return;
+        }
+        CharSequence text = inlineRenderer.render(node);
+        if (text.toString().trim().length() > 0) {
+            addBlock(target, new MarkdownTextBlockView(context, text, LineTheme.FONT_MD, false, linkHandler), depth == 0 ? 2 : 0, 7);
+        }
+    }
+
+    private void renderFencedCodeBlock(LinearLayout target, Node node) {
+        FencedCodeBlock block = (FencedCodeBlock) node;
+        addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), languageFromInfo(block.getInfo()), codeWrapEnabled), 4, 8);
+    }
+
+    private void renderIndentedCodeBlock(LinearLayout target, Node node) {
+        IndentedCodeBlock block = (IndentedCodeBlock) node;
+        addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), "", codeWrapEnabled), 4, 8);
+    }
+
+    private void renderBlockQuote(LinearLayout target, Node node, int depth) {
+        MarkdownQuoteBlockView quote = new MarkdownQuoteBlockView(context);
+        renderChildren(quote.getContent(), node, depth + 1);
+        addBlock(target, quote, 3, 8);
+    }
+
+    private void renderTableBlock(LinearLayout target, Node node) {
+        addBlock(target, new MarkdownTableView(context, inlineRenderer, linkHandler, (TableBlock) node), 4, 8);
+    }
+
+    private void renderThematicBreak(LinearLayout target) {
+        addBlock(target, new MarkdownThematicBreakView(context), 8, 8);
+    }
+
+    private void renderHtmlBlock(LinearLayout target, Node node) {
+        HtmlBlock block = (HtmlBlock) node;
+        addBlock(target, new MarkdownCodeBlockView(context, block.getLiteral(), "html", codeWrapEnabled), 4, 8);
     }
 
     private void addList(LinearLayout target, ListBlock block, int depth) {
@@ -269,5 +282,9 @@ public final class MarkdownRenderer {
         String trimmed = info.trim();
         int space = trimmed.indexOf(' ');
         return space > 0 ? trimmed.substring(0, space) : trimmed;
+    }
+
+    private interface BlockRenderer {
+        void render(LinearLayout target, Node node, int depth);
     }
 }

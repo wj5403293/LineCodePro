@@ -69,26 +69,7 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
     ) throws ModelCompletionException {
         try {
             ModelRequestOptions requestOptions = options == null ? ModelRequestOptions.defaults() : options;
-            JSONObject body = new JSONObject();
-            body.put("model", ModelContextParser.apiModelId(config.getModelId()));
-            body.put("input", ResponsesInputBuilder.inputJson(messages));
-            body.put("stream", true);
-            body.put("parallel_tool_calls", true);
-            body.put("store", isAzureResponsesEndpoint(config.getBaseUrl()));
-            JSONArray include = new JSONArray();
-            putInstructions(body, messages);
-            JSONArray tools = toolsJson(requestOptions.getTools());
-            body.put("tools", tools);
-            body.put("tool_choice", "auto");
-            if (!AiBehaviorSettings.REASONING_OFF.equals(requestOptions.getReasoningEffort())) {
-                body.put("reasoning", new JSONObject()
-                        .put("effort", AiBehaviorSettings.REASONING_MAX.equals(requestOptions.getReasoningEffort()) ? "high" : requestOptions.getReasoningEffort())
-                        .put("summary", "auto"));
-                include.put("reasoning.encrypted_content");
-            }
-            body.put("include", include);
-            putCodexClientFields(body, config);
-
+            JSONObject body = buildRequestBody(config, messages, requestOptions);
             HashMap<String, String> headers = codexHeaders(config.getApiKey());
 
             StringBuilder text = new StringBuilder();
@@ -97,82 +78,7 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
             HashMap<String, StringBuilder> customToolInputs = new HashMap<>();
 
             postJsonSse(responsesEndpoint(config.getBaseUrl()), body, headers, cancellationToken, (eventType, data) -> {
-                if ("[DONE]".equals(data.trim())) {
-                    return;
-                }
-                JSONObject event = new JSONObject(data);
-                if (event.has("error")) {
-                    throw new ModelCompletionException("Codex 流式错误: " + event.opt("error"));
-                }
-                String type = event.optString("type");
-                if (type.length() == 0) {
-                    type = eventType == null ? "" : eventType;
-                }
-
-                if ("response.custom_tool_call_input.delta".equals(type) && event.has("delta")) {
-                    appendCustomToolInput(customToolInputs, event.optString("item_id"), event.optString("delta"));
-                    appendCustomToolInput(customToolInputs, event.optString("call_id"), event.optString("delta"));
-                    return;
-                }
-
-                if ("response.function_call_arguments.delta".equals(type) && event.has("delta")) {
-                    appendFunctionArgumentsDelta(toolCallBuilders, event, event.optString("delta"));
-                    return;
-                }
-
-                if ("response.output_text.delta".equals(type) && event.has("delta")) {
-                    String delta = event.optString("delta");
-                    text.append(delta);
-                    if (callback != null) {
-                        callback.onTextDelta(delta);
-                    }
-                    return;
-                }
-
-                if ("response.output_text.done".equals(type)) {
-                    appendFinalIfMissing(text, event.optString("text", event.optString("delta")), false, callback);
-                    return;
-                }
-
-                if (("response.reasoning_summary_text.delta".equals(type) || "response.reasoning_text.delta".equals(type))
-                        && event.has("delta")) {
-                    String delta = event.optString("delta");
-                    reasoning.append(delta);
-                    if (callback != null) {
-                        callback.onReasoningDelta(delta);
-                    }
-                    return;
-                }
-
-                if ("response.reasoning_summary_part.added".equals(type) && reasoning.length() > 0) {
-                    reasoning.append('\n');
-                    if (callback != null) {
-                        callback.onReasoningDelta("\n");
-                    }
-                    return;
-                }
-
-                if ("response.completed".equals(type)) {
-                    JSONObject response = event.optJSONObject("response");
-                    if (response != null) {
-                        mergeOutputArray(response.optJSONArray("output"), text, reasoning, toolCallBuilders, customToolInputs, callback);
-                    }
-                    throw new SseStreamCompleteException();
-                } else if ("response.output_item.done".equals(type) && event.has("response")) {
-                    JSONObject response = event.optJSONObject("response");
-                    if (response != null) {
-                        mergeOutputArray(response.optJSONArray("output"), text, reasoning, toolCallBuilders, customToolInputs, callback);
-                    }
-                } else if (("response.output_item.added".equals(type) || "response.output_item.done".equals(type)) && event.has("item")) {
-                    mergeOutputItem(event.optJSONObject("item"), text, reasoning, toolCallBuilders, customToolInputs, callback);
-                } else if ("response.failed".equals(type)) {
-                    throw new ModelCompletionException("Codex response.failed: " + event.toString());
-                } else if ("response.incomplete".equals(type)) {
-                    JSONObject response = event.optJSONObject("response");
-                    JSONObject details = response == null ? null : response.optJSONObject("incomplete_details");
-                    String reason = details == null ? "unknown" : details.optString("reason", "unknown");
-                    throw new ModelCompletionException("Codex response.incomplete: " + reason);
-                }
+                handleSseEvent(eventType, data, callback, text, reasoning, toolCallBuilders, customToolInputs);
             });
 
             return new ModelCompletionResponse(text.toString(), reasoning.toString(), buildToolCalls(toolCallBuilders));
@@ -180,6 +86,132 @@ public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
             throw e;
         } catch (Exception e) {
             throw new ModelCompletionException("Codex Responses 协议流式解析失败: " + e.getMessage(), e);
+        }
+    }
+
+    private JSONObject buildRequestBody(
+            ModelConfig config,
+            List<ModelMessage> messages,
+            ModelRequestOptions requestOptions
+    ) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("model", ModelContextParser.apiModelId(config.getModelId()));
+        body.put("input", ResponsesInputBuilder.inputJson(messages));
+        body.put("stream", true);
+        body.put("parallel_tool_calls", true);
+        body.put("store", isAzureResponsesEndpoint(config.getBaseUrl()));
+        JSONArray include = new JSONArray();
+        putInstructions(body, messages);
+        JSONArray tools = toolsJson(requestOptions.getTools());
+        body.put("tools", tools);
+        body.put("tool_choice", "auto");
+        if (!AiBehaviorSettings.REASONING_OFF.equals(requestOptions.getReasoningEffort())) {
+            body.put("reasoning", new JSONObject()
+                    .put("effort", AiBehaviorSettings.REASONING_MAX.equals(requestOptions.getReasoningEffort()) ? "high" : requestOptions.getReasoningEffort())
+                    .put("summary", "auto"));
+            include.put("reasoning.encrypted_content");
+        }
+        body.put("include", include);
+        putCodexClientFields(body, config);
+        return body;
+    }
+
+    private void handleSseEvent(
+            String eventType,
+            String data,
+            ModelStreamCallback callback,
+            StringBuilder text,
+            StringBuilder reasoning,
+            LinkedHashMap<String, ToolCallBuilder> toolCallBuilders,
+            HashMap<String, StringBuilder> customToolInputs
+    ) throws Exception {
+        if ("[DONE]".equals(data.trim())) {
+            return;
+        }
+        JSONObject event = new JSONObject(data);
+        if (event.has("error")) {
+            throw new ModelCompletionException("Codex 流式错误: " + event.opt("error"));
+        }
+        String type = event.optString("type");
+        if (type.length() == 0) {
+            type = eventType == null ? "" : eventType;
+        }
+
+        if ("response.custom_tool_call_input.delta".equals(type) && event.has("delta")) {
+            appendCustomToolInput(customToolInputs, event.optString("item_id"), event.optString("delta"));
+            appendCustomToolInput(customToolInputs, event.optString("call_id"), event.optString("delta"));
+            return;
+        }
+
+        if ("response.function_call_arguments.delta".equals(type) && event.has("delta")) {
+            appendFunctionArgumentsDelta(toolCallBuilders, event, event.optString("delta"));
+            return;
+        }
+
+        if ("response.output_text.delta".equals(type) && event.has("delta")) {
+            String delta = event.optString("delta");
+            text.append(delta);
+            if (callback != null) {
+                callback.onTextDelta(delta);
+            }
+            return;
+        }
+
+        if ("response.output_text.done".equals(type)) {
+            appendFinalIfMissing(text, event.optString("text", event.optString("delta")), false, callback);
+            return;
+        }
+
+        if (("response.reasoning_summary_text.delta".equals(type) || "response.reasoning_text.delta".equals(type))
+                && event.has("delta")) {
+            String delta = event.optString("delta");
+            reasoning.append(delta);
+            if (callback != null) {
+                callback.onReasoningDelta(delta);
+            }
+            return;
+        }
+
+        if ("response.reasoning_summary_part.added".equals(type) && reasoning.length() > 0) {
+            reasoning.append('\n');
+            if (callback != null) {
+                callback.onReasoningDelta("\n");
+            }
+            return;
+        }
+
+        handleCompleted(type, event, callback, text, reasoning, toolCallBuilders, customToolInputs);
+    }
+
+    private void handleCompleted(
+            String type,
+            JSONObject event,
+            ModelStreamCallback callback,
+            StringBuilder text,
+            StringBuilder reasoning,
+            LinkedHashMap<String, ToolCallBuilder> toolCallBuilders,
+            HashMap<String, StringBuilder> customToolInputs
+    ) throws Exception {
+        if ("response.completed".equals(type)) {
+            JSONObject response = event.optJSONObject("response");
+            if (response != null) {
+                mergeOutputArray(response.optJSONArray("output"), text, reasoning, toolCallBuilders, customToolInputs, callback);
+            }
+            throw new SseStreamCompleteException();
+        } else if ("response.output_item.done".equals(type) && event.has("response")) {
+            JSONObject response = event.optJSONObject("response");
+            if (response != null) {
+                mergeOutputArray(response.optJSONArray("output"), text, reasoning, toolCallBuilders, customToolInputs, callback);
+            }
+        } else if (("response.output_item.added".equals(type) || "response.output_item.done".equals(type)) && event.has("item")) {
+            mergeOutputItem(event.optJSONObject("item"), text, reasoning, toolCallBuilders, customToolInputs, callback);
+        } else if ("response.failed".equals(type)) {
+            throw new ModelCompletionException("Codex response.failed: " + event.toString());
+        } else if ("response.incomplete".equals(type)) {
+            JSONObject response = event.optJSONObject("response");
+            JSONObject details = response == null ? null : response.optJSONObject("incomplete_details");
+            String reason = details == null ? "unknown" : details.optString("reason", "unknown");
+            throw new ModelCompletionException("Codex response.incomplete: " + reason);
         }
     }
 

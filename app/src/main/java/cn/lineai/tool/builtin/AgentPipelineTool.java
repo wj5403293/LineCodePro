@@ -140,10 +140,6 @@ public final class AgentPipelineTool extends BaseTool {
         return context.getAgentRunner().runAgentPipeline(input, context);
     }
 
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
-
     private ArrayList<String> scopeList(JSONArray array) {
         ArrayList<String> values = new ArrayList<>();
         if (array == null) {

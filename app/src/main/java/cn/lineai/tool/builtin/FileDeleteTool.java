@@ -125,8 +125,4 @@ public final class FileDeleteTool extends BaseTool {
             throw new java.io.IOException("无法删除 " + file.getPath());
         }
     }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
 }

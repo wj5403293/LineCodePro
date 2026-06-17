@@ -112,8 +112,4 @@ public final class CustomAgentExtensionTool extends BaseTool {
         }
         return builder.toString();
     }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
 }

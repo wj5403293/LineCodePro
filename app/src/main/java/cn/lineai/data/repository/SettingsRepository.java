@@ -8,11 +8,10 @@ import cn.lineai.data.db.LineCodeDatabase;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public final class SettingsRepository {
-    private final LineCodeDatabase database;
+public final class SettingsRepository extends BaseRepository implements SettingsStore {
 
     public SettingsRepository(Context context) {
-        database = LineCodeDatabase.getInstance(context);
+        super(LineCodeDatabase.getInstance(context));
     }
 
     public synchronized String getString(String key, String fallback) {

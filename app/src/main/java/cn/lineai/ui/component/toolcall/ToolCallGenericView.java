@@ -15,14 +15,12 @@ import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 import org.json.JSONObject;
 
-public final class ToolCallGenericView extends LinearLayout {
+public final class ToolCallGenericView extends BaseToolCallView {
     private final String label;
 
     public ToolCallGenericView(Context context, String label) {
         super(context);
         this.label = label == null || label.length() == 0 ? getContext().getString(R.string.tool_call_generic_mcp) : label;
-        setOrientation(VERTICAL);
-        setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 8, LineTheme.CODE_BORDER));
     }
 
     public void bind(ToolCall toolCall, ToolResult result) {

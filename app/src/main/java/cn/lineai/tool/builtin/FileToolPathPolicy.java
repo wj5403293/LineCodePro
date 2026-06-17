@@ -52,7 +52,7 @@ public final class FileToolPathPolicy {
         return targetPath;
     }
 
-    private static boolean isInside(File root, File target) {
+    public static boolean isInside(File root, File target) {
         String rootPath = root.getPath();
         String targetPath = target.getPath();
         return targetPath.equals(rootPath) || targetPath.startsWith(rootPath + File.separator);

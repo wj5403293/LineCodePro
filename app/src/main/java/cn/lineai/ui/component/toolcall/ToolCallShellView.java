@@ -17,7 +17,7 @@ import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 import org.json.JSONObject;
 
-public final class ToolCallShellView extends LinearLayout {
+public final class ToolCallShellView extends BaseToolCallView {
     private static final int COLLAPSED_LINE_COUNT = 4;
     private static final int EXPANDED_OUTPUT_LIMIT = 64 * 1024;
     private static final int EXPANDED_HEAD_LIMIT = 24 * 1024;
@@ -48,7 +48,6 @@ public final class ToolCallShellView extends LinearLayout {
 
     public ToolCallShellView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
         setBackground(LineTheme.rounded(context, LineTheme.CODE_BG, 6));
         LineTheme.padding(this, LineTheme.MD, LineTheme.XS, LineTheme.MD, LineTheme.XS);
 

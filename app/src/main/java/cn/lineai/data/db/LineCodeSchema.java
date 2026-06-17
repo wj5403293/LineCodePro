@@ -2,7 +2,7 @@ package cn.lineai.data.db;
 
 public final class LineCodeSchema {
     public static final String DATABASE_NAME = "linecode.db";
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     public static final String TABLE_METADATA = "metadata";
     public static final String TABLE_SETTINGS = "settings";
@@ -22,7 +22,66 @@ public final class LineCodeSchema {
     public static final String TABLE_SKILL_USAGE = "skill_usage";
     public static final String TABLE_EXTENSION_AGENTS = "extension_agents";
     public static final String TABLE_EXTENSION_MCPS = "extension_mcps";
+    public static final String TABLE_IPC_PROVIDERS = "ipc_providers";
     public static final String TABLE_IMPORT_JOBS = "import_jobs";
+
+    public static final String[] TABLES = new String[] {
+            TABLE_METADATA,
+            TABLE_SETTINGS,
+            TABLE_PROJECTS,
+            TABLE_MODELS,
+            TABLE_CONVERSATIONS,
+            TABLE_MESSAGES,
+            TABLE_MESSAGE_BLOCKS,
+            TABLE_TOOL_CALLS,
+            TABLE_TOOL_RESULTS,
+            TABLE_ATTACHMENTS,
+            TABLE_DIFFS,
+            TABLE_MEMORIES,
+            TABLE_WORKING_MEMORY,
+            TABLE_CONVERSATION_INDEX,
+            TABLE_SKILLS,
+            TABLE_SKILL_USAGE,
+            TABLE_EXTENSION_AGENTS,
+            TABLE_EXTENSION_MCPS,
+            TABLE_IPC_PROVIDERS,
+            TABLE_IMPORT_JOBS
+    };
+
+    public static boolean isValidTable(String name) {
+        if (name == null) {
+            return false;
+        }
+        for (String table : TABLES) {
+            if (table.equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ipc_providers 建表语句。从 {@link #CREATE_SQL} 中提取，供
+     * {@link cn.lineai.data.db.migration.AddIpcProvidersTable} 复用，避免两处维护漂移。
+     */
+    public static final String SQL_CREATE_IPC_PROVIDERS =
+            "CREATE TABLE IF NOT EXISTS ipc_providers ("
+                    + "id TEXT PRIMARY KEY,"
+                    + "enabled INTEGER NOT NULL DEFAULT 1,"
+                    + "provider_type TEXT NOT NULL,"
+                    + "name TEXT NOT NULL,"
+                    + "package_name TEXT NOT NULL,"
+                    + "service_class TEXT NOT NULL,"
+                    + "created_at INTEGER NOT NULL,"
+                    + "updated_at INTEGER NOT NULL,"
+                    + "raw_json TEXT"
+                    + ")";
+
+    /**
+     * ipc_providers 启用状态索引语句，与 {@link #SQL_CREATE_IPC_PROVIDERS} 同源。
+     */
+    public static final String SQL_CREATE_INDEX_IPC_PROVIDERS =
+            "CREATE INDEX IF NOT EXISTS idx_ipc_providers_enabled ON ipc_providers(enabled, provider_type, updated_at DESC)";
 
     public static final String[] CREATE_SQL = new String[] {
             "CREATE TABLE IF NOT EXISTS metadata ("
@@ -213,6 +272,7 @@ public final class LineCodeSchema {
                     + "updated_at INTEGER NOT NULL,"
                     + "raw_json TEXT"
                     + ")",
+            SQL_CREATE_IPC_PROVIDERS,
             "CREATE TABLE IF NOT EXISTS import_jobs ("
                     + "id TEXT PRIMARY KEY,"
                     + "source_name TEXT NOT NULL,"
@@ -232,7 +292,8 @@ public final class LineCodeSchema {
             "CREATE INDEX IF NOT EXISTS idx_memories_scope_project ON memories(scope, project_id)",
             "CREATE INDEX IF NOT EXISTS idx_working_memory_project ON working_memory(project_id, expires_at)",
             "CREATE INDEX IF NOT EXISTS idx_extension_agents_enabled ON extension_agents(enabled, updated_at DESC)",
-            "CREATE INDEX IF NOT EXISTS idx_extension_mcps_enabled ON extension_mcps(enabled, updated_at DESC)"
+            "CREATE INDEX IF NOT EXISTS idx_extension_mcps_enabled ON extension_mcps(enabled, updated_at DESC)",
+            SQL_CREATE_INDEX_IPC_PROVIDERS
     };
 
     public static final String[] OPTIONAL_FTS_SQL = new String[] {
@@ -265,6 +326,7 @@ public final class LineCodeSchema {
             "DROP TABLE IF EXISTS conversation_index_fts",
             "DROP TABLE IF EXISTS memories_fts",
             "DROP TABLE IF EXISTS import_jobs",
+            "DROP TABLE IF EXISTS ipc_providers",
             "DROP TABLE IF EXISTS extension_mcps",
             "DROP TABLE IF EXISTS extension_agents",
             "DROP TABLE IF EXISTS skill_usage",

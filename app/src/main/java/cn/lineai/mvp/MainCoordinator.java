@@ -20,21 +20,22 @@ import cn.lineai.ai.protocol.OpenAiCompatibleCapabilities;
 import cn.lineai.context.ContextCompactionResult;
 import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
+import cn.lineai.context.MemoryExtractionService;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ConversationRecord;
-import cn.lineai.data.repository.ConversationRepository;
+import cn.lineai.data.repository.ConversationStore;
 import cn.lineai.data.repository.DiffRecord;
 import cn.lineai.data.repository.DiffRepository;
+import cn.lineai.data.repository.DiffStore;
 import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.FileTreeRepository;
 import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.LearningContextRepository;
-import cn.lineai.data.repository.MemoryExtractionService;
 import cn.lineai.data.repository.MessageRecord;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.ProjectRecord;
-import cn.lineai.data.repository.ProjectRepository;
+import cn.lineai.data.repository.ProjectStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.SshFileTreeRepository;
 import cn.lineai.data.repository.ThemeSettingsRepository;
@@ -57,7 +58,7 @@ import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
 import cn.lineai.model.ModelProtocolType;
-import cn.lineai.model.ModelRepository;
+import cn.lineai.model.ModelStore;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.model.PromptTemplateItem;
 import cn.lineai.model.SheetOption;
@@ -102,7 +103,9 @@ public final class MainCoordinator implements MainUiController {
     private static final long AGENT_PROGRESS_RENDER_INTERVAL_MS = 100L;
     private static final int AGENT_MAX_TURNS = 8;
     private static final String DIRECTORY_PICKER_MODE_SSH_REMOTE = "ssh_remote";
-    private static final String AGENT_TERMINATED_MESSAGE = "Agent 已终止。";
+    private String agentTerminatedMessage() {
+        return context.getString(R.string.message_agent_terminated);
+    }
     private static final String SHELL_EXECUTE_TOOL = "shell_execute";
     private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
@@ -121,24 +124,31 @@ public final class MainCoordinator implements MainUiController {
     private final ModelManagementController modelManagementController;
     private final SettingsManagementController settingsManagementController;
     private final SshFileTreeController sshFileTreeController;
+    private final IpcFileTreeController ipcFileTreeController;
     private final FileOperationController fileOperationController;
     private final PermissionModeController permissionModeController;
     private final ProjectSheetController projectSheetController;
-    private final ModelRepository modelRepository;
+    private final ModelStore modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final ChatModeRepository chatModeRepository;
     private final InputSettingsRepository inputSettingsRepository;
     private final OutputSettingsRepository outputSettingsRepository;
     private final ThemeSettingsRepository themeSettingsRepository;
     private final PromptTemplateRepository promptTemplateRepository;
-    private final ConversationRepository conversationRepository;
-    private final ProjectRepository projectRepository;
+    private final ConversationStore conversationRepository;
+    private final ProjectStore projectRepository;
     private final LearningContextRepository learningContextRepository;
     private final MemoryExtractionService memoryExtractionService;
     private final ToolSettingsRepository toolSettingsRepository;
     private final ExtensionRepository extensionRepository;
-    private final DiffRepository diffRepository;
+    private final cn.lineai.data.repository.IpcProviderRepository ipcProviderRepository;
+    private final cn.lineai.ipc.IpcProviderScanner ipcProviderScanner;
+    private final cn.lineai.ipc.IpcProviderManager ipcProviderManager;
+    private java.util.List<cn.lineai.ipc.ScannedProvider> terminalProviderScanResults = java.util.Collections.emptyList();
+    private boolean terminalProviderHasScanned = false;
+    private final DiffStore diffRepository;
     private final FileTreeRepository fileTreeRepository;
+    private final cn.lineai.data.repository.IpcFileTreeRepository ipcFileTreeRepository;
     private final SshService sshService;
     private final SshFileTreeRepository sshFileTreeRepository;
     private final ContextManager contextManager;
@@ -197,14 +207,7 @@ public final class MainCoordinator implements MainUiController {
     private String directoryPickerRootPath = "";
     private boolean directoryPickerLoading;
     private String directoryPickerMessage = "";
-    private final Set<String> attachmentPickerExpandedPaths = new HashSet<>();
-    private FileTreeNode attachmentPickerTree;
-    private String attachmentPickerRootPath = "";
-    private String attachmentPickerSource = "";
-    private boolean attachmentPickerLoading;
-    private String attachmentPickerMessage = "";
-    private boolean attachmentPickerActive;
-    private int attachmentPickerLoadGeneration;
+    private final AttachmentPickerCoordinator attachmentPickerController;
     private boolean startupProjectAvailabilityChecked;
 
     private static final class ToolExecutionBatch {
@@ -536,7 +539,7 @@ public final class MainCoordinator implements MainUiController {
                 if ("running".equals(state.status) || "waiting".equals(state.status)) {
                     state.status = "error";
                     state.error = true;
-                    state.output = AGENT_TERMINATED_MESSAGE;
+                    state.output = agentTerminatedMessage();
                 }
             }
             publish(true);
@@ -566,7 +569,7 @@ public final class MainCoordinator implements MainUiController {
                 object.put("agents", array);
                 return object.toString();
             } catch (Exception e) {
-                return "Agent 流水线运行中。";
+                return context.getString(R.string.message_agent_pipeline_running);
             }
         }
 
@@ -660,8 +663,12 @@ public final class MainCoordinator implements MainUiController {
         memoryExtractionService = dependencies.memoryExtractionService;
         toolSettingsRepository = dependencies.toolSettingsRepository;
         extensionRepository = dependencies.extensionRepository;
+        ipcProviderRepository = dependencies.ipcProviderRepository;
+        ipcProviderScanner = dependencies.ipcProviderScanner;
+        ipcProviderManager = dependencies.ipcProviderManager;
         diffRepository = dependencies.diffRepository;
         fileTreeRepository = dependencies.fileTreeRepository;
+        ipcFileTreeRepository = dependencies.ipcFileTreeRepository;
         sshService = dependencies.sshService;
         sshFileTreeRepository = dependencies.sshFileTreeRepository;
         contextManager = dependencies.contextManager;
@@ -723,13 +730,67 @@ public final class MainCoordinator implements MainUiController {
                 backgroundTasks::execute,
                 mainThread::post
         );
+        ipcFileTreeController = new IpcFileTreeController(
+                ipcFileTreeRepository,
+                new IpcFileTreeController.Host() {
+                    @Override
+                    public boolean isTerminalProviderExecutionMode() {
+                        return MainCoordinator.this.isTerminalProviderExecutionMode();
+                    }
+
+                    @Override
+                    public String projectPath() {
+                        return projectPath;
+                    }
+
+                    @Override
+                    public String projectLabel() {
+                        return projectLabel;
+                    }
+
+                    @Override
+                    public boolean isExpanded(String path) {
+                        return expandedFilePaths.contains(path);
+                    }
+
+                    @Override
+                    public void addExpandedPath(String path) {
+                        if (path != null && path.length() > 0) {
+                            expandedFilePaths.add(path);
+                        }
+                    }
+
+                    @Override
+                    public void setProjectPathFromIpcRoot(String path) {
+                        projectPath = path == null ? "" : path;
+                    }
+
+                    @Override
+                    public String basename(String path) {
+                        return MainCoordinator.this.basename(path);
+                    }
+
+                    @Override
+                    public void render() {
+                        MainCoordinator.this.render();
+                    }
+                },
+                backgroundTasks::execute,
+                mainThread::post
+        );
         fileOperationController = new FileOperationController(
                 fileTreeRepository,
                 sshFileTreeRepository,
+                ipcFileTreeRepository,
                 new FileOperationController.Host() {
                     @Override
                     public boolean isSshExecutionMode() {
                         return MainCoordinator.this.isSshExecutionMode();
+                    }
+
+                    @Override
+                    public boolean isTerminalProviderExecutionMode() {
+                        return MainCoordinator.this.isTerminalProviderExecutionMode();
                     }
 
                     @Override
@@ -763,6 +824,11 @@ public final class MainCoordinator implements MainUiController {
                     @Override
                     public void refreshSshDirectoryAfterFileOperation(String path) {
                         sshFileTreeController.refreshDirectoryAfterFileOperation(path);
+                    }
+
+                    @Override
+                    public void refreshIpcDirectoryAfterFileOperation(String path) {
+                        ipcFileTreeController.refreshDirectoryAfterFileOperation(path);
                     }
 
                     @Override
@@ -864,7 +930,9 @@ public final class MainCoordinator implements MainUiController {
                     public void afterMcpExecutionModeChanged(String executionMode) {
                         applyProject(projectRepository.ensureSelectedProjectPath(executionMode));
                         sshFileTreeController.invalidateFileTree();
+                        ipcFileTreeController.invalidateFileTree();
                         requestSshFileTreeLoad(true);
+                        requestIpcFileTreeLoad(true);
                         refreshVisibleScreen("mcp");
                         MainCoordinator.this.render();
                     }
@@ -943,6 +1011,45 @@ public final class MainCoordinator implements MainUiController {
                 contextManager
         );
         toolRunController = new ToolRunController(toolExecutionCoordinator, toolRegistry, toolSettingsRepository);
+        attachmentPickerController = new AttachmentPickerCoordinator(
+                fileTreeRepository,
+                sshFileTreeRepository,
+                backgroundTasks::execute,
+                mainThread::post,
+                new AttachmentPickerCoordinator.Host() {
+                    @Override
+                    public boolean isStreaming() {
+                        return chatSessionStore.isStreaming();
+                    }
+
+                    @Override
+                    public boolean isSshExecutionMode() {
+                        return MainCoordinator.this.isSshExecutionMode();
+                    }
+
+                    @Override
+                    public String projectPath() {
+                        return projectPath;
+                    }
+
+                    @Override
+                    public String defaultHomePath() {
+                        return projectRepository.getDefaultHomePath();
+                    }
+
+                    @Override
+                    public boolean isViewAttached() {
+                        return view != null;
+                    }
+
+                    @Override
+                    public void showAttachmentPicker(String title, FileTreeNode tree, boolean loading, String message, String source) {
+                        if (view != null) {
+                            view.showAttachmentPicker(title, tree, loading, message, source);
+                        }
+                    }
+                }
+        );
         applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
         expandedFilePaths.add(projectPath);
         loadCurrentConversation();
@@ -953,6 +1060,7 @@ public final class MainCoordinator implements MainUiController {
         this.view = view;
         render();
         requestSshFileTreeLoad(false);
+        requestIpcFileTreeLoad(false);
         validateSelectedProjectAvailabilityOnStartup();
     }
 
@@ -972,6 +1080,7 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void onMenuClick() {
         requestSshFileTreeLoad(false);
+        requestIpcFileTreeLoad(false);
         if (view != null) {
             view.showDrawer();
         }
@@ -1080,11 +1189,18 @@ public final class MainCoordinator implements MainUiController {
                 if (isSshExecutionMode()) {
                     sshFileTreeController.rebuildCachedTree();
                 }
+                if (isTerminalProviderExecutionMode()) {
+                    ipcFileTreeController.rebuildCachedTree();
+                }
             } else {
                 expandedFilePaths.add(path);
                 if (isSshExecutionMode()) {
                     sshFileTreeController.requestDirectoryLoad(path, false, false);
                     sshFileTreeController.rebuildCachedTree();
+                }
+                if (isTerminalProviderExecutionMode()) {
+                    ipcFileTreeController.requestDirectoryLoad(path, false, false);
+                    ipcFileTreeController.rebuildCachedTree();
                 }
             }
             render();
@@ -1099,6 +1215,7 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void onFileTreeActivated() {
         requestSshFileTreeLoad(false);
+        requestIpcFileTreeLoad(false);
         render();
     }
 
@@ -1109,6 +1226,7 @@ public final class MainCoordinator implements MainUiController {
             expandedFilePaths.add(projectPath);
         }
         requestSshFileTreeLoad(true);
+        requestIpcFileTreeLoad(true);
         render();
     }
 
@@ -1282,39 +1400,17 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public void onAttachmentPickerRequested() {
-        if (chatSessionStore.isStreaming()) {
-            return;
-        }
-        attachmentPickerActive = true;
-        attachmentPickerSource = isSshExecutionMode() ? InputAttachment.SOURCE_SSH : InputAttachment.SOURCE_LOCAL;
-        attachmentPickerRootPath = attachmentRootPath(attachmentPickerSource);
-        attachmentPickerExpandedPaths.clear();
-        if (attachmentPickerRootPath.length() > 0) {
-            attachmentPickerExpandedPaths.add(attachmentPickerRootPath);
-        }
-        refreshAttachmentPicker(true);
+        attachmentPickerController.onAttachmentPickerRequested();
     }
 
     @Override
     public void onAttachmentPickerNodeSelected(String path, boolean directory) {
-        if (!attachmentPickerActive || !directory || path == null || path.length() == 0) {
-            return;
-        }
-        String cleanPath = path.trim();
-        if (attachmentPickerExpandedPaths.contains(cleanPath)) {
-            attachmentPickerExpandedPaths.remove(cleanPath);
-        } else {
-            attachmentPickerExpandedPaths.add(cleanPath);
-        }
-        refreshAttachmentPicker(false);
+        attachmentPickerController.onAttachmentPickerNodeSelected(path, directory);
     }
 
     @Override
     public void onAttachmentPickerCancelled() {
-        attachmentPickerActive = false;
-        attachmentPickerLoading = false;
-        attachmentPickerMessage = "";
-        attachmentPickerLoadGeneration++;
+        attachmentPickerController.onAttachmentPickerCancelled();
     }
 
     private ArrayList<InputAttachment> sanitizeAttachments(List<InputAttachment> rawAttachments) {
@@ -2009,7 +2105,9 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public ExtensionOverviewState getExtensionOverview() {
-        return extensionRepository.getOverview(projectPath);
+        ExtensionOverviewState base = extensionRepository.getOverview(projectPath);
+        return new ExtensionOverviewState(base.getAgents(), base.getMcps(), base.getSkills(),
+                ipcProviderRepository.getProvidersByType(cn.lineai.ipc.IpcProviderType.TERMINAL));
     }
 
     @Override
@@ -2149,6 +2247,68 @@ public final class MainCoordinator implements MainUiController {
         render();
     }
 
+    @Override
+    public java.util.List<cn.lineai.ipc.ScannedProvider> onTerminalProviderScan() {
+        terminalProviderScanResults = ipcProviderScanner.scan(context, cn.lineai.ipc.IpcProviderType.TERMINAL);
+        terminalProviderHasScanned = true;
+        return terminalProviderScanResults;
+    }
+
+    @Override
+    public java.util.List<cn.lineai.ipc.ScannedProvider> getTerminalProviderScanResults() {
+        return terminalProviderScanResults;
+    }
+
+    @Override
+    public boolean hasTerminalProviderScanned() {
+        return terminalProviderHasScanned;
+    }
+
+    @Override
+    public void onTerminalProviderSaved(cn.lineai.ipc.IpcProviderConfig config) {
+        cn.lineai.ipc.IpcProviderConfig saved = ipcProviderRepository.saveProvider(config);
+        if (saved.isEnabled()) {
+            ipcProviderManager.registerAndBind(saved);
+        }
+        refreshVisibleScreen("terminalProvider");
+        render();
+    }
+
+    @Override
+    public void onTerminalProviderEnabledChanged(String id, boolean enabled) {
+        ipcProviderRepository.setProviderEnabled(id, enabled);
+        if (enabled) {
+            cn.lineai.ipc.IpcProviderConfig config = findIpcProvider(id);
+            if (config != null) {
+                ipcProviderManager.registerAndBind(config);
+            }
+        } else {
+            ipcProviderManager.unregisterAndUnbind(id);
+        }
+        refreshVisibleScreen("terminalProvider");
+        render();
+    }
+
+    @Override
+    public void onTerminalProviderDeleted(String id) {
+        ipcProviderManager.unregisterAndUnbind(id);
+        ipcProviderRepository.deleteProvider(id);
+        refreshVisibleScreen("terminalProvider");
+        render();
+    }
+
+    private cn.lineai.ipc.IpcProviderConfig findIpcProvider(String id) {
+        if (id == null || id.length() == 0) {
+            return null;
+        }
+        for (cn.lineai.ipc.IpcProviderConfig config : ipcProviderRepository.getProviders()) {
+            if (id.equals(config.getId())) {
+                return config;
+            }
+        }
+        return null;
+    }
+
     private JSONArray agentMcpOptionsJson() throws Exception {
         JSONArray array = new JSONArray();
         for (McpToolConfig config : toolSettingsRepository.getConfigs()) {
@@ -2196,7 +2356,9 @@ public final class MainCoordinator implements MainUiController {
         toolRegistry.reloadExtensions();
         applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
         sshFileTreeController.invalidateFileTree();
+        ipcFileTreeController.invalidateFileTree();
         requestSshFileTreeLoad(true);
+        requestIpcFileTreeLoad(true);
         ConversationRecord current = conversationRepository.getCurrentConversation();
         if (current == null) {
             chatSessionStore.clearCurrentConversation();
@@ -2312,6 +2474,9 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public FileTreeNode getFileTree() {
+        if (isTerminalProviderExecutionMode()) {
+            return ipcFileTreeController.getFileTree();
+        }
         if (isSshExecutionMode()) {
             return sshFileTreeController.getFileTree();
         }
@@ -2662,93 +2827,20 @@ public final class MainCoordinator implements MainUiController {
                 || ToolSettingsRepository.EXECUTION_SSH.equals(directoryPickerMode);
     }
 
-    private void refreshAttachmentPicker(boolean resetTree) {
-        if (!attachmentPickerActive || view == null) {
-            return;
-        }
-        if (resetTree) {
-            attachmentPickerTree = null;
-        }
-        if (InputAttachment.SOURCE_SSH.equals(attachmentPickerSource)) {
-            refreshSshAttachmentPicker();
-            return;
-        }
-        try {
-            attachmentPickerLoading = false;
-            attachmentPickerMessage = "";
-            attachmentPickerTree = fileTreeRepository.buildReadableTree(attachmentPickerRootPath, attachmentPickerExpandedPaths);
-        } catch (RuntimeException e) {
-            attachmentPickerTree = null;
-            attachmentPickerMessage = e.getMessage();
-        }
-        renderAttachmentPicker();
-    }
-
-    private void refreshSshAttachmentPicker() {
-        attachmentPickerLoading = true;
-        attachmentPickerMessage = "正在通过 SFTP 读取 SSH 文件...";
-        renderAttachmentPicker();
-        int generation = ++attachmentPickerLoadGeneration;
-        String root = attachmentPickerRootPath;
-        HashSet<String> expanded = new HashSet<>(attachmentPickerExpandedPaths);
-        backgroundTasks.execute("linecode-ssh-attachment-picker", () -> {
-            try {
-                FileTreeNode tree = sshFileTreeRepository.buildTree(root, expanded);
-                mainThread.post(() -> {
-                    if (!attachmentPickerActive || generation != attachmentPickerLoadGeneration) {
-                        return;
-                    }
-                    attachmentPickerTree = tree;
-                    attachmentPickerRootPath = tree.getPath();
-                    attachmentPickerExpandedPaths.add(tree.getPath());
-                    attachmentPickerLoading = false;
-                    attachmentPickerMessage = "";
-                    renderAttachmentPicker();
-                });
-            } catch (Exception e) {
-                mainThread.post(() -> {
-                    if (!attachmentPickerActive || generation != attachmentPickerLoadGeneration) {
-                        return;
-                    }
-                    attachmentPickerTree = null;
-                    attachmentPickerLoading = false;
-                    attachmentPickerMessage = e.getMessage();
-                    renderAttachmentPicker();
-                });
-            }
-        });
-    }
-
-    private void renderAttachmentPicker() {
-        if (!attachmentPickerActive || view == null) {
-            return;
-        }
-        boolean ssh = InputAttachment.SOURCE_SSH.equals(attachmentPickerSource);
-        view.showAttachmentPicker(
-                ssh ? "选择 SSH 文件" : "选择本地文件",
-                attachmentPickerTree,
-                attachmentPickerLoading,
-                attachmentPickerMessage,
-                attachmentPickerSource
-        );
-    }
-
-    private String attachmentRootPath(String source) {
-        if (InputAttachment.SOURCE_SSH.equals(source)) {
-            return projectPath.length() == 0 ? "." : projectPath;
-        }
-        if (projectPath.length() > 0) {
-            return projectPath;
-        }
-        return projectRepository.getDefaultHomePath();
-    }
-
     private void requestSshFileTreeLoad(boolean force) {
         sshFileTreeController.requestFileTreeLoad(force);
     }
 
+    private void requestIpcFileTreeLoad(boolean force) {
+        ipcFileTreeController.requestFileTreeLoad(force);
+    }
+
     private boolean isSshExecutionMode() {
         return ToolSettingsRepository.EXECUTION_SSH.equals(toolSettingsRepository.getExecutionMode());
+    }
+
+    private boolean isTerminalProviderExecutionMode() {
+        return ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER.equals(toolSettingsRepository.getExecutionMode());
     }
 
     private boolean isTermuxSshHost() {
@@ -3028,6 +3120,9 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private String promptHomePath() {
+        if (isTerminalProviderExecutionMode() && projectPath.length() == 0) {
+            return "~";
+        }
         if (WorkspacePaths.SOURCE_SSH.equals(projectSource) && projectPath.length() == 0) {
             return "~";
         }
@@ -3555,11 +3650,11 @@ public final class MainCoordinator implements MainUiController {
             int generationId
     ) {
         if (selectedModel == null) {
-            return new ToolResult("", "agent_pipeline", "当前没有可用模型，无法运行 Agent 流水线。", true);
+            return new ToolResult("", "agent_pipeline", context.getString(R.string.message_agent_pipeline_no_model), true);
         }
         ArrayList<PipelineAgent> agents = parsePipelineAgents(input.optJSONArray("agents"));
         if (agents.isEmpty()) {
-            return new ToolResult("", "agent_pipeline", "agent_pipeline.agents 不能为空。", true);
+            return new ToolResult("", "agent_pipeline", context.getString(R.string.message_agent_pipeline_agents_empty), true);
         }
         String dependencyError = validatePipelineDependencies(agents);
         if (dependencyError.length() > 0) {
@@ -3567,12 +3662,12 @@ public final class MainCoordinator implements MainUiController {
         }
         ArrayList<ArrayList<PipelineAgent>> levels = dependencyLevels(agents);
         if (levels.isEmpty()) {
-            return new ToolResult("", "agent_pipeline", "Agent 流水线存在循环依赖或重复 id，无法执行。", true);
+            return new ToolResult("", "agent_pipeline", context.getString(R.string.message_agent_pipeline_circular), true);
         }
 
         LinkedHashMap<String, AgentRunResult> results = new LinkedHashMap<>();
         StringBuilder summary = new StringBuilder();
-        summary.append("Agent 流水线完成: ").append(agents.size()).append(" 个任务");
+        summary.append(context.getString(R.string.message_agent_pipeline_completed, agents.size()));
         PipelineProgressSession pipelineProgress = new PipelineProgressSession(parentContext, agents);
         pipelineProgress.publish(false);
         boolean hasError = false;
@@ -3580,7 +3675,7 @@ public final class MainCoordinator implements MainUiController {
         for (ArrayList<PipelineAgent> level : levels) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 pipelineProgress.terminate();
-                return new ToolResult("", "agent_pipeline", "Agent 流水线已终止。", true);
+                return new ToolResult("", "agent_pipeline", context.getString(R.string.message_agent_pipeline_terminated), true);
             }
             for (PipelineAgent agent : level) {
                 String prompt = agent.prompt + dependencyOutputContext(agent, results);
@@ -3645,10 +3740,10 @@ public final class MainCoordinator implements MainUiController {
         for (int turn = 0; turn < AGENT_MAX_TURNS; turn++) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 if (progress != null) {
-                    progress.setFinished("error", true, AGENT_TERMINATED_MESSAGE);
+                    progress.setFinished("error", true, agentTerminatedMessage());
                     flushAgentProgress(progress);
                 }
-                return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
+                return new AgentRunResult(agentTerminatedMessage(), toolCallCount, true);
             }
             try {
                 if (progress != null) {
@@ -3678,11 +3773,11 @@ public final class MainCoordinator implements MainUiController {
                 ModelCompletionResponse response = modelClient.stream(selectedModel, agentMessages, callback, cancellationToken, options);
                 if (cancellationToken != null && cancellationToken.isCancelled()) {
                     if (progress != null) {
-                        progress.setTurnResult(AGENT_TERMINATED_MESSAGE, response.getReasoningContent());
-                        progress.setFinished("error", true, AGENT_TERMINATED_MESSAGE);
+                        progress.setTurnResult(agentTerminatedMessage(), response.getReasoningContent());
+                        progress.setFinished("error", true, agentTerminatedMessage());
                         flushAgentProgress(progress);
                     }
-                    return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
+                    return new AgentRunResult(agentTerminatedMessage(), toolCallCount, true);
                 }
                 ToolCallTextParser.Result parsedTextToolCalls = ToolCallTextParser.parse(response.getText());
                 List<ToolCall> calls = mergeToolCalls(response.getToolCalls(), parsedTextToolCalls.getToolCalls());
@@ -3704,10 +3799,10 @@ public final class MainCoordinator implements MainUiController {
                 for (ToolCall call : calls) {
                     if (cancellationToken != null && cancellationToken.isCancelled()) {
                         if (progress != null) {
-                            progress.setFinished("error", true, AGENT_TERMINATED_MESSAGE);
+                            progress.setFinished("error", true, agentTerminatedMessage());
                             flushAgentProgress(progress);
                         }
-                        return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
+                        return new AgentRunResult(agentTerminatedMessage(), toolCallCount, true);
                     }
                     ToolResult toolResult = executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath);
                     toolCallCount++;
@@ -3971,12 +4066,12 @@ public final class MainCoordinator implements MainUiController {
 
     private String validatePipelineDependencies(ArrayList<PipelineAgent> agents) {
         if (agents == null) {
-            return "agent_pipeline.agents 不能为空。";
+            return context.getString(R.string.message_agent_pipeline_agents_empty);
         }
         for (PipelineAgent agent : agents) {
             for (String dependency : agent.dependencies) {
                 if (agent.id.equals(dependency)) {
-                    return "Agent 不能依赖自身: " + agent.id;
+                    return context.getString(R.string.message_agent_pipeline_self_dependency, agent.id);
                 }
             }
         }
@@ -4463,11 +4558,11 @@ public final class MainCoordinator implements MainUiController {
                 object.put("status", "error");
                 String output = object.optString("output").trim();
                 if (output.length() == 0) {
-                    object.put("output", AGENT_TERMINATED_MESSAGE);
-                } else if (!output.contains(AGENT_TERMINATED_MESSAGE)) {
-                    object.put("output", output + "\n\n" + AGENT_TERMINATED_MESSAGE);
+                    object.put("output", agentTerminatedMessage());
+                } else if (!output.contains(agentTerminatedMessage())) {
+                    object.put("output", output + "\n\n" + agentTerminatedMessage());
                 }
-                object.put("model_content", AGENT_TERMINATED_MESSAGE);
+                object.put("model_content", agentTerminatedMessage());
                 messages.set(i, new ChatMessage(
                         message.getId(),
                         ChatMessage.Role.TOOL,
@@ -4502,7 +4597,7 @@ public final class MainCoordinator implements MainUiController {
                     continue;
                 }
                 if ("agent".equals(call.getName()) || "agent_pipeline".equals(call.getName())) {
-                    terminatedResults.add(new ToolResult(call.getId(), call.getName(), AGENT_TERMINATED_MESSAGE, true));
+                    terminatedResults.add(new ToolResult(call.getId(), call.getName(), agentTerminatedMessage(), true));
                 }
             }
         }
@@ -4719,6 +4814,9 @@ public final class MainCoordinator implements MainUiController {
         }
         if (isSshExecutionMode()) {
             sshFileTreeController.refreshDirectoryAfterFileOperation(parentPath);
+        }
+        if (isTerminalProviderExecutionMode()) {
+            ipcFileTreeController.refreshDirectoryAfterFileOperation(parentPath);
         }
     }
 

@@ -11,6 +11,8 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
+import android.util.Log;
+import cn.lineai.R;
 import cn.lineai.data.repository.SshConfigRepository;
 import cn.lineai.model.SshConfig;
 import com.jcraft.jsch.ChannelSftp;
@@ -18,6 +20,7 @@ import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import com.jcraft.jsch.UserInfo;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -70,80 +73,8 @@ public final class SshService {
     private static final Pattern PRIVATE_KEY_PATTERN = Pattern.compile(
             "LINEAI_PRIVATE_KEY_BEGIN\\n([\\s\\S]*?)\\nLINEAI_PRIVATE_KEY_END"
     );
-    private static final String TERMUX_SETUP_SCRIPT = joinLines(
-            "set -eu",
-            "export DEBIAN_FRONTEND=noninteractive",
-            "mkdir -p \"$HOME/.termux\"",
-            "properties_path=\"$HOME/.termux/termux.properties\"",
-            "touch \"$properties_path\"",
-            "grep -qxF 'allow-external-apps=true' \"$properties_path\" || printf '\\nallow-external-apps=true\\n' >> \"$properties_path\"",
-            "termux-reload-settings >/dev/null 2>&1 || true",
-            "",
-            "if ! command -v pkg >/dev/null 2>&1; then",
-            "  echo \"Termux pkg command not found\" >&2",
-            "  exit 127",
-            "fi",
-            "pkg update -y",
-            "pkg install -y openssh",
-            "",
-            "user_name=\"$(whoami 2>/dev/null || id -un 2>/dev/null || echo \"\")\"",
-            "shell_path=\"${SHELL:-}\"",
-            "if [ -z \"$shell_path\" ] && command -v getent >/dev/null 2>&1; then",
-            "  shell_path=\"$(getent passwd \"$user_name\" | awk -F: '{print $7}' || true)\"",
-            "fi",
-            "if [ -z \"$shell_path\" ]; then",
-            "  shell_path=\"${PREFIX:-/data/data/com.termux/files/usr}/bin/sh\"",
-            "fi",
-            "shell_name=\"$(basename \"$shell_path\")\"",
-            "start_line='command -v sshd >/dev/null 2>&1 && { command -v pgrep >/dev/null 2>&1 && pgrep -x sshd >/dev/null 2>&1 || sshd >/dev/null 2>&1 || true; }'",
-            "case \"$shell_name\" in",
-            "  fish)",
-            "    rc_path=\"$HOME/.config/fish/config.fish\"",
-            "    mkdir -p \"$(dirname \"$rc_path\")\"",
-            "    start_line='command -v sshd >/dev/null 2>&1; and begin; command -v pgrep >/dev/null 2>&1; and pgrep -x sshd >/dev/null 2>&1; or sshd >/dev/null 2>&1; or true; end'",
-            "    ;;",
-            "  zsh) rc_path=\"$HOME/.zshrc\" ;;",
-            "  bash) rc_path=\"$HOME/.bashrc\" ;;",
-            "  *) rc_path=\"$HOME/.profile\" ;;",
-            "esac",
-            "touch \"$rc_path\"",
-            "if ! grep -Fq 'LineAI:sshd-autostart' \"$rc_path\"; then",
-            "  printf '\\n# LineAI:sshd-autostart\\n%s\\n' \"$start_line\" >> \"$rc_path\"",
-            "fi",
-            "",
-            "chmod 700 \"$HOME\" 2>/dev/null || true",
-            "mkdir -p \"$HOME/.ssh\"",
-            "chmod 700 \"$HOME/.ssh\"",
-            "key_path=\"$HOME/.ssh/lineai_rsa\"",
-            "if [ ! -f \"$key_path\" ] || ! ssh-keygen -y -f \"$key_path\" >/dev/null 2>&1; then",
-            "  rm -f \"$key_path.pub\"",
-            "  ssh-keygen -t rsa -b 4096 -m PEM -f \"$key_path\" -N \"\" -C \"lineai@termux\" >/dev/null",
-            "fi",
-            "chmod 600 \"$key_path\"",
-            "if [ ! -f \"$key_path.pub\" ]; then",
-            "  ssh-keygen -y -f \"$key_path\" > \"$key_path.pub\"",
-            "fi",
-            "auth_path=\"$HOME/.ssh/authorized_keys\"",
-            "touch \"$auth_path\"",
-            "pub_key=\"$(cat \"$key_path.pub\")\"",
-            "grep -qxF \"$pub_key\" \"$auth_path\" || printf '%s\\n' \"$pub_key\" >> \"$auth_path\"",
-            "chmod 600 \"$auth_path\"",
-            "if command -v pgrep >/dev/null 2>&1; then",
-            "  pgrep -x sshd >/dev/null 2>&1 || sshd >/dev/null 2>&1 || true",
-            "else",
-            "  sshd >/dev/null 2>&1 || true",
-            "fi",
-            "sleep 1",
-            "",
-            "printf 'LINEAI_TERMUX_USERNAME=%s\\n' \"$user_name\"",
-            "printf 'LINEAI_TERMUX_SHELL=%s\\n' \"$shell_name\"",
-            "printf 'LINEAI_TERMUX_RC=%s\\n' \"$rc_path\"",
-            "printf 'LINEAI_TERMUX_HOST=127.0.0.1\\n'",
-            "printf 'LINEAI_TERMUX_PORT=8022\\n'",
-            "printf 'LINEAI_PRIVATE_KEY_BEGIN\\n'",
-            "cat \"$key_path\"",
-            "printf '\\nLINEAI_PRIVATE_KEY_END\\n'"
-    );
+    private static final String TAG = "SshService";
+    private static final String TERMUX_SETUP_SCRIPT_ASSET = "termux_setup.sh";
 
     private final Context context;
     private final SshConfigRepository repository;
@@ -176,11 +107,11 @@ public final class SshService {
     public String executeCommand(String command, int timeoutMs, SshConfig config, OutputListener listener) throws Exception {
         String safeCommand = command == null ? "" : command.trim();
         if (safeCommand.length() == 0) {
-            throw new IllegalArgumentException("命令不能为空");
+            throw new IllegalArgumentException(context.getString(R.string.ssh_error_command_empty));
         }
         SshConfig safeConfig = config == null ? repository.get() : config;
         if (!safeConfig.isConfigured()) {
-            throw new IllegalStateException("SSH 未配置完整，请填写 host、port、username，并填写 password 或 private key。");
+            throw new IllegalStateException(context.getString(R.string.ssh_error_not_configured));
         }
         int boundedTimeout = Math.max(1000, Math.min(timeoutMs <= 0 ? 30000 : timeoutMs, 300000));
         return executeInternal(safeCommand, boundedTimeout, safeConfig, listener);
@@ -188,11 +119,11 @@ public final class SshService {
 
     public <T> T withSftp(SftpOperation<T> operation, int timeoutMs) throws Exception {
         if (operation == null) {
-            throw new IllegalArgumentException("SFTP 操作不能为空");
+            throw new IllegalArgumentException(context.getString(R.string.ssh_error_sftp_empty));
         }
         SshConfig config = repository.get();
         if (!config.isConfigured()) {
-            throw new IllegalStateException("SSH 未配置完整，请填写 host、port、username，并填写 password 或 private key。");
+            throw new IllegalStateException(context.getString(R.string.ssh_error_not_configured));
         }
         int boundedTimeout = Math.max(1000, Math.min(timeoutMs <= 0 ? 30000 : timeoutMs, 300000));
         Session session = null;
@@ -237,7 +168,7 @@ public final class SshService {
     public TermuxSetupResult setupTermuxOpenSsh(int timeoutMs) throws Exception {
         ensureTermuxInstalled();
         if (context.checkSelfPermission(TERMUX_RUN_COMMAND_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
-            throw new IllegalStateException("LineCode 未获得 Termux RUN_COMMAND 权限，请在应用权限中允许“Run commands in Termux environment”。");
+            throw new IllegalStateException(context.getString(R.string.ssh_error_termux_permission));
         }
         int boundedTimeout = Math.max(60000, Math.min(timeoutMs <= 0 ? 900000 : timeoutMs, 900000));
         String action = context.getPackageName() + ".TERMUX_SETUP_RESULT." + System.currentTimeMillis();
@@ -251,7 +182,7 @@ public final class SshService {
                 try {
                     android.os.Bundle result = intent == null ? null : intent.getBundleExtra(TERMUX_RESULT_BUNDLE);
                     if (result == null) {
-                        errorRef.set(new IllegalStateException("Termux 未返回执行结果，请确认 Termux 版本 >= 0.109。"));
+                        errorRef.set(new IllegalStateException(context.getString(R.string.ssh_error_termux_no_result)));
                         return;
                     }
                     String stdout = result.getString(TERMUX_RESULT_STDOUT, "");
@@ -261,7 +192,7 @@ public final class SshService {
                     String errmsg = result.getString(TERMUX_RESULT_ERRMSG, "");
                     String combined = combine(stdout, stderr, "");
                     if (err != Activity.RESULT_OK) {
-                        errorRef.set(new IllegalStateException(errmsg.length() == 0 ? "Termux 启动命令失败: " + err : errmsg));
+                        errorRef.set(new IllegalStateException(errmsg.length() == 0 ? context.getString(R.string.ssh_error_termux_command_failed, err) : errmsg));
                     } else if (exitCode != 0) {
                         errorRef.set(new IllegalStateException("exit status " + exitCode + "\n" + combined));
                     } else {
@@ -294,7 +225,7 @@ public final class SshService {
                     .setAction(TERMUX_ACTION_RUN_COMMAND)
                     .putExtra(TERMUX_EXTRA_COMMAND_PATH, TERMUX_SH)
                     .putExtra(TERMUX_EXTRA_ARGUMENTS, new String[] {"-s"})
-                    .putExtra(TERMUX_EXTRA_STDIN, TERMUX_SETUP_SCRIPT)
+                    .putExtra(TERMUX_EXTRA_STDIN, readTermuxSetupScript())
                     .putExtra(TERMUX_EXTRA_WORKDIR, TERMUX_HOME)
                     .putExtra(TERMUX_EXTRA_BACKGROUND, true)
                     .putExtra(TERMUX_EXTRA_RUNNER, "app-shell")
@@ -304,7 +235,7 @@ public final class SshService {
             context.startService(intent);
             boolean completed = latch.await(boundedTimeout, TimeUnit.MILLISECONDS);
             if (!completed) {
-                throw new IllegalStateException("等待 Termux 配置 OpenSSH 超时，请确认 Termux 已执行授权指令并开启 allow-external-apps=true。");
+                throw new IllegalStateException(context.getString(R.string.ssh_error_termux_setup_timeout));
             }
             if (errorRef.get() != null) {
                 throw errorRef.get();
@@ -336,7 +267,7 @@ public final class SshService {
             StringBuilder error = new StringBuilder();
             while (!channel.isClosed()) {
                 if (System.currentTimeMillis() - startedAt > timeoutMs) {
-                    throw new IllegalStateException("命令执行超时");
+                    throw new IllegalStateException(context.getString(R.string.ssh_error_command_timeout));
                 }
                 boolean changed = drainAvailable(stdout, output) > 0;
                 changed = drainAvailable(stderr, error) > 0 || changed;
@@ -405,11 +336,11 @@ public final class SshService {
     private File knownHostsFile() throws Exception {
         File dir = new File(context.getFilesDir(), "ssh");
         if (!dir.exists() && !dir.mkdirs()) {
-            throw new IllegalStateException("无法创建 SSH 配置目录: " + dir.getPath());
+            throw new IllegalStateException(context.getString(R.string.ssh_error_create_config_dir, dir.getPath()));
         }
         File file = new File(dir, "known_hosts");
         if (!file.exists() && !file.createNewFile()) {
-            throw new IllegalStateException("无法创建 known_hosts 文件: " + file.getPath());
+            throw new IllegalStateException(context.getString(R.string.ssh_error_create_known_hosts, file.getPath()));
         }
         return file;
     }
@@ -438,7 +369,11 @@ public final class SshService {
         @Override
         public boolean promptYesNo(String message) {
             String text = message == null ? "" : message.toLowerCase(java.util.Locale.ROOT);
-            return !text.contains("has changed") && !text.contains("offending key");
+            if (text.contains("has changed") || text.contains("offending key")) {
+                return false;
+            }
+            Log.w(TAG, "TOFU: auto-accepting host key prompt: " + message);
+            return true;
         }
 
         @Override
@@ -455,7 +390,7 @@ public final class SshService {
         Matcher matcher = PRIVATE_KEY_PATTERN.matcher(output == null ? "" : output);
         String privateKey = matcher.find() ? matcher.group(1).trim() : "";
         if (username.length() == 0 || privateKey.length() == 0) {
-            throw new IllegalStateException("Termux 已返回结果，但未解析到 username 或 private key。\n" + redactPrivateKey(output));
+            throw new IllegalStateException(context.getString(R.string.ssh_error_termux_parse_failed, redactPrivateKey(output)));
         }
         SshConfig config = new SshConfig(
                 host.length() == 0 ? SshConfig.DEFAULT_HOST : host,
@@ -476,7 +411,7 @@ public final class SshService {
                 context.getPackageManager().getPackageInfo(TERMUX_PACKAGE, 0);
             }
         } catch (PackageManager.NameNotFoundException e) {
-            throw new IllegalStateException("未检测到 Termux，请先安装 Termux。");
+            throw new IllegalStateException(context.getString(R.string.ssh_error_termux_not_installed));
         }
     }
 
@@ -545,22 +480,26 @@ public final class SshService {
         }
     }
 
-    private static String redactPrivateKey(String output) {
+    private String redactPrivateKey(String output) {
         return output == null ? "" : PRIVATE_KEY_PATTERN.matcher(output)
-                .replaceAll("LINEAI_PRIVATE_KEY=[已保存到 SSH Private key]");
+                .replaceAll(context.getString(R.string.ssh_redact_private_key));
     }
 
-    private static String joinLines(String... lines) {
-        StringBuilder builder = new StringBuilder();
-        if (lines != null) {
-            for (int i = 0; i < lines.length; i++) {
-                if (i > 0) {
-                    builder.append('\n');
-                }
-                builder.append(lines[i]);
+    private String readTermuxSetupScript() {
+        try {
+            InputStream input = context.getAssets().open(TERMUX_SETUP_SCRIPT_ASSET);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
             }
+            input.close();
+            return output.toString(StandardCharsets.UTF_8.name());
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    context.getString(R.string.ssh_error_read_termux_script, TERMUX_SETUP_SCRIPT_ASSET), e);
         }
-        return builder.toString();
     }
 
     public static final class TermuxSetupResult {

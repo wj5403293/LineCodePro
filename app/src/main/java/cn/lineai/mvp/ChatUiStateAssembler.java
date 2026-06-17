@@ -12,20 +12,20 @@ import cn.lineai.model.InputSettings;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextInfo;
 import cn.lineai.model.ModelContextParser;
-import cn.lineai.model.ModelRepository;
+import cn.lineai.model.ModelStore;
 import cn.lineai.model.OutputSettings;
 import cn.lineai.workspace.WorkspacePaths;
 import java.util.List;
 
 public final class ChatUiStateAssembler {
-    private final ModelRepository modelRepository;
+    private final ModelStore modelRepository;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final InputSettingsRepository inputSettingsRepository;
     private final OutputSettingsRepository outputSettingsRepository;
     private final ContextManager contextManager;
 
     public ChatUiStateAssembler(
-            ModelRepository modelRepository,
+            ModelStore modelRepository,
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
             InputSettingsRepository inputSettingsRepository,
             OutputSettingsRepository outputSettingsRepository,

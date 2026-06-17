@@ -91,10 +91,6 @@ public final class AgentTool extends BaseTool {
         return type;
     }
 
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
-
     private boolean hasScope(JSONArray array) {
         if (array == null) {
             return false;

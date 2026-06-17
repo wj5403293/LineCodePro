@@ -159,6 +159,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    buildFeatures {
+        aidl = true
+    }
 }
 
 val exportDebugUserCertApk by tasks.registering(Copy::class) {

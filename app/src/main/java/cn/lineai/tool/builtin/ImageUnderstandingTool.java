@@ -9,6 +9,9 @@ import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.data.repository.SshFileTreeRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.ipc.IpcProviderManager;
+import cn.lineai.ipc.IpcProviderType;
+import cn.lineai.ipc.terminal.TerminalIpcProvider;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelRepository;
@@ -30,17 +33,23 @@ public final class ImageUnderstandingTool extends BaseTool {
     private final ModelRepository modelRepository;
     private final SshFileTreeRepository sshFileTreeRepository;
     private final ModelClient modelClient;
+    private final IpcProviderManager ipcProviderManager;
 
     public ImageUnderstandingTool() {
         this(null);
     }
 
     public ImageUnderstandingTool(Context context) {
+        this(context, null);
+    }
+
+    public ImageUnderstandingTool(Context context, IpcProviderManager ipcProviderManager) {
         Context appContext = context == null ? null : context.getApplicationContext();
         settingsRepository = appContext == null ? null : new ToolSettingsRepository(appContext);
         modelRepository = appContext == null ? null : new ModelRepository(appContext);
         sshFileTreeRepository = appContext == null ? null : new SshFileTreeRepository(new SshService(appContext));
         modelClient = new ModelClient();
+        this.ipcProviderManager = ipcProviderManager;
     }
 
     @Override
@@ -131,6 +140,22 @@ public final class ImageUnderstandingTool extends BaseTool {
     }
 
     private ImageBytes readImageBytes(String path, ToolContext context) throws Exception {
+        if (isTerminalProviderMode()) {
+            if (ipcProviderManager == null) {
+                throw new IllegalStateException("终端提供者图片理解未接入应用上下文。");
+            }
+            TerminalIpcProvider provider = ipcProviderManager.getProviderByType(IpcProviderType.TERMINAL) instanceof TerminalIpcProvider
+                    ? (TerminalIpcProvider) ipcProviderManager.getProviderByType(IpcProviderType.TERMINAL)
+                    : null;
+            if (provider == null || !provider.isBound()) {
+                throw new IllegalStateException("没有已绑定的终端提供者。");
+            }
+            String remotePath = resolveSshPath(path, context == null ? "" : context.getHomePath());
+            if (context != null) {
+                context.reportToolProgress(getName(), "正在通过 IPC 读取图片...", false);
+            }
+            return new ImageBytes(remotePath, provider.readFile(remotePath));
+        }
         if (isSshMode()) {
             if (sshFileTreeRepository == null) {
                 throw new IllegalStateException("SSH 图片理解未接入应用上下文。");
@@ -157,6 +182,11 @@ public final class ImageUnderstandingTool extends BaseTool {
     private boolean isSshMode() {
         return settingsRepository != null
                 && ToolSettingsRepository.EXECUTION_SSH.equals(settingsRepository.getExecutionMode());
+    }
+
+    private boolean isTerminalProviderMode() {
+        return settingsRepository != null
+                && ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER.equals(settingsRepository.getExecutionMode());
     }
 
     private String resolveSshPath(String path, String homePath) {
@@ -215,13 +245,5 @@ public final class ImageUnderstandingTool extends BaseTool {
             }
         }
         return "";
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

@@ -4,10 +4,7 @@ import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.json.JSONObject;
 
@@ -29,6 +26,11 @@ public final class FileReadTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.READ;
+    }
+
+    @Override
+    public boolean isConcurrencySafe() {
+        return true;
     }
 
     @Override
@@ -66,7 +68,7 @@ public final class FileReadTool extends BaseTool {
                         + "请使用 start_line 和 end_line 指定行号范围，例如："
                         + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_line\":1,\"end_line\":200}");
             }
-            String content = readUtf8(file);
+            String content = FileIo.readUtf8(file);
             String[] lines = content.split("\n", -1);
             Range range = resolveRange(input, lines.length);
             StringBuilder result = new StringBuilder();
@@ -126,29 +128,6 @@ public final class FileReadTool extends BaseTool {
         int offset = Math.max(0, input.optInt("offset", 0));
         int limit = Math.max(1, input.optInt("limit", DEFAULT_LIMIT));
         return new Range(Math.min(offset, totalLines), Math.min(totalLines, offset + limit));
-    }
-
-    private String readUtf8(File file) throws Exception {
-        FileInputStream input = new FileInputStream(file);
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
-            return output.toString(StandardCharsets.UTF_8.name());
-        } finally {
-            input.close();
-        }
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 
     private static final class Range {

@@ -39,6 +39,7 @@ public final class ExtensionsScreenView extends LinearLayout {
         addCard(content, "mcp", getContext().getString(R.string.screen_extensions_section_mcp), getContext().getString(R.string.screen_extensions_desc_mcp), getContext().getString(R.string.screen_extensions_badge_https), IconButtonView.MCP);
         addCard(content, "skills", getContext().getString(R.string.screen_extensions_section_skills), getContext().getString(R.string.screen_extensions_desc_skills), getContext().getString(R.string.screen_extensions_badge_zip), IconButtonView.ARCHIVE);
         addCard(content, "linecode", getContext().getString(R.string.screen_extensions_section_linecode), getContext().getString(R.string.screen_extensions_desc_linecode), getContext().getString(R.string.screen_extensions_badge_lip), IconButtonView.PACKAGE);
+        addCard(content, "terminalProvider", getContext().getString(R.string.screen_extensions_section_terminal_provider), getContext().getString(R.string.screen_extensions_desc_terminal_provider), getContext().getString(R.string.screen_extensions_badge_terminal_provider), IconButtonView.TERMINAL);
     }
 
     private void addCard(LinearLayout content, String id, String title, String desc, String badge, int iconType) {

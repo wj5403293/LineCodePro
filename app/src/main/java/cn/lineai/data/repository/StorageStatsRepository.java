@@ -4,6 +4,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
+import cn.lineai.data.db.LineCodeSchema;
 import java.io.File;
 
 public final class StorageStatsRepository {
@@ -195,6 +196,9 @@ public final class StorageStatsRepository {
     }
 
     private int countRecords(SQLiteDatabase db, String table) {
+        if (!LineCodeSchema.isValidTable(table)) {
+            throw new IllegalArgumentException("非法表名: " + table);
+        }
         Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + table, null);
         try {
             return cursor.moveToFirst() ? cursor.getInt(0) : 0;
@@ -209,12 +213,18 @@ public final class StorageStatsRepository {
 
     public void clearChatHistory() {
         SQLiteDatabase db = database.getWritableDatabase();
-        db.delete("messages", null, null);
-        db.delete("conversations", null, null);
-        db.delete("tool_calls", null, null);
-        db.delete("tool_results", null, null);
-        db.delete("message_blocks", null, null);
-        db.delete("attachments", null, null);
+        db.beginTransaction();
+        try {
+            db.delete("messages", null, null);
+            db.delete("conversations", null, null);
+            db.delete("tool_calls", null, null);
+            db.delete("tool_results", null, null);
+            db.delete("message_blocks", null, null);
+            db.delete("attachments", null, null);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public static final class StorageStats {

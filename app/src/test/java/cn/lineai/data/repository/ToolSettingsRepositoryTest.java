@@ -148,6 +148,171 @@ public final class ToolSettingsRepositoryTest {
         Assert.assertTrue(prompt.contains("Agent、Agent Pipeline、任务清单仍可用"));
     }
 
+    @Test
+    public void normalizeExecutionModeAcceptsTerminalProvider() {
+        Assert.assertEquals(ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                ToolSettingsRepository.normalizeExecutionMode(ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER));
+    }
+
+    @Test
+    public void normalizeExecutionModeDefaultsToLocalForUnknown() {
+        Assert.assertEquals(ToolSettingsRepository.EXECUTION_LOCAL,
+                ToolSettingsRepository.normalizeExecutionMode("unknown_mode"));
+    }
+
+    @Test
+    public void normalizeExecutionModeDefaultsToLocalForNull() {
+        Assert.assertEquals(ToolSettingsRepository.EXECUTION_LOCAL,
+                ToolSettingsRepository.normalizeExecutionMode(null));
+    }
+
+    @Test
+    public void terminalProviderToolPromptIncludesShellAndImageTools() {
+        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        ToolRegistry registry = new ToolRegistry();
+        toolByName.put("shell_execute", registry.get("shell_execute"));
+        toolByName.put("image_understanding", registry.get("image_understanding"));
+        toolByName.put("image_generation", registry.get("image_generation"));
+        Set<String> enabled = new LinkedHashSet<>();
+        enabled.add("shell_execute");
+        enabled.add("image_understanding");
+        enabled.add("image_generation");
+        McpToolConfig shell = new McpToolConfig(
+                "shell",
+                "Terminal Shell",
+                "",
+                true,
+                new String[] {"shell_execute"}
+        );
+        McpToolConfig imageUnderstanding = new McpToolConfig(
+                "image_understanding",
+                "图片理解",
+                "",
+                true,
+                new String[] {"image_understanding"}
+        );
+        McpToolConfig imageGeneration = new McpToolConfig(
+                "image_generation",
+                "图片生成",
+                "",
+                true,
+                new String[] {"image_generation"}
+        );
+
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                java.util.Arrays.asList(shell, imageUnderstanding, imageGeneration),
+                enabled,
+                toolByName,
+                true
+        );
+
+        Assert.assertTrue(prompt.contains("shell_execute"));
+        Assert.assertTrue(prompt.contains("image_understanding"));
+        Assert.assertTrue(prompt.contains("通过 IPC 读取终端提供者环境图片"));
+        Assert.assertTrue(prompt.contains("image_generation"));
+        Assert.assertTrue(prompt.contains("以内联 Markdown 图片返回"));
+        Assert.assertTrue(prompt.contains("终端提供者（Terminal Provider）"));
+        Assert.assertTrue(prompt.contains("本地文件读写、文件搜索和 HTTP 服务器已禁用"));
+        Assert.assertTrue(prompt.contains("Agent、Agent Pipeline、任务清单仍可用"));
+    }
+
+    @Test
+    public void terminalProviderToolPromptIncludesCustomMcpTools() {
+        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        ToolRegistry registry = new ToolRegistry();
+        BaseTool customMcp = new DummyCustomMcpTool();
+        toolByName.put("shell_execute", registry.get("shell_execute"));
+        toolByName.put(customMcp.getName(), customMcp);
+        Set<String> enabled = new LinkedHashSet<>();
+        enabled.add("shell_execute");
+        enabled.add(customMcp.getName());
+        McpToolConfig shell = new McpToolConfig(
+                "shell",
+                "Terminal Shell",
+                "",
+                true,
+                new String[] {"shell_execute"}
+        );
+
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                java.util.Collections.singletonList(shell),
+                enabled,
+                toolByName,
+                true
+        );
+
+        Assert.assertTrue(prompt.contains("shell_execute"));
+        Assert.assertTrue(prompt.contains("mcpx_test_lookup"));
+        Assert.assertTrue(prompt.contains("调用测试 MCP"));
+    }
+
+    @Test
+    public void terminalProviderToolPromptUsesNativeToolProtocolNotice() {
+        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        ToolRegistry registry = new ToolRegistry();
+        toolByName.put("shell_execute", registry.get("shell_execute"));
+        Set<String> enabled = new LinkedHashSet<>();
+        enabled.add("shell_execute");
+        McpToolConfig shell = new McpToolConfig(
+                "shell",
+                "Terminal Shell",
+                "",
+                true,
+                new String[] {"shell_execute"}
+        );
+
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                java.util.Collections.singletonList(shell),
+                enabled,
+                toolByName,
+                true
+        );
+
+        Assert.assertTrue(prompt.contains("原生 tools/function calling"));
+    }
+
+    @Test
+    public void terminalProviderToolPromptUsesToolCallsMarkupWhenNotNative() {
+        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        ToolRegistry registry = new ToolRegistry();
+        toolByName.put("shell_execute", registry.get("shell_execute"));
+        Set<String> enabled = new LinkedHashSet<>();
+        enabled.add("shell_execute");
+        McpToolConfig shell = new McpToolConfig(
+                "shell",
+                "Terminal Shell",
+                "",
+                true,
+                new String[] {"shell_execute"}
+        );
+
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                java.util.Collections.singletonList(shell),
+                enabled,
+                toolByName,
+                false
+        );
+
+        Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"工具名\">"));
+    }
+
+    @Test
+    public void terminalProviderToolPromptEmptyEnabledReturnsNoToolsMessage() {
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
+                java.util.Collections.<McpToolConfig>emptyList(),
+                new LinkedHashSet<>(),
+                new LinkedHashMap<>(),
+                false
+        );
+
+        Assert.assertTrue(prompt.contains("当前没有可用工具"));
+    }
+
     private static final class DummyCustomMcpTool extends BaseTool {
         @Override
         public String getName() {

@@ -10,19 +10,18 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class ProjectRepository {
+public final class ProjectRepository extends BaseRepository implements ProjectStore {
     private static final String SSH_DEFAULT_PROJECT_ID = "ssh:default";
     private static final String KEY_SELECTED_LOCAL_PROJECT = "@linecode_selected_project_local";
     private static final String KEY_SELECTED_SSH_PROJECT = "@linecode_selected_project_ssh";
 
     private final Context context;
-    private final LineCodeDatabase database;
     private final SettingsRepository settingsRepository;
     private final WorkspacePaths workspacePaths;
 
     public ProjectRepository(Context context) {
+        super(LineCodeDatabase.getInstance(context));
         this.context = context.getApplicationContext();
-        database = LineCodeDatabase.getInstance(context);
         settingsRepository = new SettingsRepository(this.context);
         workspacePaths = new WorkspacePaths(this.context);
         workspacePaths.ensurePrivateRoots();

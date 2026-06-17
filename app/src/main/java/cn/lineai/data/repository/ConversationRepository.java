@@ -9,11 +9,10 @@ import cn.lineai.model.ChatMessage;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class ConversationRepository {
-    private final LineCodeDatabase database;
+public final class ConversationRepository extends BaseRepository implements ConversationStore {
 
     public ConversationRepository(Context context) {
-        database = LineCodeDatabase.getInstance(context);
+        super(LineCodeDatabase.getInstance(context));
     }
 
     public synchronized List<ConversationRecord> getConversationMetas() {

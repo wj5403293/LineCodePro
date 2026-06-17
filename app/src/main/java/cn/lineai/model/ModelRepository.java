@@ -13,7 +13,7 @@ import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
 
-public final class ModelRepository {
+public final class ModelRepository implements ModelStore {
     private static final String PREFS = "linecode_models";
     private static final String KEY_MODELS = "models";
     private static final String KEY_SELECTED_ID = "selected_id";

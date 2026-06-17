@@ -2,6 +2,7 @@ package cn.lineai.data.importer;
 
 import cn.lineai.model.ModelConfig;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.json.JSONArray;
@@ -9,8 +10,21 @@ import org.json.JSONObject;
 
 final class ArchiveSecretRedactor {
     private static final String REDACTED = "";
+    private static final Map<String, String[]> SENSITIVE_FIELDS = new HashMap<>();
+
+    static {
+        register("@lineai_ssh_config", new String[]{"password", "privateKey", "passphrase"});
+        register("@lineai_web_search_config", new String[]{"apiKey"});
+    }
 
     private ArchiveSecretRedactor() {
+    }
+
+    static void register(String settingsKey, String[] fields) {
+        if (settingsKey == null || fields == null) {
+            return;
+        }
+        SENSITIVE_FIELDS.put(settingsKey, fields);
     }
 
     static ImportedLineCodeData redactData(ImportedLineCodeData data) {
@@ -132,11 +146,9 @@ final class ArchiveSecretRedactor {
 
     private static String redactSettingValue(String key, String value) {
         String safeKey = key == null ? "" : key;
-        if ("@lineai_ssh_config".equals(safeKey)) {
-            return redactJsonFields(value, "password", "privateKey", "passphrase");
-        }
-        if ("@lineai_web_search_config".equals(safeKey)) {
-            return redactJsonFields(value, "apiKey");
+        String[] fields = SENSITIVE_FIELDS.get(safeKey);
+        if (fields != null) {
+            return redactJsonFields(value, fields);
         }
         if (isSensitiveName(safeKey)) {
             return REDACTED;

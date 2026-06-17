@@ -25,6 +25,11 @@ public final class WebFetchTool extends BaseTool {
     }
 
     @Override
+    public boolean isConcurrencySafe() {
+        return true;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -46,13 +51,5 @@ public final class WebFetchTool extends BaseTool {
         } catch (Exception e) {
             return error("网页查看失败: " + e.getMessage());
         }
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

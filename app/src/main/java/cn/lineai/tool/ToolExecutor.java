@@ -1,25 +1,23 @@
 package cn.lineai.tool;
 
 import cn.lineai.data.repository.DiffRecord;
-import cn.lineai.data.repository.DiffRepository;
+import cn.lineai.data.repository.DiffStore;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.tool.builtin.FileIo;
 import cn.lineai.tool.builtin.FileToolPathPolicy;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
 
 public final class ToolExecutor {
     private final ToolRegistry registry;
     private final ToolSettingsRepository settingsRepository;
-    private final DiffRepository diffRepository;
+    private final DiffStore diffRepository;
 
     public ToolExecutor(ToolRegistry registry, ToolSettingsRepository settingsRepository) {
         this(registry, settingsRepository, null);
     }
 
-    public ToolExecutor(ToolRegistry registry, ToolSettingsRepository settingsRepository, DiffRepository diffRepository) {
+    public ToolExecutor(ToolRegistry registry, ToolSettingsRepository settingsRepository, DiffStore diffRepository) {
         this.registry = registry;
         this.settingsRepository = settingsRepository;
         this.diffRepository = diffRepository;
@@ -53,7 +51,7 @@ public final class ToolExecutor {
             JSONObject input = toolCall.getArguments().trim().length() == 0
                     ? new JSONObject()
                     : new JSONObject(toolCall.getArguments());
-            ToolResult result = shouldRecordDiff(tool.getName())
+            ToolResult result = shouldRecordDiff(tool)
                     ? executeWithDiff(tool, input, callContext)
                     : tool.execute(input, callContext);
             return result.withCall(toolCall.getId(), tool.getName());
@@ -62,8 +60,8 @@ public final class ToolExecutor {
         }
     }
 
-    private boolean shouldRecordDiff(String toolName) {
-        return diffRepository != null && ("file_write".equals(toolName) || "file_edit".equals(toolName));
+    private boolean shouldRecordDiff(BaseTool tool) {
+        return diffRepository != null && tool.shouldRecordDiff();
     }
 
     private ToolResult executeWithDiff(BaseTool tool, JSONObject input, ToolContext context) {
@@ -78,7 +76,7 @@ public final class ToolExecutor {
                 return new ToolResult("", tool.getName(), "路径是一个目录，无法写入文件: " + path, true);
             }
             if (existed) {
-                oldContent = readUtf8(file);
+                oldContent = FileIo.readUtf8(file);
             }
         } catch (Exception e) {
             return new ToolResult("", tool.getName(), "无法读取原文件: " + path + "\n" + e.getMessage(), true);
@@ -91,7 +89,7 @@ public final class ToolExecutor {
 
         String newContent;
         try {
-            newContent = file.exists() ? readUtf8(file) : "";
+            newContent = file.exists() ? FileIo.readUtf8(file) : "";
         } catch (Exception ignored) {
             newContent = input.optString("content");
         }
@@ -100,20 +98,5 @@ public final class ToolExecutor {
             return result.withDiffId(diff.getId());
         }
         return result;
-    }
-
-    private String readUtf8(File file) throws Exception {
-        FileInputStream input = new FileInputStream(file);
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
-                output.write(buffer, 0, read);
-            }
-            return new String(output.toByteArray(), StandardCharsets.UTF_8);
-        } finally {
-            input.close();
-        }
     }
 }

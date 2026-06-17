@@ -4,6 +4,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class ToolExecutionCoordinator {
+    private final ToolRegistry toolRegistry;
+
+    public ToolExecutionCoordinator() {
+        this(null);
+    }
+
+    public ToolExecutionCoordinator(ToolRegistry toolRegistry) {
+        this.toolRegistry = toolRegistry;
+    }
+
     public ToolExecutionPlan createPlan(List<ToolCall> toolCalls) {
         ArrayList<ToolCall> concurrentTasks = new ArrayList<>();
         ArrayList<ToolCall> sequentialTasks = new ArrayList<>();
@@ -21,15 +31,11 @@ public final class ToolExecutionCoordinator {
     }
 
     private boolean isConcurrencySafe(ToolCall toolCall) {
-        if (toolCall == null) {
+        if (toolCall == null || toolRegistry == null) {
             return false;
         }
-        String name = toolCall.getName();
-        return "file_read".equals(name)
-                || "glob".equals(name)
-                || "list_dir".equals(name)
-                || "web_search".equals(name)
-                || "web_fetch".equals(name);
+        BaseTool tool = toolRegistry.get(toolCall.getName());
+        return tool != null && tool.isConcurrencySafe();
     }
 
     public static final class ToolExecutionPlan {

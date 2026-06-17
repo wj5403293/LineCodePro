@@ -2,6 +2,7 @@ package cn.lineai.mvp;
 
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolExecutionCoordinator;
+import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,7 +13,7 @@ import org.junit.Test;
 public final class ToolRunControllerTest {
     @Test
     public void orderedResultsFollowOriginalToolCallOrder() {
-        ToolRunController controller = new ToolRunController(new ToolExecutionCoordinator(), null, null);
+        ToolRunController controller = new ToolRunController(new ToolExecutionCoordinator(new ToolRegistry()), null, null);
         ToolCall first = new ToolCall("read_1", "file_read", "{}");
         ToolCall second = new ToolCall("glob_1", "glob", "{}");
         HashMap<String, ToolResult> resultById = new HashMap<>();
@@ -27,7 +28,7 @@ public final class ToolRunControllerTest {
 
     @Test
     public void remainingCallsSkipsCompletedPrefixAndNulls() {
-        ToolRunController controller = new ToolRunController(new ToolExecutionCoordinator(), null, null);
+        ToolRunController controller = new ToolRunController(new ToolExecutionCoordinator(new ToolRegistry()), null, null);
         ToolCall second = new ToolCall("delete_1", "file_delete", "{}");
         ToolCall third = new ToolCall("write_1", "file_write", "{}");
 

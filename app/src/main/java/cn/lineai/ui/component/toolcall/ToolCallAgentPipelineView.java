@@ -19,14 +19,13 @@ import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class ToolCallAgentPipelineView extends LinearLayout {
+public final class ToolCallAgentPipelineView extends BaseToolCallView {
     private boolean expanded = true;
     private ToolCall lastToolCall;
     private ToolResult lastResult;
 
     public ToolCallAgentPipelineView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
         setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_ELEVATED, 8, LineTheme.BORDER_LIGHT));
     }
 

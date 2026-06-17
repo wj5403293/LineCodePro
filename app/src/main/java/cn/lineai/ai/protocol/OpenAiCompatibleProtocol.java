@@ -366,19 +366,6 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
         }
     }
 
-    private int thinkingBudget(String effort) {
-        if (AiBehaviorSettings.REASONING_LOW.equals(effort)) {
-            return 1024;
-        }
-        if (AiBehaviorSettings.REASONING_HIGH.equals(effort)) {
-            return 8192;
-        }
-        if (AiBehaviorSettings.REASONING_MAX.equals(effort)) {
-            return 16000;
-        }
-        return 4096;
-    }
-
     JSONObject reasoningRequestBodyForTest(ModelConfig config, ModelRequestOptions options) throws Exception {
         JSONObject body = new JSONObject();
         applyReasoningRequest(config, body, options == null ? ModelRequestOptions.defaults() : options);

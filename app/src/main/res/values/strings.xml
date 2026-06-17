@@ -494,6 +494,25 @@
     <string name="screen_extension_detail_delete_confirm_desc">You will need to re-add or re-install it to use it again</string>
     <string name="screen_extension_detail_delete_title">Delete extension</string>
 
+    <!-- IPC terminal provider -->
+    <string name="permission_ipc_terminal_provider_desc">Allows the app to act as a terminal provider for LineCode</string>
+    <string name="screen_extensions_section_terminal_provider">Terminal providers</string>
+    <string name="screen_extensions_desc_terminal_provider">Connect external terminal provider apps for shell execution and file transfer</string>
+    <string name="screen_extensions_badge_terminal_provider">IPC</string>
+    <string name="screen_terminal_provider_title">Terminal providers</string>
+    <string name="screen_terminal_provider_scan">Scan</string>
+    <string name="screen_terminal_provider_scan_desc">Scan for available terminal provider apps</string>
+    <string name="screen_terminal_provider_scan_empty">No terminal providers found. Install a provider app and try again.</string>
+    <string name="screen_terminal_provider_scan_results">Scan results</string>
+    <string name="screen_terminal_provider_installed">Installed</string>
+    <string name="screen_terminal_provider_empty">No terminal providers added yet.</string>
+    <string name="screen_terminal_provider_add_confirm">Add \"%1$s\"?</string>
+    <string name="screen_terminal_provider_add_confirm_desc">This app will be used for shell execution and file transfer</string>
+    <string name="screen_terminal_provider_delete_title">Delete terminal provider</string>
+    <string name="screen_terminal_provider_delete_confirm">Delete \"%1$s\"?</string>
+    <string name="screen_mcp_execution_terminal_provider">Terminal provider</string>
+    <string name="screen_mcp_execution_terminal_provider_desc">Execute shell commands and transfer files via external terminal provider app</string>
+
     <string name="screen_ssh_title">SSH connection</string>
     <string name="screen_ssh_section_server">Remote Linux / server</string>
     <string name="screen_ssh_server_desc">Connect a remote server via SSH and use it as the workspace</string>
@@ -807,6 +826,8 @@
     <string name="notification_keep_alive_title">LineCode</string>
     <string name="notification_keep_alive_text">Coding in progress</string>
     <string name="notification_keep_alive_ticker">LineCode</string>
+    <string name="keep_alive_status_encoding">Encoding</string>
+    <string name="keep_alive_notification_title">LineCode coding task background keep-alive notification</string>
 
     <string name="toast_open_link_failed">Failed to open link: %1$s</string>
     <string name="toast_copied">Copied</string>
@@ -954,4 +975,34 @@
 
     <string name="markdown_code_copy_desc">Copy code</string>
     <string name="markdown_code_copied">Copied</string>
+
+    <!-- SshService user-visible messages -->
+    <string name="ssh_error_command_empty">Command cannot be empty</string>
+    <string name="ssh_error_not_configured">SSH is not fully configured. Please fill in host, port, username, and either password or private key.</string>
+    <string name="ssh_error_sftp_empty">SFTP operation cannot be empty</string>
+    <string name="ssh_error_termux_permission">LineCode has not been granted the Termux RUN_COMMAND permission. Please allow \"Run commands in Termux environment\" in app permissions.</string>
+    <string name="ssh_error_termux_no_result">Termux returned no execution result. Please ensure Termux version &gt;= 0.109.</string>
+    <string name="ssh_error_termux_command_failed">Termux failed to start command: %1$d</string>
+    <string name="ssh_error_termux_setup_timeout">Timed out waiting for Termux to configure OpenSSH. Please ensure Termux has run the authorization command and enabled allow-external-apps=true.</string>
+    <string name="ssh_error_command_timeout">Command execution timed out</string>
+    <string name="ssh_error_create_config_dir">Unable to create SSH config directory: %1$s</string>
+    <string name="ssh_error_create_known_hosts">Unable to create known_hosts file: %1$s</string>
+    <string name="ssh_error_termux_parse_failed">Termux returned a result, but no username or private key was parsed.\n%1$s</string>
+    <string name="ssh_error_termux_not_installed">Termux is not detected. Please install Termux first.</string>
+    <string name="ssh_redact_private_key">LINEAI_PRIVATE_KEY=[saved to SSH Private key]</string>
+    <string name="ssh_error_read_termux_script">Unable to read Termux setup script: %1$s</string>
+
+    <!-- MainCoordinator agent messages -->
+    <string name="message_agent_terminated">Agent terminated.</string>
+    <string name="message_agent_pipeline_running">Agent pipeline running.</string>
+    <string name="message_agent_pipeline_no_model">No model available, unable to run the agent pipeline.</string>
+    <string name="message_agent_pipeline_agents_empty">agent_pipeline.agents cannot be empty.</string>
+    <string name="message_agent_pipeline_circular">Agent pipeline has a circular dependency or duplicate id, unable to execute.</string>
+    <string name="message_agent_pipeline_completed">Agent pipeline completed: %1$d tasks</string>
+    <string name="message_agent_pipeline_terminated">Agent pipeline terminated.</string>
+    <string name="message_agent_pipeline_self_dependency">Agent cannot depend on itself: %1$s</string>
+
+    <!-- StoragePermissionManager messages -->
+    <string name="permission_denied_manage_all">Missing \"manage all files\" permission, unable to access the external workspace. Please allow LineCode to manage all files in system settings and retry.</string>
+    <string name="permission_denied_read_write">Missing file read/write permission, unable to access the external workspace. Please allow LineCode to read and write storage and retry.</string>
 </resources>

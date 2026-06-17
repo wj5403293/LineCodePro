@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Environment;
+import cn.lineai.R;
 
 public final class StoragePermissionManager {
     private final Context context;
@@ -27,8 +28,8 @@ public final class StoragePermissionManager {
 
     public String permissionDeniedMessage() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return "缺少“管理所有文件”权限，无法访问外部工作区。请在系统设置中允许 LineCode 管理所有文件，然后重试。";
+            return context.getString(R.string.permission_denied_manage_all);
         }
-        return "缺少文件读写权限，无法访问外部工作区。请允许 LineCode 读取和写入存储空间后重试。";
+        return context.getString(R.string.permission_denied_read_write);
     }
 }

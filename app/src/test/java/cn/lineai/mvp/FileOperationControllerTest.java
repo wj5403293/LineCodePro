@@ -124,10 +124,12 @@ public final class FileOperationControllerTest {
     private static final class Fixture {
         private final FakeFileStore localStore = new FakeFileStore();
         private final FakeFileStore sshStore = new FakeFileStore();
+        private final FakeFileStore ipcStore = new FakeFileStore();
         private final FakeHost host = new FakeHost();
         private final FileOperationController controller = new FileOperationController(
                 localStore,
                 sshStore,
+                ipcStore,
                 host,
                 (name, runnable) -> runnable.run(),
                 Runnable::run
@@ -189,6 +191,7 @@ public final class FileOperationControllerTest {
 
     private static final class FakeHost implements FileOperationController.Host {
         private boolean sshMode;
+        private boolean ipcMode;
         private String dialogTitle = "";
         private String dialogMessage = "";
         private String dialogActionId = "";
@@ -197,12 +200,18 @@ public final class FileOperationControllerTest {
         private ArrayList<SheetOption> fileActionOptions = new ArrayList<>();
         private String expandedPath = "";
         private String sshRefreshPath = "";
+        private String ipcRefreshPath = "";
         private int renderCount;
         private String notice = "";
 
         @Override
         public boolean isSshExecutionMode() {
             return sshMode;
+        }
+
+        @Override
+        public boolean isTerminalProviderExecutionMode() {
+            return ipcMode;
         }
 
         @Override
@@ -234,6 +243,11 @@ public final class FileOperationControllerTest {
         @Override
         public void refreshSshDirectoryAfterFileOperation(String path) {
             sshRefreshPath = path;
+        }
+
+        @Override
+        public void refreshIpcDirectoryAfterFileOperation(String path) {
+            ipcRefreshPath = path;
         }
 
         @Override

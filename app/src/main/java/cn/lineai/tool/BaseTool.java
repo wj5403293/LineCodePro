@@ -17,6 +17,22 @@ public abstract class BaseTool {
 
     public abstract ToolResult execute(JSONObject input, ToolContext context);
 
+    public boolean isConcurrencySafe() {
+        return false;
+    }
+
+    public boolean shouldRecordDiff() {
+        return false;
+    }
+
+    protected ToolResult ok(String content) {
+        return new ToolResult("", getName(), content, false);
+    }
+
+    protected ToolResult error(String message) {
+        return new ToolResult("", getName(), message, true);
+    }
+
     public final JSONObject toJson() throws org.json.JSONException {
         JSONObject function = new JSONObject();
         function.put("name", getName());

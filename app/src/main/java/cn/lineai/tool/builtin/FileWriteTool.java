@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
@@ -26,6 +27,11 @@ public final class FileWriteTool extends BaseTool {
     }
 
     @Override
+    public boolean shouldRecordDiff() {
+        return true;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -39,9 +45,7 @@ public final class FileWriteTool extends BaseTool {
     public ToolResult execute(JSONObject input, ToolContext context) {
         try {
             String path = input.optString("file_path");
-            if (path.trim().length() == 0) {
-                return error("file_path 不能为空");
-            }
+            ToolArgs.requireNonEmpty(path, "file_path");
             File file = FileToolPathPolicy.resolve(context, path);
             if (file.exists() && file.isDirectory()) {
                 return error("路径是一个目录，无法写入文件: " + path + "\n如需创建文件，请指定完整文件路径。");
@@ -63,13 +67,5 @@ public final class FileWriteTool extends BaseTool {
         } catch (Exception e) {
             return error("写入文件失败: " + e.getMessage());
         }
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

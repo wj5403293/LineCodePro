@@ -6,10 +6,6 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.media.AudioAttributes;
-import android.media.AudioFormat;
-import android.media.AudioManager;
-import android.media.AudioTrack;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -30,10 +26,9 @@ public final class KeepAliveService extends Service {
     private static final int NOTIFICATION_ID = 1001;
 
     private PowerManager.WakeLock wakeLock;
-    private AudioTrack fakeAudioTrack;
     private NotificationManager notificationManager;
     private boolean isForeground = false;
-    private String currentStatus = "正在编码";
+    private String currentStatus;
 
     @Override
     public void onCreate() {
@@ -67,9 +62,8 @@ public final class KeepAliveService extends Service {
         if (ACTION_START.equals(action)) {
             boolean wakeLockEnabled = intent.getBooleanExtra(EXTRA_WAKE_LOCK, false);
             boolean foregroundEnabled = intent.getBooleanExtra(EXTRA_FOREGROUND, false);
-            boolean fakeAudioEnabled = intent.getBooleanExtra(EXTRA_FAKE_AUDIO, false);
 
-            startKeepAlive(wakeLockEnabled, foregroundEnabled, fakeAudioEnabled);
+            startKeepAlive(wakeLockEnabled, foregroundEnabled);
             return START_STICKY;
         }
 
@@ -94,13 +88,13 @@ public final class KeepAliveService extends Service {
                     getString(R.string.notification_keep_alive_title),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("LineCode 编码任务后台保活通知");
+            channel.setDescription(getString(R.string.keep_alive_notification_title));
             channel.setShowBadge(false);
             notificationManager.createNotificationChannel(channel);
         }
     }
 
-    private void startKeepAlive(boolean wakeLockEnabled, boolean foregroundEnabled, boolean fakeAudioEnabled) {
+    private void startKeepAlive(boolean wakeLockEnabled, boolean foregroundEnabled) {
         if (wakeLockEnabled) {
             acquireWakeLock();
         }
@@ -109,15 +103,10 @@ public final class KeepAliveService extends Service {
             startForeground(NOTIFICATION_ID, buildNotification());
             isForeground = true;
         }
-
-        if (fakeAudioEnabled) {
-            startFakeAudio();
-        }
     }
 
     private void stopKeepAlive() {
         releaseWakeLock();
-        stopFakeAudio();
 
         if (isForeground) {
             stopForeground(true);
@@ -135,7 +124,7 @@ public final class KeepAliveService extends Service {
                     PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE,
                     "LineCode:EncodingWakeLock"
             );
-            wakeLock.acquire(10 * 60 * 1000L);
+            wakeLock.acquire();
         }
     }
 
@@ -146,64 +135,10 @@ public final class KeepAliveService extends Service {
         }
     }
 
-    private void startFakeAudio() {
-        if (fakeAudioTrack != null) {
-            return;
-        }
-        int sampleRate = 44100;
-        int channelConfig = AudioFormat.CHANNEL_OUT_MONO;
-        int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-        int bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat);
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            AudioAttributes attributes = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build();
-            AudioFormat format = new AudioFormat.Builder()
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelConfig)
-                    .setEncoding(audioFormat)
-                    .build();
-            fakeAudioTrack = new AudioTrack(attributes, format, bufferSize, AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE);
-        } else {
-            fakeAudioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, sampleRate, channelConfig, audioFormat, bufferSize, AudioTrack.MODE_STREAM);
-        }
-
-        if (fakeAudioTrack.getState() == AudioTrack.STATE_INITIALIZED) {
-            fakeAudioTrack.play();
-            writeSilenceLoop();
-        }
-    }
-
-    private void writeSilenceLoop() {
-        new Thread(() -> {
-            byte[] silence = new byte[1024];
-            while (fakeAudioTrack != null && fakeAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
-                fakeAudioTrack.write(silence, 0, silence.length);
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        }).start();
-    }
-
-    private void stopFakeAudio() {
-        if (fakeAudioTrack != null) {
-            if (fakeAudioTrack.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) {
-                fakeAudioTrack.stop();
-            }
-            fakeAudioTrack.release();
-            fakeAudioTrack = null;
-        }
-    }
-
     private Notification buildNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             return new Notification.Builder(this, CHANNEL_ID)
-                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_keepalive_notification)
                     .setContentTitle(getString(R.string.notification_keep_alive_title))
                     .setContentText(currentStatus)
                     .setOngoing(true)
@@ -211,7 +146,7 @@ public final class KeepAliveService extends Service {
                     .build();
         } else {
             return new Notification.Builder(this)
-                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_keepalive_notification)
                     .setContentTitle(getString(R.string.notification_keep_alive_title))
                     .setContentText(currentStatus)
                     .setOngoing(true)

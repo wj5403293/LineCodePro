@@ -417,6 +417,8 @@
     <string name="screen_mcp_section_execution">执行目标</string>
     <string name="screen_mcp_execution_local">本地工作区</string>
     <string name="screen_mcp_execution_ssh">SSH Shell</string>
+    <string name="screen_mcp_execution_terminal_provider">终端提供者</string>
+    <string name="screen_mcp_execution_terminal_provider_desc">通过外部终端提供者应用执行 Shell 命令和传输文件</string>
     <string name="screen_mcp_execution_desc">选择工具调用的执行环境</string>
     <string name="screen_mcp_section_ssh">SSH 连接</string>
     <string name="screen_mcp_ssh_desc">连接远程 Linux 服务器并将其作为执行目标</string>
@@ -462,6 +464,10 @@
     <string name="screen_extensions_badge_mcp">MCP</string>
     <string name="screen_extensions_badge_skills">Skills</string>
     <string name="screen_extensions_badge_linecode">LineCode</string>
+    <string name="screen_extensions_section_terminal_provider">终端提供者</string>
+    <string name="screen_extensions_desc_terminal_provider">连接外部终端提供者应用以执行 Shell 命令和传输文件</string>
+    <string name="screen_extensions_badge_terminal_provider">IPC</string>
+    <string name="permission_ipc_terminal_provider_desc">允许应用作为 LineCode 的终端提供者</string>
 
     <string name="screen_extension_detail_title">扩展详情</string>
     <string name="screen_extension_detail_section_install_skills">安装与创建</string>
@@ -493,6 +499,18 @@
     <string name="screen_extension_detail_delete_confirm">确定删除「%1$s」？</string>
     <string name="screen_extension_detail_delete_confirm_desc">删除后需要重新添加或安装才能使用</string>
     <string name="screen_extension_detail_delete_title">删除扩展</string>
+
+    <string name="screen_terminal_provider_title">终端提供者</string>
+    <string name="screen_terminal_provider_scan">扫描</string>
+    <string name="screen_terminal_provider_scan_desc">扫描可用的终端提供者应用</string>
+    <string name="screen_terminal_provider_scan_empty">未找到终端提供者。请安装提供者应用后重试。</string>
+    <string name="screen_terminal_provider_scan_results">扫描结果</string>
+    <string name="screen_terminal_provider_installed">已安装</string>
+    <string name="screen_terminal_provider_empty">尚未添加终端提供者。</string>
+    <string name="screen_terminal_provider_add_confirm">添加「%1$s」？</string>
+    <string name="screen_terminal_provider_add_confirm_desc">此应用将用于执行 Shell 命令和传输文件</string>
+    <string name="screen_terminal_provider_delete_title">删除终端提供者</string>
+    <string name="screen_terminal_provider_delete_confirm">删除「%1$s」？</string>
 
     <string name="screen_ssh_title">SSH 连接</string>
     <string name="screen_ssh_section_server">远程 Linux / 服务器</string>
@@ -807,6 +825,8 @@
     <string name="notification_keep_alive_title">LineCode</string>
     <string name="notification_keep_alive_text">正在编码</string>
     <string name="notification_keep_alive_ticker">LineCode</string>
+    <string name="keep_alive_status_encoding">正在编码</string>
+    <string name="keep_alive_notification_title">LineCode 编码任务后台保活通知</string>
 
     <string name="toast_open_link_failed">无法打开链接：%1$s</string>
     <string name="toast_copied">已复制</string>
@@ -954,4 +974,34 @@
 
     <string name="markdown_code_copy_desc">复制代码</string>
     <string name="markdown_code_copied">已复制</string>
+
+    <!-- SshService user-visible messages -->
+    <string name="ssh_error_command_empty">命令不能为空</string>
+    <string name="ssh_error_not_configured">SSH 未配置完整，请填写 host、port、username，并填写 password 或 private key。</string>
+    <string name="ssh_error_sftp_empty">SFTP 操作不能为空</string>
+    <string name="ssh_error_termux_permission">LineCode 未获得 Termux RUN_COMMAND 权限，请在应用权限中允许"Run commands in Termux environment"。</string>
+    <string name="ssh_error_termux_no_result">Termux 未返回执行结果，请确认 Termux 版本 &gt;= 0.109。</string>
+    <string name="ssh_error_termux_command_failed">Termux 启动命令失败: %1$d</string>
+    <string name="ssh_error_termux_setup_timeout">等待 Termux 配置 OpenSSH 超时，请确认 Termux 已执行授权指令并开启 allow-external-apps=true。</string>
+    <string name="ssh_error_command_timeout">命令执行超时</string>
+    <string name="ssh_error_create_config_dir">无法创建 SSH 配置目录: %1$s</string>
+    <string name="ssh_error_create_known_hosts">无法创建 known_hosts 文件: %1$s</string>
+    <string name="ssh_error_termux_parse_failed">Termux 已返回结果，但未解析到 username 或 private key。\n%1$s</string>
+    <string name="ssh_error_termux_not_installed">未检测到 Termux，请先安装 Termux。</string>
+    <string name="ssh_redact_private_key">LINEAI_PRIVATE_KEY=[已保存到 SSH Private key]</string>
+    <string name="ssh_error_read_termux_script">无法读取 Termux 配置脚本: %1$s</string>
+
+    <!-- MainCoordinator agent messages -->
+    <string name="message_agent_terminated">Agent 已终止。</string>
+    <string name="message_agent_pipeline_running">Agent 流水线运行中。</string>
+    <string name="message_agent_pipeline_no_model">当前没有可用模型，无法运行 Agent 流水线。</string>
+    <string name="message_agent_pipeline_agents_empty">agent_pipeline.agents 不能为空。</string>
+    <string name="message_agent_pipeline_circular">Agent 流水线存在循环依赖或重复 id，无法执行。</string>
+    <string name="message_agent_pipeline_completed">Agent 流水线完成: %1$d 个任务</string>
+    <string name="message_agent_pipeline_terminated">Agent 流水线已终止。</string>
+    <string name="message_agent_pipeline_self_dependency">Agent 不能依赖自身: %1$s</string>
+
+    <!-- StoragePermissionManager messages -->
+    <string name="permission_denied_manage_all">缺少“管理所有文件”权限，无法访问外部工作区。请在系统设置中允许 LineCode 管理所有文件，然后重试。</string>
+    <string name="permission_denied_read_write">缺少文件读写权限，无法访问外部工作区。请允许 LineCode 读取和写入存储空间后重试。</string>
 </resources>

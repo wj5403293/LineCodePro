@@ -1,13 +1,13 @@
 package cn.lineai.mvp;
 
 import cn.lineai.data.repository.FileTreeRepository;
+import cn.lineai.data.repository.IpcFileTreeRepository;
 import cn.lineai.data.repository.SshFileTreeRepository;
 import cn.lineai.model.SheetOption;
 import java.util.ArrayList;
 
 public final class FileOperationController {
-    interface BackgroundRunner {
-        void execute(String name, Runnable runnable);
+    interface BackgroundRunner extends cn.lineai.mvp.BackgroundRunner {
     }
 
     interface FileStore {
@@ -22,8 +22,10 @@ public final class FileOperationController {
         void copyInto(String sourcePath, String targetDirectoryPath) throws Exception;
     }
 
-    interface Host {
+    interface Host extends CoordinatorHost {
         boolean isSshExecutionMode();
+
+        boolean isTerminalProviderExecutionMode();
 
         void showInputDialog(String title, String message, String initialValue, String actionId);
 
@@ -35,17 +37,12 @@ public final class FileOperationController {
 
         void refreshSshDirectoryAfterFileOperation(String path);
 
-        void render();
+        void refreshIpcDirectoryAfterFileOperation(String path);
 
         void showNotice(String text);
-
-        String basename(String path);
-
-        String parentPath(String path);
     }
 
-    interface UiDispatcher {
-        void post(Runnable runnable);
+    interface UiDispatcher extends cn.lineai.mvp.UiDispatcher {
     }
 
     private static final class LocalFileStore implements FileStore {
@@ -114,18 +111,54 @@ public final class FileOperationController {
         }
     }
 
+    private static final class IpcFileStore implements FileStore {
+        private final IpcFileTreeRepository repository;
+
+        IpcFileStore(IpcFileTreeRepository repository) {
+            this.repository = repository;
+        }
+
+        @Override
+        public void createFile(String parentPath, String name) throws Exception {
+            repository.createFile(parentPath, name);
+        }
+
+        @Override
+        public void createDirectory(String parentPath, String name) throws Exception {
+            repository.createDirectory(parentPath, name);
+        }
+
+        @Override
+        public void rename(String path, String newName) throws Exception {
+            repository.rename(path, newName);
+        }
+
+        @Override
+        public void delete(String path) throws Exception {
+            repository.delete(path);
+        }
+
+        @Override
+        public void copyInto(String sourcePath, String targetDirectoryPath) throws Exception {
+            repository.copyInto(sourcePath, targetDirectoryPath);
+        }
+    }
+
     private final FileStore localFileStore;
     private final FileStore sshFileStore;
+    private final FileStore ipcFileStore;
     private final Host host;
     private final BackgroundRunner backgroundRunner;
     private final UiDispatcher uiDispatcher;
     private String clipboardPath = "";
     private String clipboardName = "";
     private boolean clipboardSsh;
+    private boolean clipboardIpc;
 
     public FileOperationController(
             FileTreeRepository fileTreeRepository,
             SshFileTreeRepository sshFileTreeRepository,
+            IpcFileTreeRepository ipcFileTreeRepository,
             Host host,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher
@@ -133,6 +166,7 @@ public final class FileOperationController {
         this(
                 new LocalFileStore(fileTreeRepository),
                 new SshFileStore(sshFileTreeRepository),
+                new IpcFileStore(ipcFileTreeRepository),
                 host,
                 backgroundRunner,
                 uiDispatcher
@@ -142,12 +176,14 @@ public final class FileOperationController {
     FileOperationController(
             FileStore localFileStore,
             FileStore sshFileStore,
+            FileStore ipcFileStore,
             Host host,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher
     ) {
         this.localFileStore = localFileStore;
         this.sshFileStore = sshFileStore;
+        this.ipcFileStore = ipcFileStore;
         this.host = host;
         this.backgroundRunner = backgroundRunner;
         this.uiDispatcher = uiDispatcher;
@@ -158,7 +194,16 @@ public final class FileOperationController {
     }
 
     public boolean canPasteInto(boolean directory) {
-        return directory && clipboardPath.length() > 0 && clipboardSsh == host.isSshExecutionMode();
+        if (!directory || clipboardPath.length() == 0) {
+            return false;
+        }
+        if (host.isSshExecutionMode()) {
+            return clipboardSsh;
+        }
+        if (host.isTerminalProviderExecutionMode()) {
+            return clipboardIpc;
+        }
+        return !clipboardSsh && !clipboardIpc;
     }
 
     public void showFileNodeActions(String path, String name, boolean directory, boolean root) {
@@ -233,17 +278,33 @@ public final class FileOperationController {
         clipboardPath = path == null ? "" : path;
         clipboardName = host.basename(path);
         clipboardSsh = host.isSshExecutionMode();
+        clipboardIpc = host.isTerminalProviderExecutionMode();
     }
 
     public void pasteFileNode(String targetDirectoryPath) {
-        if (clipboardPath.length() == 0 || clipboardSsh != host.isSshExecutionMode()) {
+        if (clipboardPath.length() == 0) {
+            return;
+        }
+        if (host.isSshExecutionMode() && !clipboardSsh) {
+            return;
+        }
+        if (host.isTerminalProviderExecutionMode() && !clipboardIpc) {
+            return;
+        }
+        if (!host.isSshExecutionMode() && !host.isTerminalProviderExecutionMode() && (clipboardSsh || clipboardIpc)) {
             return;
         }
         runFileOperation(targetDirectoryPath, () -> currentFileStore().copyInto(clipboardPath, targetDirectoryPath));
     }
 
     private FileStore currentFileStore() {
-        return host.isSshExecutionMode() ? sshFileStore : localFileStore;
+        if (host.isTerminalProviderExecutionMode()) {
+            return ipcFileStore;
+        }
+        if (host.isSshExecutionMode()) {
+            return sshFileStore;
+        }
+        return localFileStore;
     }
 
     private void runFileOperation(String expandedPath, FileOperation operation) {
@@ -256,6 +317,9 @@ public final class FileOperationController {
                     }
                     if (host.isSshExecutionMode()) {
                         host.refreshSshDirectoryAfterFileOperation(expandedPath);
+                    }
+                    if (host.isTerminalProviderExecutionMode()) {
+                        host.refreshIpcDirectoryAfterFileOperation(expandedPath);
                     }
                     host.render();
                 });

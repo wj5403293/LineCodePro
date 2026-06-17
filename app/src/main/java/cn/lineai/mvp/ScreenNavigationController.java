@@ -149,7 +149,8 @@ public final class ScreenNavigationController {
                 || "agentEdit".equals(safeScreenId)
                 || safeScreenId.startsWith("agentEdit:")
                 || "mcpEdit".equals(safeScreenId)
-                || safeScreenId.startsWith("mcpEdit:")) {
+                || safeScreenId.startsWith("mcpEdit:")
+                || "terminalProvider".equals(safeScreenId)) {
             return "extensions";
         }
         return "";

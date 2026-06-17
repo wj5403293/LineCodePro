@@ -1,7 +1,6 @@
 package cn.lineai.mvp;
 
 import cn.lineai.model.ModelConfig;
-import cn.lineai.model.ModelRepository;
 import java.util.List;
 
 public final class ModelManagementController {
@@ -28,48 +27,48 @@ public final class ModelManagementController {
     }
 
     private static final class RepositoryModelStore implements ModelStore {
-        private final ModelRepository modelRepository;
+        private final cn.lineai.model.ModelStore modelStore;
 
-        RepositoryModelStore(ModelRepository modelRepository) {
-            this.modelRepository = modelRepository;
+        RepositoryModelStore(cn.lineai.model.ModelStore modelStore) {
+            this.modelStore = modelStore;
         }
 
         @Override
         public List<ModelConfig> getModels() {
-            return modelRepository.getModels();
+            return modelStore.getModels();
         }
 
         @Override
         public ModelConfig getModel(String id) {
-            return modelRepository.getModel(id);
+            return modelStore.getModel(id);
         }
 
         @Override
         public String getSelectedModelId() {
-            return modelRepository.getSelectedModelId();
+            return modelStore.getSelectedModelId();
         }
 
         @Override
         public void setSelectedModelId(String id) {
-            modelRepository.setSelectedModelId(id);
+            modelStore.setSelectedModelId(id);
         }
 
         @Override
         public ModelConfig save(ModelConfig model) {
-            return modelRepository.save(model);
+            return modelStore.save(model);
         }
 
         @Override
         public void deleteModels(List<String> ids) {
-            modelRepository.deleteModels(ids);
+            modelStore.deleteModels(ids);
         }
     }
 
     private final ModelStore modelStore;
     private final Host host;
 
-    public ModelManagementController(ModelRepository modelRepository, Host host) {
-        this(new RepositoryModelStore(modelRepository), host);
+    public ModelManagementController(cn.lineai.model.ModelStore modelStore, Host host) {
+        this(new RepositoryModelStore(modelStore), host);
     }
 
     ModelManagementController(ModelStore modelStore, Host host) {

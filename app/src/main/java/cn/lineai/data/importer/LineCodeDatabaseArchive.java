@@ -182,6 +182,9 @@ public final class LineCodeDatabaseArchive {
     }
 
     private HashSet<String> tableColumns(SQLiteDatabase db, String table) {
+        if (!LineCodeSchema.isValidTable(table)) {
+            throw new IllegalArgumentException("非法表名: " + table);
+        }
         HashSet<String> columns = new HashSet<>();
         Cursor cursor = db.rawQuery("PRAGMA table_info(" + table + ")", null);
         try {

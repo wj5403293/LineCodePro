@@ -1,12 +1,11 @@
 package cn.lineai.tool.builtin;
 
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import org.json.JSONObject;
@@ -28,6 +27,11 @@ public final class FileEditTool extends BaseTool {
     }
 
     @Override
+    public boolean shouldRecordDiff() {
+        return true;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -44,9 +48,7 @@ public final class FileEditTool extends BaseTool {
             String path = input.optString("file_path");
             String oldString = input.optString("old_string");
             String newString = input.optString("new_string");
-            if (path.trim().length() == 0) {
-                return error("file_path 不能为空");
-            }
+            ToolArgs.requireNonEmpty(path, "file_path");
             if (oldString.length() == 0) {
                 return error("old_string 不能为空");
             }
@@ -57,7 +59,7 @@ public final class FileEditTool extends BaseTool {
             if (file.isDirectory()) {
                 return error("路径是一个目录，无法编辑文件: " + path + "\n如需编辑文件，请指定具体文件路径。");
             }
-            String content = readUtf8(file);
+            String content = FileIo.readUtf8(file);
             if (!content.contains(oldString)) {
                 return error("未找到匹配的文本");
             }
@@ -76,21 +78,6 @@ public final class FileEditTool extends BaseTool {
         }
     }
 
-    private String readUtf8(File file) throws Exception {
-        FileInputStream input = new FileInputStream(file);
-        try {
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = input.read(buffer)) != -1) {
-                output.write(buffer, 0, read);
-            }
-            return output.toString(StandardCharsets.UTF_8.name());
-        } finally {
-            input.close();
-        }
-    }
-
     private int countOccurrences(String content, String value) {
         int count = 0;
         int index = 0;
@@ -99,13 +86,5 @@ public final class FileEditTool extends BaseTool {
             index += value.length();
         }
         return count;
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

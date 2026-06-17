@@ -33,6 +33,15 @@ public final class LineCodeDatabase extends SQLiteOpenHelper {
         db.setForeignKeyConstraintsEnabled(true);
     }
 
+    /**
+     * 仅在数据库首次创建时调用。执行 {@link LineCodeSchema#CREATE_SQL} 一次性建出全部表
+     * 与索引（代表当前 {@link LineCodeSchema#VERSION} 的完整 schema），随后写入版本元数据。
+     *
+     * <p>设计意图：全新安装的数据库已包含全部最新表结构，因此 {@link #onUpgrade}
+     * 中的迁移类不会对全新安装重复执行——{@link #applyMigrations} 仅在
+     * {@code oldVersion < newVersion} 时由 {@link #onUpgrade} 调用。迁移类中的
+     * {@code CREATE TABLE IF NOT EXISTS} 语句对已存在的表是幂等的，不会破坏数据。
+     */
     @Override
     public void onCreate(SQLiteDatabase db) {
         executeAll(db, LineCodeSchema.CREATE_SQL);
@@ -47,6 +56,14 @@ public final class LineCodeDatabase extends SQLiteOpenHelper {
         writeSchemaVersionMetadata(db, LineCodeSchema.VERSION);
     }
 
+    /**
+     * 每次打开数据库时调用。此处重复执行 {@link LineCodeSchema#CREATE_SQL} 作为幂等兜底，
+     * 确保表与索引结构完整（应对数据库文件损坏、外部修改或迁移遗漏等边缘情况）。
+     *
+     * <p>性能影响：所有语句均使用 {@code IF NOT EXISTS}，SQLite 仅做存在性检查后即跳过，
+     * 不会重写数据；但每次开库仍需解析并执行全部 DDL，在表数量增长后存在非零开销。
+     * 当前表规模下开销可接受，故保留；若后续表数量大幅增加，应改为仅在迁移后执行。
+     */
     @Override
     public void onOpen(SQLiteDatabase db) {
         super.onOpen(db);

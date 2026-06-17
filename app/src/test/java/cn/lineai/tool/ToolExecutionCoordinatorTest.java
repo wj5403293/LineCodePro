@@ -10,7 +10,7 @@ public final class ToolExecutionCoordinatorTest {
         ToolCall read = new ToolCall("read_1", "file_read", "{\"file_path\":\"a.txt\"}");
         ToolCall delete = new ToolCall("delete_1", "file_delete", "{\"reason\":\"cleanup\",\"paths\":[\"a.txt\"]}");
 
-        ToolExecutionCoordinator.ToolExecutionPlan plan = new ToolExecutionCoordinator()
+        ToolExecutionCoordinator.ToolExecutionPlan plan = new ToolExecutionCoordinator(new ToolRegistry())
                 .createPlan(Arrays.asList(read, delete));
 
         Assert.assertEquals(1, plan.getConcurrentTasks().size());

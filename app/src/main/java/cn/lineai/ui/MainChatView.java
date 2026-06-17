@@ -63,11 +63,14 @@ import cn.lineai.ui.component.ModelListScreenView;
 import cn.lineai.ui.component.OutputSettingsScreenView;
 import cn.lineai.ui.component.PluginPageScreenView;
 import cn.lineai.ui.component.PromptTemplatesScreenView;
+import cn.lineai.ui.component.ScreenFactories;
+import cn.lineai.ui.component.ScreenRegistry;
 import cn.lineai.ui.component.SettingsScreenView;
 import cn.lineai.ui.component.ShellCommandScreenView;
 import cn.lineai.ui.component.SimpleSettingsScreenView;
 import cn.lineai.ui.component.SshSettingsScreenView;
 import cn.lineai.ui.component.StorageManagementScreenView;
+import cn.lineai.ui.component.TerminalProviderDetailScreenView;
 import cn.lineai.ui.component.TermuxIntegrationScreenView;
 import cn.lineai.ui.component.ThemeSettingsScreenView;
 import cn.lineai.ui.component.ToolSettingsScreenView;
@@ -116,6 +119,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private ChatUiState lastState;
     private String shellCommandText = "";
     private String currentScreenId = "";
+    private final ScreenRegistry screenRegistry = new ScreenRegistry();
     private String attachmentPickerTitle = "";
     private String attachmentPickerMessage = "";
     private String attachmentPickerSource = InputAttachment.SOURCE_LOCAL;
@@ -341,6 +345,45 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         screenHost.setVisibility(GONE);
         addView(screenHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         installSystemBarInsetsHandling();
+        registerScreenFactories();
+    }
+
+    private void registerScreenFactories() {
+        screenRegistry.register(new ScreenFactories.SettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.LlmSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.PromptTemplatesScreenFactory());
+        screenRegistry.register(new ScreenFactories.InputSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.ToolSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.McpSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.OutputSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.ThemeSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.ExperimentalSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.DataSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.StorageManagementScreenFactory());
+        screenRegistry.register(new ScreenFactories.MemorySettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.KeepAliveSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.SshSettingsScreenFactory());
+        screenRegistry.register(new ScreenFactories.TermuxIntegrationScreenFactory());
+        screenRegistry.register(new ScreenFactories.AboutScreenFactory());
+        screenRegistry.register(new ScreenFactories.LicensesScreenFactory());
+        screenRegistry.register(new ScreenFactories.TutorialScreenFactory());
+        screenRegistry.register(new ScreenFactories.PluginPageScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelListScreenFactory());
+        screenRegistry.register(new ScreenFactories.ImageUnderstandingModelScreenFactory());
+        screenRegistry.register(new ScreenFactories.ImageGenerationModelScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelAddOptionsScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelAddScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelAddLocalScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelAddPresetScreenFactory());
+        screenRegistry.register(new ScreenFactories.ModelEditScreenFactory());
+        screenRegistry.register(new ScreenFactories.ExtensionsScreenFactory());
+        screenRegistry.register(new ScreenFactories.TerminalProviderScreenFactory());
+        screenRegistry.register(new ScreenFactories.AgentEditScreenFactory());
+        screenRegistry.register(new ScreenFactories.McpEditScreenFactory());
+        screenRegistry.register(new ScreenFactories.ExtensionDetailScreenFactory());
+        screenRegistry.register(new ScreenFactories.BrowserScreenFactory());
+        screenRegistry.register(new ScreenFactories.BrowserPrefixScreenFactory());
+        screenRegistry.register(new ScreenFactories.ShellCommandScreenFactory());
     }
 
     @Override
@@ -751,8 +794,16 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         return false;
     }
 
-    private void handleScreenBack() {
+    public void handleScreenBack() {
         presenter.onScreenBackFrom(currentScreenId);
+    }
+
+    public String getCurrentScreenId() {
+        return currentScreenId;
+    }
+
+    public String getShellCommandText() {
+        return shellCommandText;
     }
 
     private void renderAttachmentPicker() {
@@ -767,634 +818,11 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     }
 
     private View buildScreen(String screenId) {
-        Context context = getContext();
-        if ("settings".equals(screenId)) {
-            return new SettingsScreenView(context, new SettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onItem(String id) {
-                    presenter.onSettingsItemSelected(id);
-                }
-            });
-        }
-        if ("models".equals(screenId)) {
-            return new ModelListScreenView(context, presenter.getModels(), presenter.getSelectedModelId(), new ModelListScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onAddModel() {
-                    presenter.onSettingsItemSelected("modelAddOptions");
-                }
-
-                @Override
-                public void onSelectModel(String id) {
-                    presenter.onModelSelected(id);
-                }
-
-                @Override
-                public void onEditModel(String id) {
-                    presenter.onSettingsItemSelected("modelEdit:" + id);
-                }
-
-                @Override
-                public void onDeleteModels(List<String> ids) {
-                    presenter.onModelsDeleted(ids);
-                }
-            });
-        }
-        if ("imageUnderstandingModel".equals(screenId)) {
-            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageUnderstandingModelId(), getContext().getString(R.string.screen_models_pick_image_understanding), false, new ModelListScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onAddModel() {
-                }
-
-                @Override
-                public void onSelectModel(String id) {
-                    presenter.onImageUnderstandingModelSelected(id);
-                }
-
-                @Override
-                public void onEditModel(String id) {
-                }
-
-                @Override
-                public void onDeleteModels(List<String> ids) {
-                }
-            });
-        }
-        if ("imageGenerationModel".equals(screenId)) {
-            return new ModelListScreenView(context, presenter.getModels(), presenter.getImageGenerationModelId(), getContext().getString(R.string.screen_models_pick_image_generation), false, new ModelListScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onAddModel() {
-                }
-
-                @Override
-                public void onSelectModel(String id) {
-                    presenter.onImageGenerationModelSelected(id);
-                }
-
-                @Override
-                public void onEditModel(String id) {
-                }
-
-                @Override
-                public void onDeleteModels(List<String> ids) {
-                }
-            });
-        }
-        if ("extensions".equals(screenId)) {
-            return new ExtensionsScreenView(context, new ExtensionsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onOpen(String id) {
-                    presenter.onSettingsItemSelected("extension:" + id);
-                }
-            });
-        }
-        if ("llm".equals(screenId)) {
-            return new LLMSettingsScreenView(context, presenter.getAiBehaviorSettings(), new LLMSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onToneModeChanged(String toneMode) {
-                    presenter.onAiToneModeChanged(toneMode);
-                }
-
-                @Override
-                public void onReasoningEffortChanged(String effort) {
-                    presenter.onAiReasoningEffortChanged(effort);
-                }
-
-                @Override
-                public void onThinkingScrollChanged(boolean enabled) {
-                    presenter.onAiThinkingScrollChanged(enabled);
-                }
-
-                @Override
-                public void onThinkingAutoExpandChanged(boolean enabled) {
-                    presenter.onAiThinkingAutoExpandChanged(enabled);
-                }
-
-                @Override
-                public void onPreserveReasoningChanged(boolean enabled) {
-                    presenter.onAiPreserveReasoningChanged(enabled);
-                }
-
-                @Override
-                public void onLearningModeChanged(boolean enabled) {
-                    presenter.onAiLearningModeChanged(enabled);
-                }
-
-                @Override
-                public void onOpenPromptTemplates() {
-                    presenter.onSettingsItemSelected("promptTemplates");
-                }
-            });
-        }
-        if ("promptTemplates".equals(screenId)) {
-            return new PromptTemplatesScreenView(context, presenter.getPromptTemplates(), new PromptTemplatesScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onPromptTemplateSaved(String id, String value) {
-                    presenter.onPromptTemplateSaved(id, value);
-                }
-
-                @Override
-                public void onPromptTemplateReset(String id) {
-                    presenter.onPromptTemplateReset(id);
-                }
-            });
-        }
-        if ("input".equals(screenId)) {
-            return new InputSettingsScreenView(context, presenter.getInputSettings(), new InputSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onEnterKeyBehaviorChanged(String behavior) {
-                    presenter.onEnterKeyBehaviorChanged(behavior);
-                }
-            });
-        }
-        if ("toolSettings".equals(screenId)) {
-            return new ToolSettingsScreenView(context, presenter.getMcpSettingsState(), imageUnderstandingModelLabel(), imageGenerationModelLabel(), new ToolSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onWebSearchConfigChanged(cn.lineai.model.WebSearchConfig config) {
-                    presenter.onMcpWebSearchConfigChanged(config);
-                }
-
-                @Override
-                public void onOpenImageUnderstandingModelPicker() {
-                    presenter.onSettingsItemSelected("imageUnderstandingModel");
-                }
-
-                @Override
-                public void onOpenImageGenerationModelPicker() {
-                    presenter.onSettingsItemSelected("imageGenerationModel");
-                }
-            });
-        }
-        if ("mcp".equals(screenId)) {
-            return new MCPSettingsScreenView(context, presenter.getMcpSettingsState(), new MCPSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onExecutionModeChanged(String mode) {
-                    presenter.onMcpExecutionModeChanged(mode);
-                }
-
-                @Override
-                public void onToolGroupChanged(String id, boolean enabled) {
-                    presenter.onMcpToolGroupChanged(id, enabled);
-                }
-
-                @Override
-                public void onOpenSshSettings() {
-                    presenter.onSettingsItemSelected("sshSettings");
-                }
-
-                @Override
-                public void onOpenTermuxIntegration() {
-                    presenter.onSettingsItemSelected("termuxIntegration");
-                }
-            });
-        }
-        if ("output".equals(screenId)) {
-            return new OutputSettingsScreenView(context, presenter.getOutputSettings(), new OutputSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onCodeWrapChanged(boolean enabled) {
-                    presenter.onCodeWrapChanged(enabled);
-                }
-
-                @Override
-                public void onBrowserModeChanged(String mode) {
-                    presenter.onBrowserModeChanged(mode);
-                }
-
-                @Override
-                public void onBrowserJavaScriptChanged(boolean enabled) {
-                    presenter.onBrowserJavaScriptChanged(enabled);
-                }
-            });
-        }
-        if ("theme".equals(screenId)) {
-            return new ThemeSettingsScreenView(context, presenter.getThemeSettings(), new ThemeSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onThemeModeChanged(String mode) {
-                    presenter.onThemeModeChanged(mode);
-                }
-
-                @Override
-                public void onCustomThemeColorsSaved(java.util.Map<String, String> colors) {
-                    presenter.onCustomThemeColorsSaved(colors);
-                }
-            });
-        }
-        if ("experimental".equals(screenId)) {
-            return new ExperimentalSettingsScreenView(context, this::handleScreenBack);
-        }
-        if ("data".equals(screenId)) {
-            return new DataSettingsScreenView(context, new DataSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onExport() {
-                    presenter.onLineCodeExportRequested();
-                }
-
-                @Override
-                public void onImport() {
-                    presenter.onLineCodeImportRequested();
-                }
-            });
-        }
-        if ("storage".equals(screenId)) {
-            return new StorageManagementScreenView(context, new StorageManagementScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onClearDiffCache() {
-                    presenter.onClearDiffCache();
-                }
-
-                @Override
-                public void onClearChatHistory() {
-                    presenter.onClearChatHistory();
-                }
-            });
-        }
-        if ("memory".equals(screenId)) {
-            return new MemorySettingsScreenView(context, new MemorySettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public cn.lineai.model.MemoryOverviewState getMemoryOverview() {
-                    return presenter.getMemoryOverview();
-                }
-
-                @Override
-                public void onMemorySaved(String id, String scope, String content) {
-                    presenter.onMemorySaved(id, scope, content);
-                }
-
-                @Override
-                public void onMemoryDeleted(String id) {
-                    presenter.onMemoryDeleted(id);
-                }
-            });
-        }
-        if ("keepAlive".equals(screenId)) {
-            return new KeepAliveSettingsScreenView(context, new KeepAliveSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onSettingsChanged() {
-                    presenter.onKeepAliveSettingsChanged();
-                }
-            });
-        }
-        if ("sshSettings".equals(screenId)) {
-            return new SshSettingsScreenView(context, new SshSettingsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onOpenTermuxIntegration() {
-                    presenter.onSettingsItemSelected("termuxIntegration");
-                }
-            });
-        }
-        if ("termuxIntegration".equals(screenId)) {
-            return new TermuxIntegrationScreenView(context, this::handleScreenBack);
-        }
-        if ("about".equals(screenId)) {
-            return new AboutScreenView(context, new AboutScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onOpenLicenses() {
-                    presenter.onSettingsItemSelected("licenses");
-                }
-            });
-        }
-        if ("licenses".equals(screenId)) {
-            return new LicensesScreenView(context, this::handleScreenBack);
-        }
-        if ("tutorial".equals(screenId)) {
-            return new TutorialScreenView(context, this::handleScreenBack);
-        }
-        if ("pluginPage".equals(screenId)) {
-            return new PluginPageScreenView(context, getContext().getString(R.string.plugin_page_title), this::handleScreenBack);
-        }
-        if (screenId != null && screenId.startsWith("browser:")) {
-            return new InAppBrowserScreenView(context, screenId.substring("browser:".length()),
-                    presenter.getOutputSettings().isBrowserJavaScriptEnabled(), this::handleScreenBack);
-        }
-        if ("browser".equals(screenId)) {
-            return new InAppBrowserScreenView(context, "about:blank",
-                    presenter.getOutputSettings().isBrowserJavaScriptEnabled(), this::handleScreenBack);
-        }
-        if ("agentEdit".equals(screenId) || (screenId != null && screenId.startsWith("agentEdit:"))) {
-            cn.lineai.model.ExtensionOverviewState overview = presenter.getExtensionOverview();
-            cn.lineai.model.ExtensionAgentConfig editingAgent = findAgent(overview, screenId == null ? "" : screenId.substring("agentEdit".length()).replaceFirst("^:", ""));
-            return new AgentExtensionEditScreenView(
-                    context,
-                    editingAgent,
-                    presenter.getExtensionAvailableTools(),
-                    presenter.getMcpSettingsState().getConfigs(),
-                    overview.getMcps(),
-                    new AgentExtensionEditScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public cn.lineai.model.ExtensionAgentConfig onGenerateDraft(String description) throws Exception {
-                    return presenter.onAgentDraftGenerated(description);
-                }
-
-                @Override
-                public void onSave(cn.lineai.model.ExtensionAgentConfig config) {
-                    presenter.onAgentExtensionSaved(config);
-                }
-            });
-        }
-        if ("mcpEdit".equals(screenId) || (screenId != null && screenId.startsWith("mcpEdit:"))) {
-            cn.lineai.model.ExtensionOverviewState overview = presenter.getExtensionOverview();
-            cn.lineai.model.ExtensionMcpConfig editingMcp = findMcp(overview, screenId == null ? "" : screenId.substring("mcpEdit".length()).replaceFirst("^:", ""));
-            return new McpExtensionEditScreenView(context, editingMcp, new McpExtensionEditScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public java.util.List<cn.lineai.model.McpToolSummary> onQueryTools(String url, java.util.List<cn.lineai.model.McpRequestHeader> headers) throws Exception {
-                    return presenter.onMcpToolsQuery(url, headers);
-                }
-
-                @Override
-                public void onSave(cn.lineai.model.ExtensionMcpConfig config) {
-                    presenter.onMcpExtensionSaved(config);
-                }
-            });
-        }
-        if (screenId != null && screenId.startsWith("extension:")) {
-            String kind = screenId.substring("extension:".length());
-            return new ExtensionDetailScreenView(context, kind, presenter.getExtensionOverview(), new ExtensionDetailScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onAddAgent() {
-                    presenter.onSettingsItemSelected("agentEdit");
-                }
-
-                @Override
-                public void onEditAgent(String id) {
-                    presenter.onSettingsItemSelected("agentEdit:" + id);
-                }
-
-                @Override
-                public void onAddMcp() {
-                    presenter.onSettingsItemSelected("mcpEdit");
-                }
-
-                @Override
-                public void onEditMcp(String id) {
-                    presenter.onSettingsItemSelected("mcpEdit:" + id);
-                }
-
-                @Override
-                public void onCreateSkill(String location, String name, String description, String content) {
-                    presenter.onSkillCreated(location, name, description, content);
-                }
-
-                @Override
-                public void onInstallSkill(String location, String sourcePath, String name) {
-                    try {
-                        presenter.onSkillInstalled(location, sourcePath, name);
-                    } catch (Exception e) {
-                        android.widget.Toast.makeText(getContext(), e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-                    }
-                }
-
-                @Override
-                public void onInstallSkillFromUri(String location, String uri, String displayName) {
-                    try {
-                        presenter.onSkillInstalledFromUri(location, uri, displayName);
-                    } catch (Exception e) {
-                        android.widget.Toast.makeText(getContext(), e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
-                    }
-                }
-
-                @Override
-                public void onEnabledChanged(String kind, String id, boolean enabled) {
-                    presenter.onExtensionEnabledChanged(kind, id, enabled);
-                }
-
-                @Override
-                public void onDelete(String kind, String id) {
-                    presenter.onExtensionDeleted(kind, id);
-                }
-            });
-        }
-        if ("shellCommand".equals(screenId)) {
-            return new ShellCommandScreenView(context, shellCommandText, this::handleScreenBack);
-        }
-        if ("modelAddOptions".equals(screenId)) {
-            return new ModelAddOptionsScreenView(context, new ModelAddOptionsScreenView.Listener() {
-                @Override
-                public void onBack() {
-                    handleScreenBack();
-                }
-
-                @Override
-                public void onCustom() {
-                    presenter.onSettingsItemSelected("modelAdd");
-                }
-
-                @Override
-                public void onLocal() {
-                    presenter.onSettingsItemSelected("modelAdd:local");
-                }
-
-                @Override
-                public void onProvider(String id) {
-                    presenter.onSettingsItemSelected("modelAdd:preset:" + id);
-                }
-            });
-        }
-        if ("modelAdd".equals(screenId)) {
-            return modelAddScreen(context, null, false);
-        }
-        if ("modelAdd:local".equals(screenId)) {
-            return modelAddScreen(context, null, true);
-        }
-        if (screenId != null && screenId.startsWith("modelAdd:preset:")) {
-            return modelAddScreen(context, ModelProviderPresets.find(screenId.substring("modelAdd:preset:".length())), false);
-        }
-        if (screenId != null && screenId.startsWith("modelEdit:")) {
-            ModelConfig model = presenter.getModel(screenId.substring("modelEdit:".length()));
-            if (model != null) {
-                return modelEditScreen(context, model);
-            }
-            return modelAddScreen(context, null, false);
+        View view = screenRegistry.createScreen(screenId, this, presenter, getContext());
+        if (view != null) {
+            return view;
         }
         return simpleScreen(screenId);
-    }
-
-    private cn.lineai.model.ExtensionAgentConfig findAgent(cn.lineai.model.ExtensionOverviewState state, String id) {
-        if (state == null || id == null || id.length() == 0) {
-            return null;
-        }
-        for (cn.lineai.model.ExtensionAgentConfig agent : state.getAgents()) {
-            if (id.equals(agent.getId())) {
-                return agent;
-            }
-        }
-        return null;
-    }
-
-    private cn.lineai.model.ExtensionMcpConfig findMcp(cn.lineai.model.ExtensionOverviewState state, String id) {
-        if (state == null || id == null || id.length() == 0) {
-            return null;
-        }
-        for (cn.lineai.model.ExtensionMcpConfig mcp : state.getMcps()) {
-            if (id.equals(mcp.getId())) {
-                return mcp;
-            }
-        }
-        return null;
-    }
-
-    private View modelAddScreen(Context context, ModelProviderPreset preset, boolean local) {
-        return new ModelAddScreenView(context, preset, local, null, new ModelAddScreenView.Listener() {
-            @Override
-            public void onBack() {
-                handleScreenBack();
-            }
-
-            @Override
-            public void onSave(ModelConfig model) {
-                presenter.onModelSaved(model);
-            }
-        });
-    }
-
-    private View modelEditScreen(Context context, ModelConfig model) {
-        return new ModelAddScreenView(context, null, model.getProtocolType().name().equals("LOCAL_GGUF"), model, new ModelAddScreenView.Listener() {
-            @Override
-            public void onBack() {
-                handleScreenBack();
-            }
-
-            @Override
-            public void onSave(ModelConfig model) {
-                presenter.onModelSaved(model);
-            }
-        });
-    }
-
-    private String providerLabel(String id) {
-        if ("deepseek".equals(id)) return "DeepSeek";
-        if ("glm".equals(id)) return "GLM";
-        if ("mimo".equals(id)) return "Mimo";
-        if ("mimo-token-plan".equals(id)) return getContext().getString(R.string.provider_mimo_token_plan);
-        if ("kimi".equals(id)) return "Kimi";
-        if ("qwen".equals(id)) return "Qwen";
-        if ("openai".equals(id)) return "OpenAI";
-        if ("codex".equals(id)) return "Codex";
-        if ("claude".equals(id)) return "Claude";
-        if ("gemini".equals(id)) return "Gemini";
-        if ("openrouter".equals(id)) return "OpenRouter";
-        return null;
-    }
-
-    private String imageUnderstandingModelLabel() {
-        ModelConfig model = presenter.getModel(presenter.getImageUnderstandingModelId());
-        if (model == null) {
-            return "";
-        }
-        String modelId = model.getModelId();
-        return model.getName() + (modelId.length() == 0 ? "" : " · " + modelId);
-    }
-
-    private String imageGenerationModelLabel() {
-        ModelConfig model = presenter.getModel(presenter.getImageGenerationModelId());
-        if (model == null) {
-            return "";
-        }
-        String modelId = model.getModelId();
-        return model.getName() + (modelId.length() == 0 ? "" : " · " + modelId);
     }
 
     private View simpleScreen(String screenId) {

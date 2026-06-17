@@ -37,6 +37,11 @@ public final class WebSearchTool extends BaseTool {
     }
 
     @Override
+    public boolean isConcurrencySafe() {
+        return true;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -81,13 +86,5 @@ public final class WebSearchTool extends BaseTool {
 
     private WebSearchConfig config() {
         return configRepository == null ? WebSearchConfig.defaultConfig() : configRepository.get();
-    }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
     }
 }

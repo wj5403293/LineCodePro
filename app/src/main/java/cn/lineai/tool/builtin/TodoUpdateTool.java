@@ -97,8 +97,4 @@ public final class TodoUpdateTool extends BaseTool {
         }
         return new ToolResult("", getName(), summary, false);
     }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
 }

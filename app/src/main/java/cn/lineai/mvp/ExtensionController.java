@@ -1,5 +1,7 @@
 package cn.lineai.mvp;
 
+import cn.lineai.ipc.IpcProviderConfig;
+import cn.lineai.ipc.ScannedProvider;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
@@ -31,4 +33,16 @@ public interface ExtensionController {
     void onExtensionEnabledChanged(String kind, String id, boolean enabled);
 
     void onExtensionDeleted(String kind, String id);
+
+    List<ScannedProvider> onTerminalProviderScan();
+
+    List<ScannedProvider> getTerminalProviderScanResults();
+
+    boolean hasTerminalProviderScanned();
+
+    void onTerminalProviderSaved(IpcProviderConfig config);
+
+    void onTerminalProviderEnabledChanged(String id, boolean enabled);
+
+    void onTerminalProviderDeleted(String id);
 }

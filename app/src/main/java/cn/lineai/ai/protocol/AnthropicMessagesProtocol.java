@@ -56,27 +56,7 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
     ) throws ModelCompletionException {
         try {
             ModelRequestOptions requestOptions = options == null ? ModelRequestOptions.defaults() : options;
-            String effort = requestOptions.getReasoningEffort();
-            boolean thinkingEnabled = !AiBehaviorSettings.REASONING_OFF.equals(effort);
-            int thinkingBudget = thinkingEnabled ? thinkingBudget(effort) : 0;
-            JSONObject body = new JSONObject();
-            body.put("model", ModelContextParser.apiModelId(config.getModelId()));
-            body.put("max_tokens", thinkingEnabled ? Math.max(4096, thinkingBudget + 1024) : 4096);
-            body.put("messages", messagesJson(messages));
-            body.put("stream", true);
-            if (!requestOptions.getTools().isEmpty()) {
-                body.put("tools", toolsJson(requestOptions.getTools()));
-            }
-            if (thinkingEnabled) {
-                body.put("thinking", new JSONObject()
-                        .put("type", "enabled")
-                        .put("budget_tokens", thinkingBudget));
-            }
-
-            String system = systemPrompt(messages);
-            if (system.length() > 0) {
-                body.put("system", system);
-            }
+            JSONObject body = buildRequestBody(config, messages, requestOptions);
 
             HashMap<String, String> headers = new HashMap<>();
             headers.put("x-api-key", config.getApiKey());
@@ -87,44 +67,7 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
             HashMap<Integer, ToolUseBuilder> toolUseBuilders = new HashMap<>();
 
             postJsonSse(endpoint(config.getBaseUrl(), "/v1/messages"), body, headers, cancellationToken, (eventType, data) -> {
-                if ("[DONE]".equals(data.trim())) {
-                    return;
-                }
-                JSONObject event = new JSONObject(data);
-                if (event.has("error")) {
-                    throw new ModelCompletionException("Anthropic 流式错误: " + event.opt("error"));
-                }
-                String type = event.optString("type");
-
-                if ("content_block_start".equals(type)) {
-                    JSONObject block = event.optJSONObject("content_block");
-                    if (block != null) {
-                        String blockType = block.optString("type");
-                        if ("redacted_thinking".equals(blockType)) {
-                            appendDelta(reasoning, "[redacted thinking]", true, callback);
-                        } else if ("tool_use".equals(blockType)) {
-                            startToolUse(toolUseBuilders, event.optInt("index", toolUseBuilders.size()), block);
-                        }
-                    }
-                    return;
-                }
-
-                if (!"content_block_delta".equals(type)) {
-                    return;
-                }
-
-                JSONObject delta = event.optJSONObject("delta");
-                if (delta == null) {
-                    return;
-                }
-                String deltaType = delta.optString("type");
-                if ("thinking_delta".equals(deltaType)) {
-                    appendDelta(reasoning, delta.optString("thinking"), true, callback);
-                } else if ("text_delta".equals(deltaType)) {
-                    appendDelta(text, delta.optString("text"), false, callback);
-                } else if ("input_json_delta".equals(deltaType)) {
-                    appendToolUseInput(toolUseBuilders, event.optInt("index", toolUseBuilders.size()), delta.optString("partial_json"));
-                }
+                handleSseEvent(data, callback, text, reasoning, toolUseBuilders);
             });
 
             return new ModelCompletionResponse(text.toString(), reasoning.toString(), buildToolCalls(toolUseBuilders));
@@ -132,6 +75,82 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
             throw e;
         } catch (Exception e) {
             throw new ModelCompletionException("Anthropic Messages 协议流式解析失败: " + e.getMessage(), e);
+        }
+    }
+
+    private JSONObject buildRequestBody(
+            ModelConfig config,
+            List<ModelMessage> messages,
+            ModelRequestOptions requestOptions
+    ) throws Exception {
+        String effort = requestOptions.getReasoningEffort();
+        boolean thinkingEnabled = !AiBehaviorSettings.REASONING_OFF.equals(effort);
+        int thinkingBudget = thinkingEnabled ? thinkingBudget(effort) : 0;
+        JSONObject body = new JSONObject();
+        body.put("model", ModelContextParser.apiModelId(config.getModelId()));
+        body.put("max_tokens", thinkingEnabled ? Math.max(4096, thinkingBudget + 1024) : 4096);
+        body.put("messages", messagesJson(messages));
+        body.put("stream", true);
+        if (!requestOptions.getTools().isEmpty()) {
+            body.put("tools", toolsJson(requestOptions.getTools()));
+        }
+        if (thinkingEnabled) {
+            body.put("thinking", new JSONObject()
+                    .put("type", "enabled")
+                    .put("budget_tokens", thinkingBudget));
+        }
+
+        String system = systemPrompt(messages);
+        if (system.length() > 0) {
+            body.put("system", system);
+        }
+        return body;
+    }
+
+    private void handleSseEvent(
+            String data,
+            ModelStreamCallback callback,
+            StringBuilder text,
+            StringBuilder reasoning,
+            HashMap<Integer, ToolUseBuilder> toolUseBuilders
+    ) throws Exception {
+        if ("[DONE]".equals(data.trim())) {
+            return;
+        }
+        JSONObject event = new JSONObject(data);
+        if (event.has("error")) {
+            throw new ModelCompletionException("Anthropic 流式错误: " + event.opt("error"));
+        }
+        String type = event.optString("type");
+
+        if ("content_block_start".equals(type)) {
+            JSONObject block = event.optJSONObject("content_block");
+            if (block != null) {
+                String blockType = block.optString("type");
+                if ("redacted_thinking".equals(blockType)) {
+                    appendDelta(reasoning, "[redacted thinking]", true, callback);
+                } else if ("tool_use".equals(blockType)) {
+                    startToolUse(toolUseBuilders, event.optInt("index", toolUseBuilders.size()), block);
+                }
+            }
+            return;
+        }
+
+        if (!"content_block_delta".equals(type)) {
+            return;
+        }
+
+        JSONObject delta = event.optJSONObject("delta");
+        if (delta == null) {
+            return;
+        }
+        String deltaType = delta.optString("type");
+        if ("thinking_delta".equals(deltaType)) {
+            appendDelta(reasoning, delta.optString("thinking"), true, callback);
+        } else if ("text_delta".equals(deltaType)) {
+            appendDelta(text, delta.optString("text"), false, callback);
+        } else if ("input_json_delta".equals(deltaType)) {
+            appendToolUseInput(toolUseBuilders, event.optInt("index", toolUseBuilders.size()), delta.optString("partial_json"));
         }
     }
 
@@ -288,19 +307,6 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
         } else {
             callback.onTextDelta(delta);
         }
-    }
-
-    private int thinkingBudget(String effort) {
-        if (AiBehaviorSettings.REASONING_LOW.equals(effort)) {
-            return 1024;
-        }
-        if (AiBehaviorSettings.REASONING_HIGH.equals(effort)) {
-            return 8192;
-        }
-        if (AiBehaviorSettings.REASONING_MAX.equals(effort)) {
-            return 16000;
-        }
-        return 4096;
     }
 
     private JSONObject toolInputJson(String arguments) throws Exception {

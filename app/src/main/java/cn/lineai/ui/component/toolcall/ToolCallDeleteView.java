@@ -16,13 +16,12 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class ToolCallDeleteView extends LinearLayout {
+public final class ToolCallDeleteView extends BaseToolCallView {
     private ToolReviewListener toolReviewListener;
     private String projectPath = "";
 
     public ToolCallDeleteView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
         setBackground(LineTheme.roundedStroke(context, LineTheme.DANGER_MUTED, 8, LineTheme.DANGER_MUTED_2));
     }
 

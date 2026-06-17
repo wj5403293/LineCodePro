@@ -12,12 +12,11 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class DiffRepository {
-    private final LineCodeDatabase database;
+public final class DiffRepository extends BaseRepository implements DiffStore {
     private final SecureRandom random = new SecureRandom();
 
     public DiffRepository(Context context) {
-        database = LineCodeDatabase.getInstance(context);
+        super(LineCodeDatabase.getInstance(context));
     }
 
     public synchronized DiffRecord recordDiff(
@@ -45,7 +44,14 @@ public final class DiffRepository {
         values.put("timestamp", record.getTimestamp());
         values.put("reverted", record.isReverted() ? 1 : 0);
         values.put("raw_json", "");
-        database.getWritableDatabase().insertWithOnConflict("diff_records", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        SQLiteDatabase db = database.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.insertWithOnConflict("diff_records", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
         return record;
     }
 

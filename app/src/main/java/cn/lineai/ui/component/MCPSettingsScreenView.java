@@ -55,12 +55,18 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
         LineTheme.padding(segment, 3, 3, 3, 3);
         addModeButton(segment, context.getString(R.string.screen_mcp_execution_local), ToolSettingsRepository.EXECUTION_LOCAL);
         addModeButton(segment, context.getString(R.string.screen_mcp_execution_ssh), ToolSettingsRepository.EXECUTION_SSH);
+        addModeButton(segment, context.getString(R.string.screen_mcp_execution_terminal_provider), ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER);
         LinearLayout.LayoutParams segmentParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 42));
         segmentParams.topMargin = LineTheme.dp(context, LineTheme.SM);
         card.addView(segment, segmentParams);
-        String executionDesc = ToolSettingsRepository.EXECUTION_LOCAL.equals(state.getExecutionMode())
-                ? context.getString(R.string.screen_mcp_execution_local_desc)
-                : context.getString(R.string.screen_mcp_execution_ssh_desc);
+        String executionDesc;
+        if (ToolSettingsRepository.EXECUTION_LOCAL.equals(state.getExecutionMode())) {
+            executionDesc = context.getString(R.string.screen_mcp_execution_local_desc);
+        } else if (ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER.equals(state.getExecutionMode())) {
+            executionDesc = context.getString(R.string.screen_mcp_execution_terminal_provider_desc);
+        } else {
+            executionDesc = context.getString(R.string.screen_mcp_execution_ssh_desc);
+        }
         TextView desc = desc(context, executionDesc);
         LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         descParams.topMargin = LineTheme.dp(context, LineTheme.SM);

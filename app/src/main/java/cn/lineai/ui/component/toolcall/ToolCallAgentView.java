@@ -19,7 +19,7 @@ import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class ToolCallAgentView extends LinearLayout {
+public final class ToolCallAgentView extends BaseToolCallView {
     private boolean expanded = true;
     private ToolCall lastToolCall;
     private ToolResult lastResult;
@@ -28,7 +28,6 @@ public final class ToolCallAgentView extends LinearLayout {
 
     public ToolCallAgentView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
         setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_ELEVATED, 8, LineTheme.BORDER_LIGHT));
     }
 

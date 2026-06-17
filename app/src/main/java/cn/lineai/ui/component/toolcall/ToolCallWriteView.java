@@ -6,7 +6,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.data.repository.DiffRecord;
@@ -18,15 +17,13 @@ import cn.lineai.ui.theme.LineTheme;
 import java.util.Locale;
 import org.json.JSONObject;
 
-public final class ToolCallWriteView extends LinearLayout {
+public final class ToolCallWriteView extends BaseToolCallView {
     private ToolReviewListener toolReviewListener;
     private String projectPath = "";
     private boolean diffExpanded;
 
     public ToolCallWriteView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
-        setBackground(LineTheme.roundedStroke(context, LineTheme.CODE_BG, 8, LineTheme.CODE_BORDER));
     }
 
     public void setToolReviewListener(ToolReviewListener listener) {
@@ -40,7 +37,25 @@ public final class ToolCallWriteView extends LinearLayout {
     public void bind(ToolCall toolCall, ToolResult result) {
         removeAllViews();
         setTag(new Object[] {toolCall, result});
-        String name = toolCall == null ? "" : toolCall.getName();
+        DiffRecord diffRecord = loadDiff(result);
+
+        LinearLayout body = new LinearLayout(getContext());
+        body.setOrientation(VERTICAL);
+        LineTheme.padding(body, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
+
+        body.addView(buildHeader(toolCall, result, diffRecord),
+                new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        LayoutParams actionRowParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        actionRowParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
+        body.addView(buildActionRow(toolCall, result, diffRecord), actionRowParams);
+        addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        buildDiffSection(toolCall, result, diffRecord);
+        buildMessage(toolCall, result, diffRecord);
+    }
+
+    private LinearLayout buildHeader(ToolCall toolCall, ToolResult result, DiffRecord diffRecord) {
         JSONObject input = ToolCallUtils.parseInput(toolCall);
         String filePath = input.optString("file_path");
         String fileName = fileName(filePath);
@@ -48,11 +63,8 @@ public final class ToolCallWriteView extends LinearLayout {
         String lang = langLabel(displayName);
         boolean complete = result != null;
         boolean error = result != null && result.isError();
-        DiffRecord diffRecord = loadDiff(result);
-        boolean hasDiff = complete && !error && diffRecord != null;
         String reviewState = result == null ? "" : result.getReviewState();
         boolean rejected = "rejected".equals(reviewState) || (diffRecord != null && diffRecord.isReverted());
-        boolean accepted = "accepted".equals(reviewState);
         int statusColor = error || rejected ? LineTheme.DANGER : complete ? LineTheme.SUCCESS : LineTheme.ACCENT;
         String targetPath = diffRecord != null && diffRecord.getFilePath().length() > 0 ? diffRecord.getFilePath() : filePath;
         if (fileName.length() == 0 && targetPath.length() > 0) {
@@ -64,10 +76,6 @@ public final class ToolCallWriteView extends LinearLayout {
         if (shownPath.length() == 0) {
             shownPath = displayName;
         }
-
-        LinearLayout body = new LinearLayout(getContext());
-        body.setOrientation(VERTICAL);
-        LineTheme.padding(body, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
 
         LinearLayout fileRow = new LinearLayout(getContext());
         fileRow.setOrientation(HORIZONTAL);
@@ -105,14 +113,31 @@ public final class ToolCallWriteView extends LinearLayout {
         TextView path = LineTheme.text(getContext(), shownPath, LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         path.setSingleLine(true);
         path.setHorizontallyScrolling(true);
-        HorizontalScrollView pathScroll = horizontalPathScroll();
-        pathScroll.addView(path, new HorizontalScrollView.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+        HorizontalScrollView pathScroll = horizontalPathScroll(path);
         meta.addView(pathScroll, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        View status = statusView(complete, error || rejected, statusColor);
+        View status = statusView(complete);
+        if (status instanceof IconButtonView) {
+            IconButtonView statusIcon = (IconButtonView) status;
+            statusIcon.setIconSizeDp(28, 14);
+            statusIcon.setIconColor(statusColor);
+            if (error || rejected) {
+                statusIcon.setIconType(IconButtonView.CLOSE);
+            }
+        }
         status.setBackground(LineTheme.roundedStroke(getContext(), LineTheme.SURFACE_LIGHT, 8, LineTheme.CODE_BORDER));
         fileRow.addView(status, new LayoutParams(LineTheme.dp(getContext(), 28), LineTheme.dp(getContext(), 28)));
-        body.addView(fileRow, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        return fileRow;
+    }
+
+    private LinearLayout buildActionRow(ToolCall toolCall, ToolResult result, DiffRecord diffRecord) {
+        JSONObject input = ToolCallUtils.parseInput(toolCall);
+        boolean complete = result != null;
+        boolean error = result != null && result.isError();
+        boolean hasDiff = complete && !error && diffRecord != null;
+        String reviewState = result == null ? "" : result.getReviewState();
+        boolean rejected = "rejected".equals(reviewState) || (diffRecord != null && diffRecord.isReverted());
+        boolean accepted = "accepted".equals(reviewState);
 
         LinearLayout actionRow = new LinearLayout(getContext());
         actionRow.setOrientation(HORIZONTAL);
@@ -150,15 +175,22 @@ public final class ToolCallWriteView extends LinearLayout {
             acceptParams.leftMargin = LineTheme.dp(getContext(), LineTheme.SM);
             actionRow.addView(acceptButton, acceptParams);
         }
-        LayoutParams actionRowParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        actionRowParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
-        body.addView(actionRow, actionRowParams);
-        addView(body, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        return actionRow;
+    }
 
+    private void buildDiffSection(ToolCall toolCall, ToolResult result, DiffRecord diffRecord) {
+        boolean complete = result != null;
+        boolean error = result != null && result.isError();
+        boolean hasDiff = complete && !error && diffRecord != null;
         if (hasDiff) {
             addDiffSection(diffRecord);
         }
+    }
 
+    private void buildMessage(ToolCall toolCall, ToolResult result, DiffRecord diffRecord) {
+        boolean complete = result != null;
+        boolean error = result != null && result.isError();
+        boolean hasDiff = complete && !error && diffRecord != null;
         if (error && result.getContent().length() > 0) {
             addMessage(result.getContent(), LineTheme.DANGER);
         } else if (result != null && result.getReviewMessage().length() > 0 && result.getReviewState().length() == 0) {
@@ -166,19 +198,6 @@ public final class ToolCallWriteView extends LinearLayout {
         } else if (complete && !hasDiff && result.getContent().length() > 0) {
             addMessage(result.getContent(), LineTheme.TEXT_SECONDARY);
         }
-    }
-
-    private View statusView(boolean complete, boolean error, int statusColor) {
-        if (!complete) {
-            ProgressBar bar = new ProgressBar(getContext());
-            bar.setIndeterminate(true);
-            return bar;
-        }
-        IconButtonView icon = new IconButtonView(getContext(), error ? IconButtonView.CLOSE : IconButtonView.CHECK);
-        icon.setIconColor(statusColor);
-        icon.setIconSizeDp(28, 14);
-        icon.setClickable(false);
-        return icon;
     }
 
     private DiffRecord loadDiff(ToolResult result) {
@@ -262,12 +281,6 @@ public final class ToolCallWriteView extends LinearLayout {
         TextView result = LineTheme.text(getContext(), text, LineTheme.FONT_XS, color, Typeface.NORMAL);
         LineTheme.padding(result, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
         addView(result, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-    }
-
-    private HorizontalScrollView horizontalPathScroll() {
-        HorizontalScrollView scroll = new HorizontalScrollView(getContext());
-        scroll.setHorizontalScrollBarEnabled(false);
-        return scroll;
     }
 
     private String fileName(String path) {

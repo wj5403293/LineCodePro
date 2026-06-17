@@ -2,6 +2,7 @@ package cn.lineai.ai.protocol;
 
 import cn.lineai.ai.ModelCompletionException;
 import cn.lineai.ai.ModelCancellationToken;
+import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.security.UrlPolicy;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -21,6 +22,24 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
     }
 
     protected static final class SseStreamCompleteException extends Exception {
+    }
+
+    protected static final int REASONING_BUDGET_LOW = 1024;
+    protected static final int REASONING_BUDGET_HIGH = 8192;
+    protected static final int REASONING_BUDGET_MAX = 16000;
+    protected static final int REASONING_BUDGET_DEFAULT = 4096;
+
+    protected int thinkingBudget(String effort) {
+        if (AiBehaviorSettings.REASONING_LOW.equals(effort)) {
+            return REASONING_BUDGET_LOW;
+        }
+        if (AiBehaviorSettings.REASONING_HIGH.equals(effort)) {
+            return REASONING_BUDGET_HIGH;
+        }
+        if (AiBehaviorSettings.REASONING_MAX.equals(effort)) {
+            return REASONING_BUDGET_MAX;
+        }
+        return REASONING_BUDGET_DEFAULT;
     }
 
     protected String postJson(String url, JSONObject body, Map<String, String> headers) throws ModelCompletionException {

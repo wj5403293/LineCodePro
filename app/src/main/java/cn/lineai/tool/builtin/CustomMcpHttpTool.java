@@ -170,12 +170,4 @@ public final class CustomMcpHttpTool extends BaseTool {
             input.close();
         }
     }
-
-    private ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
-    }
-
-    private ToolResult error(String content) {
-        return new ToolResult("", getName(), content, true);
-    }
 }

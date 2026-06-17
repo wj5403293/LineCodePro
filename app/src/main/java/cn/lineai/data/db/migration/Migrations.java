@@ -1,18 +1,28 @@
 package cn.lineai.data.db.migration;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public final class Migrations {
-    private static final List<DatabaseMigration> ALL = Collections.unmodifiableList(Arrays.asList(
-            new AddToolCallObservabilityColumns()
-    ));
+    private static final List<DatabaseMigration> REGISTRY = new ArrayList<>();
+
+    static {
+        register(new AddToolCallObservabilityColumns());
+        register(new AddIpcProvidersTable());
+    }
 
     private Migrations() {
     }
 
-    public static List<DatabaseMigration> all() {
-        return ALL;
+    public static synchronized void register(DatabaseMigration migration) {
+        if (migration == null) {
+            return;
+        }
+        REGISTRY.add(migration);
+    }
+
+    public static synchronized List<DatabaseMigration> all() {
+        return Collections.unmodifiableList(new ArrayList<>(REGISTRY));
     }
 }

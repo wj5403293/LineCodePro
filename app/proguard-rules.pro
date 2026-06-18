@@ -10,6 +10,15 @@
 # follow the normal release obfuscation policy.
 -keep class com.jcraft.jsch.** { *; }
 
+# AIDL-generated IPC stubs must keep their names so that cross-process
+# Binder calls can resolve the interface, Stub and Proxy classes at runtime.
+-keep class cn.lineai.ipc.** { *; }
+-keep class * extends android.os.IInterface
+-keepclassmembers class * extends android.os.IInterface {
+    public static ** asInterface(android.os.IBinder);
+    public static ** castDefaultImpl(android.os.IBinder);
+}
+
 # Optional JSch integrations that are not packaged on Android.
 -dontwarn com.sun.jna.**
 -dontwarn org.apache.logging.log4j.**

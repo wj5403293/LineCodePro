@@ -1,5 +1,52 @@
 # 更新日志
 
+## v1.1.0
+
+### 新功能
+
+- **IPC 终端提供者** - 新增 `cn.lineai.ipc.terminal` 模块，通过 AIDL 跨进程调用终端提供者服务执行 SHELL/SFTP/文件读写操作；支持 `executeShell`、`readFile`/`writeFile`、`readFileChunk`/`writeFileChunk`（大文件分块，1MB 上限）、`listDirDetailed`、`statFile`、`getFileSize` 等接口
+- **AIDL 混淆保护** - `proguard-rules.pro` 新增 IPC 接口 keep 规则，保护 AIDL 生成的 `Stub` / `Proxy` / `asInterface` 入口类名，避免 release 包跨进程 Binder 调用失败
+
+### 优化与重构
+
+- **Repository 接口抽象** - 为 `ConversationRepository` / `ProjectRepository` / `ModelRepository` / `DiffRepository` / `ExtensionRepository` / `IpcProviderRepository` / `LearningContextRepository` / `ToolSettingsRepository` / `FileTreeRepository` / `IpcFileTreeRepository` / `SshFileTreeRepository` 抽取 `*Store` 接口；`MainDependencies` 字段类型改为接口
+- **BaseRepository 公共基类** - 抽取 `database` 字段与 `value/intValue/longValue/safe` Cursor 辅助方法，消除各 Repository 重复代码
+- **ExtensionRepository 拆分** - 1232 行巨型门面拆为 `AgentExtensionRepository`、`McpExtensionRepository`、`SkillRepository` 三个子 Repository；`ExtensionRepository` 降为 103 行纯门面
+- **LearningContextRepository 拆分** - 793 行拆为 `MemoryRanker`（BM25 排序）、`TextTokenizer`（CJK 双字分词）、`ConversationIndexer`（对话索引）三个独立类
+- **MainCoordinator 拆分** - 5046 行 → 4981 行，提取 `AttachmentPickerCoordinator` 接管附件选择器的 8 个状态字段与 7 个方法
+- **MainChatView 拆分** - 1589 行 → 789 行（-50%），提取 `ScreenFactory` 注册表（582 行 `buildScreen` → 7 行委托）、`DialogManager`、`PermissionUiHelper`、`MainChatViewLayoutBuilder`、`SimpleScreenContent`、`FileActionRow`、`BackNavigation`、`DialogDimensions`、`SafPickerDelegate` 共 9 个独立类
+- **巨型 Controller 拆分** - `SettingsController` 拆为 7 个细粒度接口（AiBehaviorSettingsController / InputSettingsController / OutputSettingsController / ThemeSettingsController / McpSettingsController / ArchiveController / StorageController）；`MainContract.View` 拆为 5 个细粒度接口（ChatRenderView / OverlayView / PickerView / ScreenView / PermissionView）
+- **过长方法拆分** - `CodexResponsesProtocol.stream()`（122→28）、`AnthropicMessagesProtocol.stream()`（87→30）、`ToolCallWriteView.bind()`（130→20）、`MarkdownRenderer.renderBlock()`（70→9）
+- **重复代码消除** - `RemoteFileTreeController` 公共基类；`BaseTool.ok/error` 上移；`FileIo.readUtf8` 提取；`ToolArgs.requireNonEmpty` 提取；`BaseToolCallView` 抽象基类；`thinkingBudget` 上移到 `AbstractHttpModelProtocol`
+- **OCP 改造** - `ModelProtocolFactory`、`Migrations`、`ArchiveSecretRedactor` 改为注册表实现，新增工具通过 `BuiltInToolProvider` 注册到 `BuiltInToolProviders.defaults()` 即可
+- **SshService 拆分** - 提取 `SshConnectionPool`（连接复用缓存）与 `TermuxHelper`（Termux 集成独立类）；`termux_setup.sh` 移至 assets 资源
+- **ContextCompactionService 依赖注入** - 构造函数注入 `ModelClient` / `OpenAiResponsesCompactionProtocol` / `CodexResponsesProtocol` / `PromptTemplateRepository`；`MemoryExtractionService` 从 `data.repository` 包移至 `context` 包修复反向依赖
+- **字符串外部化** - 所有硬编码中文字符串替换为 `strings.xml` 资源引用，英文 / 中文分别放在 `values/` 和 `values-zh/`
+- **兼容性代码清理** - 移除 `getSelectedProjectLegacy`、`SshService.TERMUX_*` 委托字段、`SshService.TermuxSetupResult` 委托类、`MainActivity.Legacy branch` 注释等兼容代码
+
+### Bug 修复
+
+- **HttpServerTool 健壮性** - 请求头读取改为循环至结束标记（8192 字节上限）；`new Thread` 替换为 10 线程固定线程池；`Socket.setSoTimeout(30s)`；异常记录 `Log.w` 不再静默
+- **AIDL 大文件** - `ITerminalProviderService` 新增 `readFileChunk` / `writeFileChunk` / `getFileSize` 三个分块方法，避免 1MB+ 事务缓冲区溢出
+- **SshService TOFU** - `TrustOnFirstUseUserInfo.promptYesNo` 添加警告日志，降低中间人攻击风险
+- **数据库迁移** - `LineCodeSchema` 集中 SQL 常量；`AddToolCallObservabilityColumns.apply` 通过 `PRAGMA table_info` 检查避免重复列；`onCreate` 与 `onUpgrade` 职责厘清
+- **IPC 权限** - 新增 `IpcProviderScanner` / `BaseIpcProvider` 校验 target service signature fingerprint
+
+### 安全
+
+- **UrlPolicy SSRF 加固** - 增加内网 IP 段黑名单（192.168/10/172.16-31）、端口白名单（80/443/8080/8443）、URL 用户信息（user:pass@host）校验
+- **KeepAliveService** - 移除静音音频 hack；WakeLock 与任务生命周期绑定
+- **requestLegacyExternalStorage** - 移除冗余声明
+- **AIDL 调用方权限** - 在 `ITerminalProviderService.aidl` 注释中声明调用方所需权限
+
+### 测试
+
+- 新增 `UrlPolicyTest` 覆盖 SSRF 新增场景
+- 新增 `LineCodeSchemaTest`、`AddToolCallObservabilityColumnsTest`、`MigrationsTest` 覆盖迁移框架
+- 新增多个 Repository / Controller / Service 单测
+
+---
+
 ## v1.0.9
 
 ### 新功能

@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 rootProject.name = "LineCode"
 include(":app")
 include(":terminal-provider")
+include(":ipc")

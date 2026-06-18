@@ -3,6 +3,7 @@ package cn.lineai.model;
 public final class InputAttachment {
     public static final String SOURCE_LOCAL = "local";
     public static final String SOURCE_SSH = "ssh";
+    public static final String SOURCE_TERMINAL_PROVIDER = "terminal_provider";
 
     private final String name;
     private final String path;
@@ -11,7 +12,7 @@ public final class InputAttachment {
     public InputAttachment(String name, String path, String source) {
         this.path = path == null ? "" : path;
         this.name = name == null || name.length() == 0 ? basename(this.path) : name;
-        this.source = SOURCE_SSH.equals(source) ? SOURCE_SSH : SOURCE_LOCAL;
+        this.source = normalizeSource(source);
     }
 
     public String getName() {
@@ -28,7 +29,13 @@ public final class InputAttachment {
 
     public boolean matches(String otherPath, String otherSource) {
         return path.equals(otherPath == null ? "" : otherPath)
-                && source.equals(SOURCE_SSH.equals(otherSource) ? SOURCE_SSH : SOURCE_LOCAL);
+                && source.equals(normalizeSource(otherSource));
+    }
+
+    private static String normalizeSource(String raw) {
+        if (SOURCE_SSH.equals(raw)) return SOURCE_SSH;
+        if (SOURCE_TERMINAL_PROVIDER.equals(raw)) return SOURCE_TERMINAL_PROVIDER;
+        return SOURCE_LOCAL;
     }
 
     private static String basename(String path) {

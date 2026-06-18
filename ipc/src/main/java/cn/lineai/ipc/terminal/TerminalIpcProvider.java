@@ -4,6 +4,7 @@ import android.os.RemoteException;
 import cn.lineai.ipc.BaseIpcProvider;
 import cn.lineai.ipc.IpcProviderConfig;
 import cn.lineai.ipc.IpcProviderType;
+import org.json.JSONObject;
 
 public final class TerminalIpcProvider extends BaseIpcProvider {
 
@@ -95,5 +96,18 @@ public final class TerminalIpcProvider extends BaseIpcProvider {
 
     public String listDirDetailed(String path) throws RemoteException {
         return getService().listDirDetailed(path);
+    }
+
+    public String getHomePath() throws RemoteException {
+        String info = getService().getProviderInfo();
+        if (info == null || info.length() == 0) {
+            return "";
+        }
+        try {
+            JSONObject json = new JSONObject(info);
+            return json.optString("home", "");
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

@@ -207,6 +207,7 @@ tasks.matching {
 }
 
 dependencies {
+    implementation(project(":ipc"))
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
     implementation(libs.jsch)

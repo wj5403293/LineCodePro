@@ -1,112 +1,372 @@
 # LineCode Pro
 
-> 一个能塞进口袋的 AI 编程工作台。接入主流大模型，让它直接读写你的项目文件、跑 Shell、用 SSH 连远程主机 —— 全部在 Android 上完成。
+> **一个能塞进口袋的 AI 编程工作台。**
+> 在 Android 上接入主流大模型，让它直接读写你的项目文件、跑 Shell、用 SSH 连远程主机，或者接入一个可插拔的 IPC Provider —— 一切都在手机本地完成。
 
 [English](README.md) · [中文](README_CN.md)
 
-许可证：**GPL-3.0-or-later** · Android **7.0+**（API 24） · 当前版本：**1.0.3**
+[![许可证: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+[![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84.svg)](app/build.gradle.kts)
+[![当前版本: 1.0.3](https://img.shields.io/badge/version-1.0.3-success.svg)](app/build.gradle.kts)
+[![Java 11 only](https://img.shields.io/badge/code-Java%2011-orange.svg)](#项目结构)
+
+---
+
+## 目录
+
+1. [LineCode Pro 是什么？](#linecode-pro-是什么)
+2. [它能做什么](#它能做什么)
+3. [功能亮点](#功能亮点)
+4. [项目结构](#项目结构)
+5. [安装](#安装)
+6. [上手指南](#上手指南)
+7. [执行模式](#执行模式)
+8. [支持的模型协议](#支持的模型协议)
+9. [工具系统](#工具系统)
+10. [扩展 LineCode](#扩展-linecode)
+11. [从源码构建](#从源码构建)
+12. [隐私与安全](#隐私与安全)
+13. [参与贡献](#参与贡献)
+14. [许可证](#许可证)
+
+---
+
+## LineCode Pro 是什么？
+
+**LineCode Pro** 是一款面向 Android 7.0+ 的本地化 AI 编程助理。它围绕"一个 Activity + 一段流式聊天 + 一套真正可执行的工具循环"组织代码。你只要指定一个项目目录（本地、SSH 远程，或第三方 IPC Provider），接好一个大模型，模型就能读取、编辑、glob、新建、删除文件，能跑 Shell、能抓取和搜索网页、能理解和生成图片，还能分派子任务。
+
+LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作台**：系统提示、工具注册表、上下文管理、Diff 存档、文件树、项目选择器、SSH / IPC 管道、导入导出归档、扩展框架、安全策略……全部跑在 App 内部。除非你自己接到远程模型，否则项目文件不会离开你的手机。
+
+应用包名是 `cn.lineai`，仓库采用"单模块 `:app` + 可复用库 `:ipc` + 示例 Provider `:terminal-provider`"的多模块 Gradle 结构。
 
 ---
 
 ## 它能做什么
 
-LineCode Pro 把手机或平板变成一个真正能上手干活的 AI 编程助手。选一个项目目录、配好模型，它就可以：
+### 对话
 
-- 用**同一个聊天界面**与 OpenAI 兼容 API、Codex Responses、Anthropic Messages，或本地 GGUF 推理后端对话。
-- 在你授权的目录里读取、编辑、glob、删除和新建文件。
-- 通过 Termux 在本地执行 Shell，或者经由 SSH 在远程机器上工作。
-- 抓取与搜索网页、理解图片、生成图片。
-- 把长对话沉淀成长期记忆，下次会话再喂回上下文。
+- 同一个聊天界面下支持**多种模型协议**：OpenAI 兼容 HTTP API、Anthropic Messages、OpenAI Codex Responses、本地 GGUF 推理。
+- 推理块（`<think>…</think>`）会被 `ThinkTagParser` 单独抽出来，和最终回答分块渲染。
+- 流中的工具调用文本由 `ToolCallTextParser` 解析并派发；模型请求做的每件事，在真正执行前都会先展示给你看。
+- 系统提示由 `app/src/main/assets/prompts/*.txt` 中的模板拼装：语气（聊天 / 编程）变体、上下文压缩、记忆抽取、技能抽取、工作目录、学习上下文、模型身份。你可以在设置里覆盖语气、工作目录、身份块、提示模板。
+- 长对话由 `ContextCompactionService` 后台用**当前模型本身**总结；`MemoryExtractionService` 抽取长期知识，`LearningContextRepository` 在下一次会话中喂回上下文。
 
-整个流程都在端侧运行，项目文件不会被传到任何地方 —— 除非你自己把它接到远程模型。
+### 工具执行
+
+模型可以调用 `ToolRegistry` 里的全部工具，并支持会话级自动确认：
+
+| 分类 | 内置工具 |
+| ---- | -------- |
+| 文件系统 | `file_read`、`file_write`、`file_edit`、`file_delete`、`glob`、`list_directory` |
+| Shell | `shell_execute`（经 Termux 或 IPC Provider） |
+| 网络 | `web_search`、`web_fetch`、`http_server` |
+| 媒体 | `image_understanding`、`image_generation` |
+| 子任务 | `agent`、`agent_pipeline`（分派给另一个 LLM 循环） |
+| 效率 | `todo_update` |
+
+每个会触碰文件的工具都走 `FileToolPathPolicy` 路径校验，模型只能动你授权的目录里的内容。Shell 调用走 Termux 或 IPC Provider —— **永远不在 App 自身进程里跑命令**。
+
+### 工作区与文件
+
+- **本地** —— 通过系统 Storage Access Framework 选择器选一个目录，App 会在重启后记住。授权 `MANAGE_EXTERNAL_STORAGE` 后，模型可以对真实项目目录做 glob。
+- **SSH** —— 通过 `jsch` 远程浏览、读写、执行；凭据加密存在设置仓库里。
+- **IPC Provider（可插拔）** —— 绑定到任何对外暴露 `cn.lineai.action.IPC_TERMINAL_PROVIDER` 动作和 `ITerminalProviderService` AIDL 接口的第三方 App。仓库自带的 `terminal-provider` 模块就是参考实现，把命令和文件操作跑在独立进程里。
+- **自定义 Agent / MCP** —— 在 **扩展** 页面注册 `agentx_` / `mcpx_` 工具，模型可以像调用内置工具一样调用它们。
+
+### Diff 与审查
+
+- 每次成功的 `file_write` / `file_edit` 都会在 `DiffRepository` 里生成一条 `DiffRecord`；聊天流里能看到内联变更，**存储 → Diff 历史** 页面可以回放。
+- Shell 跑在自定义的 `ToolCallShellView` 中流式输出；Agent 跑在 `ToolCallAgentView` / `ToolCallAgentPipelineView` 卡片中实时显示进度。
+
+### 导入导出
+
+- 一个 `.linecode` 归档里包含整库（对话、消息、记忆、设置、扩展）和工作区文件。**敏感信息 —— 模型 API key、SSH 凭据、网页搜索 key、敏感 MCP 请求头 —— 在写入前由 `ArchiveSecretRedactor` 自动剥离**。
+- 导入流程需要显式确认，因为它会覆盖本地数据。
+
+### 存储
+
+- 所有持久化都走 SQLite（`LineCodeDatabase` 单例，schema 在 `LineCodeSchema`）和"一个关注点对应一个仓库"的设计。控制器不直接操作数据库。
+
+---
 
 ## 功能亮点
 
-- **一个聊天界面，多家模型。** OpenAI 兼容、Anthropic、Codex、本地 GGUF 之间任意切换，UI 不变。
-- **真正能干活的工具循环。** 文件读 / 写 / 编辑 / 删除、glob、目录列表、Shell 执行、HTTP 服务、网页抓取与搜索、图像理解、图像生成、子任务分派 —— 模型可调，你可以逐条审批。
-- **支持自定义扩展。** 自定义 Agent 和 MCP-HTTP 工具会自动注册，和内置工具放在一起。
-- **可在任意目录工作。** 通过系统选择器挑一个目录，LineCode 会在重启后记住授权。
-- **远程友好。** 用 `jsch` 浏览和编辑 SSH 远程文件，可选 Termux 本地 Shell 集成。
-- **默认隐私优先。** 导出文件自动去敏，明文 HTTP 仅放行 loopback，内置浏览器默认禁用 JavaScript。
-- **可导入导出。** 会话、项目、设置和扩展可以打包成单个 `.linecode` 文件，换设备即恢复。
+- **一个聊天，多家后端。** OpenAI 兼容、Anthropic Messages、Codex Responses、本地 GGUF 在同一 UI 内任意切换。
+- **真正能干活的工具循环。** 模型能读、改、glob、新建、删除文件，能跑 Shell，能抓取和搜索网页，能看图，能生图，能递归调子任务 —— 全部由你逐条审批或会话级自动确认。
+- **可在任意目录工作。** 本地（SAF + 可选 `MANAGE_EXTERNAL_STORAGE`）、远程（jsch SSH）、或第三方 IPC Provider。
+- **支持自定义扩展。** 自定义 Agent（`agentx_*`）和 MCP-HTTP 工具（`mcpx_*`）即配即用。
+- **可插拔 IPC Provider。** 把 Shell 和文件操作放到独立进程里以做安全隔离。可以把 Provider 当成普通 Android App 上架，详见 [`ipc/README.md`](ipc/README.md)。
+- **记忆与上下文。** 长对话自动总结；长期知识会在下一次会话注入。
+- **默认隐私优先。** URL 白名单、严格 `network_security_config.xml`、导出文件去敏、内置浏览器默认关闭 JavaScript。
+- **纯 Java 写在骨子里。** 无 Kotlin 运行时、无 XML 布局 —— App 全部由 Java 11 写成，便于审计。
 
-## 截图
+---
 
-_截图待补。_
+## 项目结构
+
+```
+LineCode/
+├── app/                       # :app Gradle 模块（cn.lineai）
+│   ├── build.gradle.kts
+│   ├── lint.xml
+│   ├── proguard-rules.pro
+│   └── src/
+│       ├── main/
+│       │   ├── AndroidManifest.xml
+│       │   ├── assets/prompts/        # 系统提示模板（.txt）
+│       │   ├── aidl/                  # IPC AIDL 存根
+│       │   ├── java/cn/lineai/
+│       │   │   ├── MainActivity.java
+│       │   │   ├── ai/                # 协议、消息、工具调用解析、系统提示
+│       │   │   ├── context/           # ContextManager、压缩、记忆
+│       │   │   ├── data/              # SQLite schema、仓库、导入导出
+│       │   │   ├── model/             # 纯数据类型（记录、设置、附件）
+│       │   │   ├── mvp/               # MainCoordinator + 各关注点控制器
+│       │   │   ├── security/          # UrlPolicy
+│       │   │   ├── service/           # KeepAliveService
+│       │   │   ├── ssh/               # SshService、jsch 连接池、TermuxHelper
+│       │   │   ├── state/             # TodoStateStore
+│       │   │   ├── tool/              # ToolRegistry + builtin/*
+│       │   │   ├── ui/                # Java 写的视图 + Markdown 渲染
+│       │   │   └── workspace/         # WorkspacePaths、SafPathResolver、存储权限
+│       │   └── res/                   # 矢量图、字符串、主题（无 XML 布局）
+│       ├── test/                      # JUnit 4 单元测试
+│       └── debugUserCert/             # 旁加载构建 flavor
+├── ipc/                       # 可复用 Android 库（cn.lineai.ipc）
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── AndroidManifest.xml        # <permission> cn.lineai.permission.IPC_TERMINAL_PROVIDER
+│       ├── aidl/                      # IBaseIpcService + terminal 接口
+│       └── java/cn/lineai/ipc/        # BaseIpcProvider、IpcProviderManager、注册表、扫描器
+├── terminal-provider/         # 示例 Provider App（cn.lineai.terminalprovider）
+│   ├── build.gradle.kts
+│   ├── proguard-rules.pro
+│   └── src/main/
+│       ├── AndroidManifest.xml        # <service> 上强制 android:permission
+│       └── java/cn/lineai/terminalprovider/TerminalProviderService.java
+├── docs/                      # 合规审计、威胁模型
+├── gradle/libs.versions.toml  # 版本目录
+├── settings.gradle.kts
+├── build.gradle.kts
+├── CLAUDE.md                  # 面向 AI / 评审者的架构圣经
+├── README.md / README_CN.md   # ← 你正在看这里
+├── LICENSE / COPYING
+└── 问题.txt                   # 本地临时问题清单（gitignored）
+```
+
+### 30 秒看架构
+
+* `MainActivity` 是唯一的 Activity，它实例化 `MainCoordinator`（Presenter）和 `MainChatView`（View），View 完全由 Java 代码构建 —— 不 inflate XML；`lint.xml` 故意屏蔽 `ViewConstructor`。
+* `MainCoordinator` 实现 `MainUiController`，把行为分派给 `cn.lineai.mvp.*` 下各关注点控制器（聊天、生成、工具执行、模型管理、设置、页面、权限模式、归档、项目面板、SSH 文件树、IPC 文件树、文件操作）。UI 状态走 `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)` 通路。
+* `cn.lineai.ai.protocol.ModelProtocol` 是流式 / Completion 接口，`ModelProtocolFactory` 按 `ModelProtocolType` 分派（`OPENAI_COMPATIBLE`、`CODEX_RESPONSES`、`ANTHROPIC_MESSAGES`、`LOCAL_GGUF`）。
+* `BaseTool`（name、description、category、JSON schema、`execute(JSONObject, ToolContext)`）是工具契约；`ToolRegistry` 注册内置并热加载用户扩展；`ToolExecutionCoordinator` + `ToolExecutor` 执行；`PermissionModeController` + `ToolReviewListener` 控制逐条审批。
+
+完整架构圣经（控制器、工具系统、上下文管理、SQLite schema、安全模型）见 [`CLAUDE.md`](CLAUDE.md)。
+
+---
 
 ## 安装
 
-**下载预编译 APK。** 在 Releases 页面下载最新的 `LineCode Pro <版本号>.APK`，安装即可。
+**方式 A —— 下载预编译 APK。** 在 Releases 页面下载最新的 `LineCode Pro <version>.APK`，旁加载安装。`release` 版本用私钥签名（见 `signing.properties`）；`debug` 版本用 debug 证书签名，适合临时测试。
 
-**从源码构建。** 见下方的 [构建](#构建)。
+**方式 B —— 从源码构建。** 见 [从源码构建](#从源码构建)。
 
-> 提示：LineCode 默认申请 `MANAGE_EXTERNAL_STORAGE`，这样 AI 才能对真实项目目录下手。如果你不愿授权，也可以只通过系统文档选择器选目录，大部分功能仍然能用，但对超大目录的 glob 会变慢。
+> **关于存储权限的提示。** LineCode 默认申请 `MANAGE_EXTERNAL_STORAGE`，这样 AI 才能对真实项目目录做 glob 和编辑。如果你不愿授权，也可以只通过系统文档选择器选目录 —— 大部分功能仍然能用，但对超大目录的 glob 会变慢。
+
+---
 
 ## 上手指南
 
-1. 打开应用，按提示授予存储权限。
-2. 抽屉 → **模型** → **新增模型**，挑一个协议（OpenAI 兼容 / Anthropic / Codex Responses / 本地 GGUF），填好 API base URL、密钥和模型名。
-3. 通过 **项目 → 打开外部目录** 选一个工作区。
-4. 开始聊天。模型会发起工具调用，你可以逐条审批，或在本次会话内开启自动确认。
+1. **授予存储权限。** 首次启动时 LineCode 会请求所需的存储权限，授权后文档选择器才可用。
+2. **添加模型。** 抽屉 → **模型** → **新增模型**。挑一个协议：
+   - **OpenAI 兼容** —— Base URL、API key、模型名。适用于 OpenAI、DeepSeek、通义千问、Moonshot、智谱、Groq、Ollama、llama.cpp server …
+   - **Anthropic Messages** —— Base URL、API key、模型名（Claude 4.x 与 3.x）。
+   - **Codex Responses** —— Base URL、API key、模型名。
+   - **本地 GGUF** —— 设备本地 llama.cpp 推理。
+3. **选一个工作区。** 抽屉 → **项目 → 打开外部目录**（本地）。路径会在重启后记住；也可以在 **设置 → SSH** 加一台远程主机，或在 **设置 → MCP execution mode → Terminal Provider** 绑定一个 IPC Provider。
+4. **开始聊天。** 输入问题或任务。模型会发出工具调用 —— 你可以逐条审批，也可以点 **本次会话自动确认** 放手让它跑。
+5. **可选集成。**
+   - **Termux。** 从 F-Droid 安装 Termux，授权 `RUN_COMMAND`，`shell_execute` 工具就会走它。
+   - **SSH。** 在 **设置 → SSH** 添加主机；项目抽屉里能看到远程文件。
+   - **IPC Provider。** 安装 `terminal-provider`（或任何第三方 Provider），在 **设置 → MCP execution mode → Terminal Provider** 启用。LineCode 每次冷启动会自动重连。
+   - **扩展。** 在 **扩展** 页面配置自定义 Agent / MCP 工具。
 
-可选：
+### 拿现成模型试一下
 
-- **Termux 集成。** 从 F-Droid 安装 Termux，授权 `RUN_COMMAND`，LineCode 就能通过它跑 Shell。
-- **SSH 工作区。** 在 **设置 → SSH** 添加远程主机，然后在项目抽屉里浏览远程目录。
-- **自定义 Agent / MCP 工具。** 在 **扩展** 里配置，配好立刻可用。
+如果你手上有 Ollama 或 llama.cpp server，指向它即可：协议选 `OpenAI 兼容`，Base URL 填 `http://10.0.2.2:11434/v1`（模拟器）或 `http://<笔记本 IP>:11434/v1`（真机），API key 填 `ollama`，模型名 `llama3.1:8b`。完全本地，无需账号。
 
-## 构建
+---
 
-需要 JDK 11+、安装了平台 36 的 Android SDK，以及本仓库的源码。
+## 执行模式
+
+LineCode 在 **设置 → MCP execution mode** 里提供三种 Shell / 文件工具执行模式：
+
+| 模式 | Shell 与文件操作实际跑在哪里 | 适用场景 |
+| ---- | -------------------------- | -------- |
+| **Local（本地）** | 经 Android SAF 选择器，在 App 自己的上下文里跑 | 设备本地任意目录，无需 Termux |
+| **SSH** | 通过 `jsch` 连到配置的 SSH 主机 | 远端开发机 |
+| **Terminal Provider（IPC）** | 绑定到一个第三方 Android App，通过 AIDL 调度（仓库自带 `terminal-provider` 作为参考实现） | 独立进程沙箱化 Shell，可插拔 —— 你可以发布自己的 Provider |
+
+三种模式都通过统一的 `IpcFileTreeStore` / `SshFileTreeStore` / `FileTreeStore` 接口暴露，所以文件树、附件选择器、模型看到的是同样的 UI，不管字节实际在哪里。
+
+---
+
+## 支持的模型协议
+
+| 协议 | 实现类 | 已验证可用的模型 / 服务 |
+| ---- | ------ | --------------------- |
+| OpenAI 兼容 | `OpenAiCompatibleProtocol`（默认） | OpenAI、DeepSeek、通义千问、Moonshot、智谱、Groq、Ollama、llama.cpp server、LM Studio … |
+| Anthropic Messages | `AnthropicMessagesProtocol` | Claude 4.x 与 3.x |
+| Codex Responses | `CodexResponsesProtocol` | OpenAI Responses API |
+| 本地 GGUF | `LocalGgufProtocol` | 设备本地 llama.cpp |
+
+加新模型通常只要填一个 Base URL 和 Key。能力探针 `OpenAiCompatibleCapabilities` 会探测工具支持，模型会被告知它能调用哪些工具。
+
+---
+
+## 工具系统
+
+`BaseTool` 是契约，每个工具都要暴露：
+
+* `name`、`description`、`category`
+* 入参的 JSON schema
+* `execute(JSONObject args, ToolContext ctx)` 返回 `ToolResult`
+
+内置工具在 `app/src/main/java/cn/lineai/tool/builtin/`：
+
+```
+FileReadTool      FileWriteTool      FileEditTool      FileDeleteTool
+GlobTool          ListDirectoryTool  HttpServerTool    ShellExecuteTool
+ImageUnderstandingTool  ImageGenerationTool  WebSearchTool  WebFetchTool
+AgentTool  AgentPipelineTool  TodoUpdateTool
+```
+
+执行由 `ToolExecutionCoordinator` + `ToolExecutor` 驱动；每次调用都要过 `PermissionModeController` + `ToolReviewListener`，用户可逐条确认或会话级自动确认。自动确认列表由 `MainCoordinator.sessionAutoConfirmedTools` 跟踪。
+
+聊天流的工具调用由 `app/src/main/java/cn/lineai/ui/component/toolcall/` 下的自定义卡片渲染（`ToolCallReadView`、`ToolCallWriteView`、`ToolCallShellView`、`ToolCallAgentView`、`ToolCallAgentPipelineView`、`ToolCallGenericView`…）。新工具只要在 `ToolCallUtils` 注册，就能拿到自己的卡片。
+
+---
+
+## 扩展 LineCode
+
+三类一等公民的扩展点：
+
+1. **自定义 Agent**（`agentx_*`）—— 实现 `CustomAgentExtensionTool`，模型可以像调用内置工具一样调用它。
+2. **自定义 MCP-HTTP 工具**（`mcpx_*`）—— 实现 `CustomMcpHttpTool`，模型可以走 HTTP 调用，per-tool 请求头存在设置仓库。
+3. **自定义 IPC Provider** —— 在任意 Android App 里实现 `IBaseIpcService` / `ITerminalProviderService` AIDL，发布为普通 APK，LineCode 就会自动发现、绑定、把 Shell + 文件操作路由过去。完整协议与可运行示例见 [`ipc/README.md`](ipc/README.md)。
+
+以上三类都通过 `ExtensionRepository` 持久化，由 `ToolRegistry.reloadExtensions()` 热加载。
+
+---
+
+## 从源码构建
+
+环境要求：
+
+* **JDK 11** 或更新
+* 已安装 **Android SDK** 平台 36
+* 本仓库一份 checkout
+
+所有 Gradle 命令都走 wrapper。`settings.gradle.kts` 强制 `FAIL_ON_PROJECT_REPOS`，并接入了腾讯云 Maven 镜像 —— 新增仓库时请保持。
+
+### 快速构建
 
 ```bash
-# Debug 构建（用 debug 证书签名，便于旁加载）
+# Debug 构建（debug 证书签名）
+./gradlew :app:assembleDebug
+# → app/build/outputs/apk/debug/app-debug.apk
+
+# Debug 构建（debug 证书 + 重命名，便于旁加载）
 ./gradlew :app:assembleDebugUserCert
-# 输出：app/build/outputs/apk/debugUserCert/export/LineCode-user-cert-debug.apk
+# → app/build/outputs/apk/debugUserCert/export/LineCode-user-cert-debug.apk
 
 # 单元测试
 ./gradlew :app:testDebugUnitTest
 
-# Lint
+# 单个测试类
+./gradlew :app:testDebugUnitTest --tests "cn.lineai.tool.ToolRegistryTest"
+# 追加 .methodName 跑单个方法
+
+# 静态分析（自定义规则在 app/lint.xml）
 ./gradlew :app:lintDebug
 ```
 
-**Release 构建** 需要在仓库根目录放一份 `signing.properties` 写明 keystore 信息 —— 构建任务会拒绝用 debug 证书签 release。签名配置好后，`./gradlew :app:assembleRelease` 会输出 `app/release/LineCode Pro <版本号>.APK`。
+### Release 构建
 
-架构内幕（控制器、工具系统、上下文管理等）见 [`CLAUDE.md`](CLAUDE.md)。
+Release APK 需要在仓库根放一份 `signing.properties`：
 
-## 支持的模型协议
+```properties
+storeFile=/绝对路径/your.keystore
+storePassword=…
+keyAlias=…
+keyPassword=…
+```
 
-只要符合下列协议之一，LineCode 都能接：
+`validateReleaseSigning` 任务会拒绝用 debug 证书签 release。配置好后：
 
-| 协议 | 已验证可用的模型/服务 |
-| --- | --- |
-| OpenAI 兼容 | OpenAI、DeepSeek、通义千问、Moonshot、智谱、Groq、Ollama、llama.cpp server …… |
-| Anthropic Messages | Claude 4.x 与 3.x |
-| Codex Responses | OpenAI Responses API |
-| 本地 GGUF | 设备本地 llama.cpp 推理 |
+```bash
+./gradlew :app:assembleRelease
+# → app/release/LineCode Pro <versionName>.APK
+```
 
-加新模型通常只需要填一个 base URL 和密钥。
+Release 流水线刻意加强：
+
+* 8192 项 R8 混淆字典，由 `generateReleaseObfuscationDictionary` 生成（`app/build/generated/r8/obfuscation-dictionary.txt`）
+* `exportReleaseApk` 把产物重命名为 `LineCode Pro <versionName>.APK`，放到 `app/release/`
+* `purgeReleaseSymbolFiles` 删除 `outputs/mapping/release` 与 `outputs/native-debug-symbols/release`
+
+改版本号要同步更新 `app/build.gradle.kts` 的 `releaseVersionName` 和 `defaultConfig.versionCode`；APK 文件名由 `releaseVersionName` 派生。
+
+### 单独构建 IPC 库与示例 Provider
+
+```bash
+./gradlew :ipc:assembleDebug
+./gradlew :terminal-provider:assembleDebug
+```
+
+`terminal-provider` 模块产出普通 debug APK（`terminal-provider/build/outputs/apk/debug/terminal-provider-debug.apk`），可以与主 App 一起安装来演示 IPC 链路。
+
+### 发版前的强制门禁
+
+按 [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md) 要求，以下命令必须全部通过：
+
+```bash
+./gradlew :app:testDebugUnitTest
+./gradlew :app:lintDebug
+./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
+```
+
+---
 
 ## 隐私与安全
 
-- API 密钥、SSH 凭据和 MCP 请求头都会从 `.linecode` 导出中**自动去敏**。
-- 所有出网请求都会过白名单；明文 HTTP 仅放行 `localhost`、`127.0.0.1`、`10.0.2.2`。
-- 内置 WebView 默认关闭 JavaScript，并禁用 `file://` / `content://` 访问。
-- Release 构建会剥离 LineNumberTable、native debug symbols 和 mapping 文件。
+* **导出文件去敏。** 模型 API key、SSH 密码 / 私钥 / passphrase、网页搜索 key、敏感 MCP 请求头都会在 `.linecode` 导出时由 `ArchiveSecretRedactor` 剥离。新增敏感字段时记得同步扩展它。
+* **出网请求全部走 `UrlPolicy`。** 内置浏览器、外链打开、模型 HTTP、模型目录、网页抓取 / 搜索、自定义 MCP HTTP 都要过白名单。明文 HTTP 仅放行 `localhost`、`127.0.0.1`、`10.0.2.2`，与 `res/xml/network_security_config.xml`（`cleartextTrafficPermitted="false"` 默认）一致。
+* **内置 WebView** 禁用 `file://` / `content://`、禁止混合内容、默认关闭 JavaScript，直到用户主动开启。
+* **IPC 权限模型。** Provider 必须在 `<service>` 上声明 `android:permission="cn.lineai.permission.IPC_TERMINAL_PROVIDER"`；主 App 声明同名 `<permission>` 和 `<uses-permission>`。没有权限的调用方会在 Android 框架层被直接拒掉，Provider 端不必再做校验。
+* **Release 加固。** R8 + 8192 项混淆字典，剥离 LineNumberTable、native debug symbols、mapping 文件。Debug 证书签 release 会被 `validateReleaseSigning` 拒绝。
 
-完整威胁模型见 [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md)。
+完整威胁模型与已接受风险见 [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md)。
+
+---
 
 ## 参与贡献
 
-欢迎提 Issue、想法和 PR。如果要写代码，请注意：
+欢迎提 Issue、想法和 PR。写代码前请注意：
 
-- 这是一个纯 Java 项目，Kotlin stdlib 被刻意排除在运行时 classpath 之外。
-- 视图全部由 Java 代码构建，不写 XML 布局。
-- 新增聊天或工具行为，请扩展 `cn.lineai.mvp` 下对应的控制器，不要绕过它去改 View。
+* **纯 Java。** `app/src/main/java` 全部是 Java；Kotlin stdlib 被刻意排除在运行时 classpath 外，引入 Kotlin 传递依赖会在运行期静默失败。`ipc/` 与 `terminal-provider/` 同样。
+* **视图用 Java 写，不用 XML。** `lint.xml` 故意屏蔽 `ViewConstructor` 与 `IconDuplicates`。
+* **通过控制器扩展。** 新增聊天或工具行为时，扩展 `cn.lineai.mvp.*` 下对应的控制器，状态走 `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)`。不要绕过控制器去直接动 View。
+* **测试镜像包路径。** `app/src/test/java/cn/lineai/...` 与生产代码同包名。仅用 JUnit 4 + `org.json`（无 Robolectric、无 Mockito）。仓库或控制器单测优先用 sibling test 里已有的内存 fake。
+* **`问题.txt` 是临时清单。** 已 gitignored，正常改动不要动它。
+* **发 PR 前跑门禁：**
 
-提交 PR 前，请确认以下命令全部通过：
-`./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease`。
+  ```bash
+  ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleRelease
+  ```
+
+---
 
 ## 许可证
 

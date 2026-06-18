@@ -43,6 +43,10 @@ import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
+import cn.lineai.ipc.BaseIpcProvider;
+import cn.lineai.ipc.IpcProviderConnectionState;
+import cn.lineai.ipc.IpcProviderStateListener;
+import cn.lineai.ipc.terminal.TerminalIpcProvider;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.mvp.agent.AgentExecutionController;
 import cn.lineai.mvp.agent.AgentProgressSession;
@@ -105,6 +109,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class MainCoordinator implements MainUiController {
+    private static final String TAG = "MainCoordinator";
     private static final long STREAM_RENDER_INTERVAL_MS = 80L;
     private static final long AGENT_PROGRESS_RENDER_INTERVAL_MS = 100L;
     private static final String DIRECTORY_PICKER_MODE_SSH_REMOTE = "ssh_remote";
@@ -149,6 +154,8 @@ public final class MainCoordinator implements MainUiController {
     private final IpcProviderStore ipcProviderRepository;
     private final cn.lineai.ipc.IpcProviderScanner ipcProviderScanner;
     private final cn.lineai.ipc.IpcProviderManager ipcProviderManager;
+    private final IpcProviderStateListener ipcStateListener = this::onIpcProviderStateChanged;
+    private boolean ipcProjectPathApplied;
     private java.util.List<cn.lineai.ipc.ScannedProvider> terminalProviderScanResults = java.util.Collections.emptyList();
     private boolean terminalProviderHasScanned = false;
     private final DiffStore diffRepository;
@@ -649,6 +656,7 @@ public final class MainCoordinator implements MainUiController {
         attachmentPickerController = new AttachmentPickerCoordinator(
                 fileTreeRepository,
                 sshFileTreeRepository,
+                ipcFileTreeRepository,
                 backgroundTasks::execute,
                 mainThread::post,
                 new AttachmentPickerCoordinator.Host() {
@@ -660,6 +668,11 @@ public final class MainCoordinator implements MainUiController {
                     @Override
                     public boolean isSshExecutionMode() {
                         return MainCoordinator.this.isSshExecutionMode();
+                    }
+
+                    @Override
+                    public boolean isTerminalProviderExecutionMode() {
+                        return MainCoordinator.this.isTerminalProviderExecutionMode();
                     }
 
                     @Override
@@ -685,6 +698,8 @@ public final class MainCoordinator implements MainUiController {
                     }
                 }
         );
+        ipcProviderManager.addStateListener(ipcStateListener);
+        restoreIpcProviders();
         applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
         expandedFilePaths.add(projectPath);
         loadCurrentConversation();
@@ -693,6 +708,8 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void attachView(MainContract.View view) {
         this.view = view;
+        applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
+        expandedFilePaths.add(projectPath);
         render();
         requestSshFileTreeLoad(false);
         requestIpcFileTreeLoad(false);
@@ -706,6 +723,7 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public void destroy() {
+        ipcProviderManager.removeStateListener(ipcStateListener);
         detachView();
         cancelActiveGeneration();
         HttpServerTool.stopActiveServer();
@@ -2464,6 +2482,71 @@ public final class MainCoordinator implements MainUiController {
 
     private void requestSshFileTreeLoad(boolean force) {
         sshFileTreeController.requestFileTreeLoad(force);
+    }
+
+    private void restoreIpcProviders() {
+        if (ipcProviderRepository == null || ipcProviderManager == null) {
+            return;
+        }
+        List<cn.lineai.ipc.IpcProviderConfig> providers = ipcProviderRepository.getProviders();
+        for (cn.lineai.ipc.IpcProviderConfig config : providers) {
+            if (!config.isEnabled()) {
+                continue;
+            }
+            try {
+                ipcProviderManager.registerAndBind(config);
+            } catch (RuntimeException e) {
+                android.util.Log.w(TAG, "重连 IPC 提供者失败: " + config.getId(), e);
+            }
+        }
+    }
+
+    private void onIpcProviderStateChanged(
+            BaseIpcProvider provider,
+            IpcProviderConnectionState newState,
+            Throwable cause) {
+        if (provider == null || provider.getProviderType() != cn.lineai.ipc.IpcProviderType.TERMINAL) {
+            return;
+        }
+        if (newState == IpcProviderConnectionState.CONNECTED) {
+            applyIpcProjectPath((TerminalIpcProvider) provider);
+            return;
+        }
+        if (newState == IpcProviderConnectionState.DISCONNECTED
+                || newState == IpcProviderConnectionState.FAILED) {
+            if (isTerminalProviderExecutionMode() && ipcProjectPathApplied) {
+                projectPath = "";
+                projectLabel = "LineCode";
+                projectSource = WorkspacePaths.SOURCE_DEFAULT;
+                expandedFilePaths.clear();
+                ipcProjectPathApplied = false;
+                render();
+            }
+        }
+    }
+
+    private void applyIpcProjectPath(TerminalIpcProvider provider) {
+        if (provider == null) {
+            return;
+        }
+        String home;
+        try {
+            home = provider.getHomePath();
+        } catch (Exception e) {
+            android.util.Log.w(TAG, "读取 IPC home 失败", e);
+            home = "";
+        }
+        if (home.length() == 0) {
+            return;
+        }
+        projectPath = home;
+        projectSource = WorkspacePaths.SOURCE_EXTERNAL;
+        projectLabel = provider.getConfig().getName();
+        expandedFilePaths.clear();
+        expandedFilePaths.add(projectPath);
+        ipcProjectPathApplied = true;
+        requestIpcFileTreeLoad(true);
+        render();
     }
 
     private void requestIpcFileTreeLoad(boolean force) {

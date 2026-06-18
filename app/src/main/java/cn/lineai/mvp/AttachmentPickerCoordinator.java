@@ -1,6 +1,7 @@
 package cn.lineai.mvp;
 
 import cn.lineai.data.repository.FileTreeStore;
+import cn.lineai.data.repository.IpcFileTreeStore;
 import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.InputAttachment;
@@ -13,6 +14,8 @@ public final class AttachmentPickerCoordinator {
 
         boolean isSshExecutionMode();
 
+        boolean isTerminalProviderExecutionMode();
+
         String projectPath();
 
         String defaultHomePath();
@@ -24,6 +27,7 @@ public final class AttachmentPickerCoordinator {
 
     private final FileTreeStore fileTreeRepository;
     private final SshFileTreeStore sshFileTreeRepository;
+    private final IpcFileTreeStore ipcFileTreeRepository;
     private final BackgroundRunner backgroundRunner;
     private final UiDispatcher uiDispatcher;
     private final Host host;
@@ -40,12 +44,14 @@ public final class AttachmentPickerCoordinator {
     public AttachmentPickerCoordinator(
             FileTreeStore fileTreeRepository,
             SshFileTreeStore sshFileTreeRepository,
+            IpcFileTreeStore ipcFileTreeRepository,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher,
             Host host
     ) {
         this.fileTreeRepository = fileTreeRepository;
         this.sshFileTreeRepository = sshFileTreeRepository;
+        this.ipcFileTreeRepository = ipcFileTreeRepository;
         this.backgroundRunner = backgroundRunner;
         this.uiDispatcher = uiDispatcher;
         this.host = host;
@@ -56,7 +62,13 @@ public final class AttachmentPickerCoordinator {
             return;
         }
         active = true;
-        source = host.isSshExecutionMode() ? InputAttachment.SOURCE_SSH : InputAttachment.SOURCE_LOCAL;
+        if (host.isSshExecutionMode()) {
+            source = InputAttachment.SOURCE_SSH;
+        } else if (host.isTerminalProviderExecutionMode()) {
+            source = InputAttachment.SOURCE_TERMINAL_PROVIDER;
+        } else {
+            source = InputAttachment.SOURCE_LOCAL;
+        }
         rootPath = attachmentRootPath(source);
         expandedPaths.clear();
         if (rootPath.length() > 0) {
@@ -94,6 +106,10 @@ public final class AttachmentPickerCoordinator {
         }
         if (InputAttachment.SOURCE_SSH.equals(source)) {
             refreshSshAttachmentPicker();
+            return;
+        }
+        if (InputAttachment.SOURCE_TERMINAL_PROVIDER.equals(source)) {
+            refreshIpcAttachmentPicker();
             return;
         }
         try {
@@ -142,22 +158,61 @@ public final class AttachmentPickerCoordinator {
         });
     }
 
+    private void refreshIpcAttachmentPicker() {
+        loading = true;
+        message = "正在通过 IPC 读取终端提供者目录...";
+        renderAttachmentPicker();
+        int generation = ++loadGeneration;
+        String root = rootPath;
+        HashSet<String> expanded = new HashSet<>(expandedPaths);
+        backgroundRunner.execute("linecode-ipc-attachment-picker", () -> {
+            try {
+                FileTreeNode node = ipcFileTreeRepository.buildTree(root, expanded);
+                uiDispatcher.post(() -> {
+                    if (!active || generation != loadGeneration) {
+                        return;
+                    }
+                    tree = node;
+                    rootPath = node.getPath();
+                    expandedPaths.add(node.getPath());
+                    loading = false;
+                    message = "";
+                    renderAttachmentPicker();
+                });
+            } catch (Exception e) {
+                uiDispatcher.post(() -> {
+                    if (!active || generation != loadGeneration) {
+                        return;
+                    }
+                    tree = null;
+                    loading = false;
+                    message = e.getMessage();
+                    renderAttachmentPicker();
+                });
+            }
+        });
+    }
+
     private void renderAttachmentPicker() {
         if (!active || !host.isViewAttached()) {
             return;
         }
-        boolean ssh = InputAttachment.SOURCE_SSH.equals(source);
-        host.showAttachmentPicker(
-                ssh ? "选择 SSH 文件" : "选择本地文件",
-                tree,
-                loading,
-                message,
-                source
-        );
+        String title;
+        if (InputAttachment.SOURCE_SSH.equals(source)) {
+            title = "选择 SSH 文件";
+        } else if (InputAttachment.SOURCE_TERMINAL_PROVIDER.equals(source)) {
+            title = "选择终端提供者文件";
+        } else {
+            title = "选择本地文件";
+        }
+        host.showAttachmentPicker(title, tree, loading, message, source);
     }
 
     private String attachmentRootPath(String source) {
         if (InputAttachment.SOURCE_SSH.equals(source)) {
+            return host.projectPath().length() == 0 ? "." : host.projectPath();
+        }
+        if (InputAttachment.SOURCE_TERMINAL_PROVIDER.equals(source)) {
             return host.projectPath().length() == 0 ? "." : host.projectPath();
         }
         if (host.projectPath().length() > 0) {

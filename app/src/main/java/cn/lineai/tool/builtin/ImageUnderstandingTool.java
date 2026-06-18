@@ -8,7 +8,9 @@ import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.data.repository.SshFileTreeRepository;
+import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.ipc.IpcProviderType;
 import cn.lineai.ipc.terminal.TerminalIpcProvider;
@@ -29,9 +31,9 @@ import org.json.JSONObject;
 public final class ImageUnderstandingTool extends BaseTool {
     private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
 
-    private final ToolSettingsRepository settingsRepository;
+    private final ToolSettingsStore settingsRepository;
     private final ModelRepository modelRepository;
-    private final SshFileTreeRepository sshFileTreeRepository;
+    private final SshFileTreeStore sshFileTreeRepository;
     private final ModelClient modelClient;
     private final IpcProviderManager ipcProviderManager;
 

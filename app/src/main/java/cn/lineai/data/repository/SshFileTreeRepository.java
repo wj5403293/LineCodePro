@@ -13,7 +13,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-public final class SshFileTreeRepository {
+public final class SshFileTreeRepository implements SshFileTreeStore {
     private static final int MAX_CHILDREN_PER_DIR = 300;
     private static final int MAX_SFTP_SCAN_ITEMS = 1200;
     private static final String[] IGNORED_ENTRIES = {".git", "node_modules", ".gradle", "build", "dist"};
@@ -24,6 +24,7 @@ public final class SshFileTreeRepository {
         this.sshService = sshService;
     }
 
+    @Override
     public FileTreeNode buildTree(String rootPath, Set<String> expandedPaths) throws Exception {
         return sshService.withSftp(sftp -> {
             sftp.cd(normalizeSftpDirectory(rootPath));
@@ -33,10 +34,12 @@ public final class SshFileTreeRepository {
         }, 120000);
     }
 
+    @Override
     public FileTreeNode listDirectory(String directoryPath) throws Exception {
         return listDirectoryWithSftp(directoryPath);
     }
 
+    @Override
     public boolean directoryExists(String directoryPath) throws Exception {
         return sshService.withSftp(sftp -> {
             try {
@@ -51,6 +54,7 @@ public final class SshFileTreeRepository {
         }, 30000);
     }
 
+    @Override
     public byte[] readFileBytes(String path, long maxBytes) throws Exception {
         return sshService.withSftp(sftp -> {
             String cleanPath = normalizeSftpPath(path);
@@ -94,6 +98,7 @@ public final class SshFileTreeRepository {
         }, 30000);
     }
 
+    @Override
     public void createFile(String parentPath, String name) throws Exception {
         String cleanName = cleanName(name);
         sshService.withSftp(sftp -> {
@@ -106,6 +111,7 @@ public final class SshFileTreeRepository {
         }, 30000);
     }
 
+    @Override
     public void createDirectory(String parentPath, String name) throws Exception {
         String cleanName = cleanName(name);
         sshService.withSftp(sftp -> {
@@ -118,6 +124,7 @@ public final class SshFileTreeRepository {
         }, 30000);
     }
 
+    @Override
     public String rename(String path, String newName) throws Exception {
         String cleanName = cleanName(newName);
         String parentPath = parentPath(path);
@@ -132,6 +139,7 @@ public final class SshFileTreeRepository {
         return targetPath;
     }
 
+    @Override
     public void delete(String path) throws Exception {
         sshService.withSftp(sftp -> {
             deleteRecursively(sftp, normalizeSftpPath(path));
@@ -139,6 +147,7 @@ public final class SshFileTreeRepository {
         }, 120000);
     }
 
+    @Override
     public String copyInto(String sourcePath, String targetDirectoryPath) throws Exception {
         String targetPath = join(targetDirectoryPath, basename(sourcePath));
         sshService.executeCommand("test ! -e " + shellQuote(targetPath) + " && cp -R " + shellQuote(sourcePath)
@@ -146,6 +155,7 @@ public final class SshFileTreeRepository {
         return targetPath;
     }
 
+    @Override
     public String createManagedProject(String name) throws Exception {
         String cleanName = cleanName(name);
         String output = sshService.executeCommand("mkdir -p ~/.linecode/project/" + shellQuote(cleanName)

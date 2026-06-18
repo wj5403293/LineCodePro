@@ -5,24 +5,8 @@ import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpToolSummary;
-import cn.lineai.data.repository.WebSearchConfigRepository;
-import cn.lineai.tool.builtin.AgentPipelineTool;
-import cn.lineai.tool.builtin.AgentTool;
 import cn.lineai.tool.builtin.CustomAgentExtensionTool;
 import cn.lineai.tool.builtin.CustomMcpHttpTool;
-import cn.lineai.tool.builtin.FileDeleteTool;
-import cn.lineai.tool.builtin.FileEditTool;
-import cn.lineai.tool.builtin.FileReadTool;
-import cn.lineai.tool.builtin.FileWriteTool;
-import cn.lineai.tool.builtin.GlobTool;
-import cn.lineai.tool.builtin.HttpServerTool;
-import cn.lineai.tool.builtin.ImageGenerationTool;
-import cn.lineai.tool.builtin.ImageUnderstandingTool;
-import cn.lineai.tool.builtin.ListDirectoryTool;
-import cn.lineai.tool.builtin.ShellExecuteTool;
-import cn.lineai.tool.builtin.TodoUpdateTool;
-import cn.lineai.tool.builtin.WebFetchTool;
-import cn.lineai.tool.builtin.WebSearchTool;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -49,21 +33,12 @@ public final class ToolRegistry {
 
     public ToolRegistry(Context context, cn.lineai.ipc.IpcProviderManager ipcProviderManager) {
         this.context = context == null ? null : context.getApplicationContext();
-        register(new FileReadTool());
-        register(new FileWriteTool());
-        register(new FileEditTool());
-        register(new FileDeleteTool());
-        register(new GlobTool());
-        register(new ListDirectoryTool());
-        register(new HttpServerTool());
-        register(new AgentTool());
-        register(new AgentPipelineTool());
-        register(new TodoUpdateTool());
-        register(new ShellExecuteTool(context, ipcProviderManager));
-        register(new ImageUnderstandingTool(context, ipcProviderManager));
-        register(new ImageGenerationTool(context));
-        register(new WebSearchTool(context == null ? null : new WebSearchConfigRepository(context)));
-        register(new WebFetchTool());
+        for (BuiltInToolProvider provider : BuiltInToolProviders.defaults()) {
+            BaseTool tool = provider.create(this.context, ipcProviderManager);
+            if (tool != null) {
+                register(tool);
+            }
+        }
         reloadExtensions();
     }
 

@@ -17,7 +17,7 @@ public final class ChatModeRepository {
         return ChatMode.normalize(settingsRepository.getString(KEY_CHAT_MODE, ChatMode.DEFAULT));
     }
 
-    public synchronized void initialize(ToolSettingsRepository toolSettingsRepository) {
+    public synchronized void initialize(ToolSettingsStore toolSettingsRepository) {
         String storedMode = settingsRepository.getString(KEY_CHAT_MODE, "");
         if (storedMode.length() > 0) {
             applyMode(storedMode, toolSettingsRepository);
@@ -33,7 +33,7 @@ public final class ChatModeRepository {
         rememberRestorablePermission(permissionMode);
     }
 
-    public synchronized void applyMode(String mode, ToolSettingsRepository toolSettingsRepository) {
+    public synchronized void applyMode(String mode, ToolSettingsStore toolSettingsRepository) {
         String normalized = ChatMode.normalize(mode);
         if (!normalized.equals(getMode())) {
             settingsRepository.setString(KEY_CHAT_MODE, normalized);

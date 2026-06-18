@@ -1,6 +1,5 @@
 package cn.lineai.ui;
 
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -9,16 +8,10 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.Insets;
 import android.net.Uri;
-import android.os.Build;
-import android.text.InputType;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
-import android.view.WindowInsets;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -28,38 +21,40 @@ import cn.lineai.model.ChatUiState;
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.InputAttachment;
-import cn.lineai.model.ModelConfig;
-import cn.lineai.model.ModelProviderPreset;
-import cn.lineai.model.ModelProviderPresets;
 import cn.lineai.model.SheetOption;
 import cn.lineai.mvp.MainContract;
 import cn.lineai.mvp.MainUiController;
 import cn.lineai.security.UrlPolicy;
-import cn.lineai.ui.component.BottomSheetView;
+import cn.lineai.ui.component.AboutScreenView;
 import cn.lineai.ui.component.AttachmentPickerSheetView;
+import cn.lineai.ui.component.BackNavigation;
+import cn.lineai.ui.component.BottomSheetView;
 import cn.lineai.ui.component.ChatMessageListView;
 import cn.lineai.ui.component.ComposerView;
-import cn.lineai.ui.component.AboutScreenView;
-import cn.lineai.ui.component.AgentExtensionEditScreenView;
 import cn.lineai.ui.component.DataSettingsScreenView;
+import cn.lineai.ui.component.DialogDimensions;
+import cn.lineai.ui.component.DialogManager;
 import cn.lineai.ui.component.DirectoryPickerSheetView;
 import cn.lineai.ui.component.DrawerView;
 import cn.lineai.ui.component.ExperimentalSettingsScreenView;
 import cn.lineai.ui.component.ExtensionDetailScreenView;
 import cn.lineai.ui.component.ExtensionsScreenView;
+import cn.lineai.ui.component.FileActionRow;
 import cn.lineai.ui.component.HeaderView;
 import cn.lineai.ui.component.InAppBrowserScreenView;
 import cn.lineai.ui.component.InputSettingsScreenView;
 import cn.lineai.ui.component.KeepAliveSettingsScreenView;
+import cn.lineai.ui.component.AgentExtensionEditScreenView;
 import cn.lineai.ui.component.LLMSettingsScreenView;
 import cn.lineai.ui.component.LicensesScreenView;
 import cn.lineai.ui.component.MCPSettingsScreenView;
+import cn.lineai.ui.component.McpExtensionEditScreenView;
 import cn.lineai.ui.component.MemorySettingsScreenView;
 import cn.lineai.ui.component.MessageActionListener;
-import cn.lineai.ui.component.McpExtensionEditScreenView;
 import cn.lineai.ui.component.ModelAddOptionsScreenView;
 import cn.lineai.ui.component.ModelAddScreenView;
 import cn.lineai.ui.component.ModelListScreenView;
+import cn.lineai.ui.component.MainChatViewLayoutBuilder;
 import cn.lineai.ui.component.OutputSettingsScreenView;
 import cn.lineai.ui.component.PluginPageScreenView;
 import cn.lineai.ui.component.PromptTemplatesScreenView;
@@ -67,6 +62,7 @@ import cn.lineai.ui.component.ScreenFactories;
 import cn.lineai.ui.component.ScreenRegistry;
 import cn.lineai.ui.component.SettingsScreenView;
 import cn.lineai.ui.component.ShellCommandScreenView;
+import cn.lineai.ui.component.SimpleScreenContent;
 import cn.lineai.ui.component.SimpleSettingsScreenView;
 import cn.lineai.ui.component.SshSettingsScreenView;
 import cn.lineai.ui.component.StorageManagementScreenView;
@@ -79,7 +75,7 @@ import cn.lineai.ui.theme.LineTheme;
 import cn.lineai.ui.util.KeyboardController;
 import java.util.List;
 
-public final class MainChatView extends FrameLayout implements MainContract.View {
+public final class MainChatView extends FrameLayout implements MainContract.View, BackNavigation.BackTarget {
     public interface WorkspaceHost {
         void openExternalProjectPicker();
 
@@ -107,6 +103,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     }
 
     private final MainUiController presenter;
+    private final DialogManager dialogManager = new DialogManager();
     private final HeaderView headerView;
     private final LinearLayout contentView;
     private final ChatMessageListView messageListView;
@@ -131,9 +128,11 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         this.presenter = presenter;
         setBackgroundColor(LineTheme.BG);
 
-        contentView = new LinearLayout(context);
-        contentView.setOrientation(LinearLayout.VERTICAL);
+        MainChatViewLayoutBuilder.Result layout = MainChatViewLayoutBuilder.build(context);
+        contentView = layout.contentView;
+        screenHost = layout.screenHost;
         addView(contentView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        addView(screenHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         headerView = new HeaderView(context);
         headerView.setListener(new HeaderView.Listener() {
@@ -337,14 +336,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         });
         addView(attachmentPickerSheetView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
-        screenHost = new FrameLayout(context);
-        screenHost.setBackgroundColor(LineTheme.BG);
-        screenHost.setClickable(true);
-        screenHost.setFocusable(true);
-        screenHost.setFocusableInTouchMode(true);
-        screenHost.setVisibility(GONE);
-        addView(screenHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        installSystemBarInsetsHandling();
+        MainChatViewLayoutBuilder.installSystemBarInsetsHandling(this, contentView, screenHost);
         registerScreenFactories();
     }
 
@@ -467,7 +459,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
         if (options != null) {
             for (SheetOption option : options) {
-                panel.addView(fileActionRow(dialog, option), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                panel.addView(FileActionRow.create(getContext(), dialog, option, presenter::onSheetOptionSelected), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             }
         }
 
@@ -476,7 +468,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             Window shown = dialog.getWindow();
             if (shown != null) {
                 shown.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                shown.setLayout(insetDialogWidth(), LayoutParams.WRAP_CONTENT);
+                shown.setLayout(DialogDimensions.insetDialogWidth(getContext()), LayoutParams.WRAP_CONTENT);
             }
         });
         dialog.show();
@@ -489,27 +481,9 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         bottomSheetView.close();
         directoryPickerSheetView.close();
         attachmentPickerSheetView.close();
-        final EditText input = new EditText(getContext());
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        input.setText(initialValue == null ? "" : initialValue);
-        input.setSelectAllOnFocus(true);
-        int horizontalPadding = LineTheme.dp(getContext(), LineTheme.LG);
-        input.setPadding(horizontalPadding, LineTheme.dp(getContext(), LineTheme.SM), horizontalPadding, LineTheme.dp(getContext(), LineTheme.SM));
-        AlertDialog dialog = new AlertDialog.Builder(getContext())
-                .setTitle(title == null ? "" : title)
-                .setMessage(message == null ? "" : message)
-                .setView(input)
-                .setNegativeButton(getContext().getString(R.string.common_cancel), null)
-                .setPositiveButton(getContext().getString(R.string.common_confirm), (d, which) -> presenter.onDialogInputSubmitted(actionId, input.getText().toString()))
-                .create();
-        dialog.setOnShowListener(d -> {
-            input.requestFocus();
-            if (dialog.getWindow() != null) {
-                dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
-            }
-        });
-        dialog.show();
+        final String capturedActionId = actionId;
+        dialogManager.showInput(getContext(), title, message, null, initialValue,
+                value -> presenter.onDialogInputSubmitted(capturedActionId, value));
     }
 
     @Override
@@ -519,19 +493,10 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         bottomSheetView.close();
         directoryPickerSheetView.close();
         attachmentPickerSheetView.close();
-        AlertDialog dialog = new AlertDialog.Builder(getContext())
-                .setTitle(title == null ? "" : title)
-                .setMessage(message == null ? "" : message)
-                .setNegativeButton(getContext().getString(R.string.common_cancel), null)
-                .setPositiveButton(confirmLabel == null || confirmLabel.length() == 0
-                        ? getContext().getString(R.string.common_confirm)
-                        : confirmLabel,
-                        (d, which) -> presenter.onDialogConfirmed(actionId))
-                .create();
-        if (danger) {
-            dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(LineTheme.DANGER));
-        }
-        dialog.show();
+        final String capturedActionId = actionId;
+        dialogManager.showConfirm(getContext(), title, message, confirmLabel, danger,
+                () -> presenter.onDialogConfirmed(capturedActionId),
+                null);
     }
 
     @Override
@@ -729,69 +694,58 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         );
     }
 
-    private View fileActionRow(Dialog dialog, SheetOption option) {
-        Context context = getContext();
-        String id = option == null ? "" : option.getId();
-        boolean danger = id.startsWith("file:delete:");
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setClickable(true);
-        row.setOnClickListener(v -> {
-            dialog.dismiss();
-            presenter.onSheetOptionSelected(id);
-        });
-        LineTheme.padding(row, 0, 14, 0, 14);
-
-        LinearLayout labels = new LinearLayout(context);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        row.addView(labels, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-
-        TextView label = LineTheme.text(context,
-                option == null ? "" : option.getLabel(),
-                LineTheme.FONT_MD,
-                danger ? LineTheme.DANGER : LineTheme.TEXT,
-                Typeface.NORMAL);
-        labels.addView(label, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-
-        String description = option == null ? "" : option.getDescription();
-        if (description != null && description.length() > 0) {
-            TextView desc = LineTheme.text(context, description, LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
-            desc.setSingleLine(false);
-            LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            descParams.topMargin = LineTheme.dp(context, 2);
-            labels.addView(desc, descParams);
-        }
-        return row;
-    }
-
-    private int insetDialogWidth() {
-        int width = getResources().getDisplayMetrics().widthPixels - LineTheme.dp(getContext(), 32);
-        return Math.max(LineTheme.dp(getContext(), 280), width);
-    }
-
     public boolean handleBackPressed() {
-        if (screenHost.getVisibility() == VISIBLE) {
-            presenter.onScreenBackFrom(currentScreenId);
-            return true;
-        }
-        if (directoryPickerSheetView.getVisibility() == VISIBLE) {
-            directoryPickerSheetView.close();
-            return true;
-        }
-        if (attachmentPickerSheetView.getVisibility() == VISIBLE) {
-            attachmentPickerSheetView.close();
-            return true;
-        }
-        if (bottomSheetView.getVisibility() == VISIBLE) {
-            bottomSheetView.close();
-            return true;
-        }
-        if (drawerView.getVisibility() == VISIBLE) {
-            drawerView.close();
-            return true;
-        }
-        return false;
+        return BackNavigation.handle(this);
+    }
+
+    @Override
+    public boolean isScreenVisible() {
+        return screenHost.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public boolean isDirectoryPickerVisible() {
+        return directoryPickerSheetView.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public boolean isAttachmentPickerVisible() {
+        return attachmentPickerSheetView.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public boolean isBottomSheetVisible() {
+        return bottomSheetView.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public boolean isDrawerVisible() {
+        return drawerView.getVisibility() == VISIBLE;
+    }
+
+    @Override
+    public void backFromScreen() {
+        presenter.onScreenBackFrom(currentScreenId);
+    }
+
+    @Override
+    public void closeDirectoryPicker() {
+        directoryPickerSheetView.close();
+    }
+
+    @Override
+    public void closeAttachmentPicker() {
+        attachmentPickerSheetView.close();
+    }
+
+    @Override
+    public void closeBottomSheet() {
+        bottomSheetView.close();
+    }
+
+    @Override
+    public void closeDrawer() {
+        drawerView.close();
     }
 
     public void handleScreenBack() {
@@ -826,153 +780,10 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     }
 
     private View simpleScreen(String screenId) {
-        String title = titleFor(screenId);
-        String subtitle = subtitleFor(screenId);
-        String[] rows = rowsFor(screenId);
-        return new SimpleSettingsScreenView(getContext(), title, subtitle, rows, this::handleScreenBack);
-    }
-
-    private String titleFor(String screenId) {
         Context context = getContext();
-        if ("llm".equals(screenId)) return context.getString(R.string.screen_llm_title);
-        if ("promptTemplates".equals(screenId)) return context.getString(R.string.screen_prompt_templates_title);
-        if ("input".equals(screenId)) return context.getString(R.string.screen_input_title);
-        if ("mcp".equals(screenId)) return context.getString(R.string.screen_mcp_title);
-        if ("toolSettings".equals(screenId)) return context.getString(R.string.screen_tools_title);
-        if ("theme".equals(screenId)) return context.getString(R.string.fallback_screen_theme_title);
-        if ("output".equals(screenId)) return context.getString(R.string.fallback_screen_output_title);
-        if ("experimental".equals(screenId)) return context.getString(R.string.screen_experimental_title);
-        if ("storage".equals(screenId)) return context.getString(R.string.screen_storage_title);
-        if ("memory".equals(screenId)) return context.getString(R.string.screen_memory_title);
-        if ("data".equals(screenId)) return context.getString(R.string.fallback_screen_data_title);
-        if ("keepAlive".equals(screenId)) return context.getString(R.string.fallback_screen_keep_alive_title_alt);
-        if ("sshSettings".equals(screenId)) return context.getString(R.string.screen_ssh_title);
-        if ("termuxIntegration".equals(screenId)) return context.getString(R.string.screen_termux_title);
-        if ("about".equals(screenId)) return context.getString(R.string.fallback_screen_about_title_alt);
-        if ("modelAddOptions".equals(screenId)) return context.getString(R.string.screen_model_add_options_title);
-        if ("licenses".equals(screenId)) return context.getString(R.string.fallback_screen_licenses_title);
-        if ("tutorial".equals(screenId)) return context.getString(R.string.fallback_screen_tutorial_title_alt);
-        if (screenId != null && screenId.startsWith("extension:")) return context.getString(R.string.fallback_screen_extension_title);
-        return context.getString(R.string.header_project_default);
-    }
-
-    private String subtitleFor(String screenId) {
-        Context context = getContext();
-        if ("about".equals(screenId)) return context.getString(R.string.fallback_screen_about_subtitle);
-        if ("modelAddOptions".equals(screenId)) return context.getString(R.string.fallback_screen_model_add_options_subtitle);
-        if (screenId != null && screenId.startsWith("extension:")) return context.getString(R.string.fallback_screen_extension_subtitle);
-        return context.getString(R.string.fallback_screen_default_subtitle);
-    }
-
-    private String[] rowsFor(String screenId) {
-        Context context = getContext();
-        if ("llm".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_llm_tone),
-                context.getString(R.string.fallback_row_llm_thinking),
-                context.getString(R.string.fallback_row_llm_keep_reasoning),
-                context.getString(R.string.fallback_row_llm_prompts)
-        };
-        if ("input".equals(screenId)) return new String[] {context.getString(R.string.fallback_row_input_enter)};
-        if ("mcp".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_mcp_execution),
-                context.getString(R.string.fallback_row_mcp_local),
-                context.getString(R.string.fallback_row_mcp_ssh),
-                context.getString(R.string.fallback_row_mcp_confirm)
-        };
-        if ("toolSettings".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_tools_image_understanding),
-                context.getString(R.string.fallback_row_tools_web_search),
-                context.getString(R.string.fallback_row_tools_model_select),
-                context.getString(R.string.fallback_row_tools_search_api)
-        };
-        if ("theme".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_theme_dark),
-                context.getString(R.string.fallback_row_theme_light),
-                context.getString(R.string.fallback_row_theme_coffee),
-                context.getString(R.string.fallback_row_theme_high_contrast)
-        };
-        if ("output".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_output_code_wrap),
-                context.getString(R.string.fallback_row_output_open_mode),
-                context.getString(R.string.fallback_row_output_browser_js),
-                context.getString(R.string.fallback_row_output_markdown_preview)
-        };
-        if ("experimental".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_experimental_keyboard),
-                context.getString(R.string.fallback_row_experimental_rendering)
-        };
-        if ("storage".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_storage_chat),
-                context.getString(R.string.fallback_row_storage_config),
-                context.getString(R.string.fallback_row_storage_diff_cache),
-                context.getString(R.string.fallback_row_storage_workspace)
-        };
-        if ("memory".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_memory_long_term),
-                context.getString(R.string.fallback_row_memory_project),
-                context.getString(R.string.fallback_row_memory_short_term),
-                context.getString(R.string.fallback_row_memory_index)
-        };
-        if ("data".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_data_full_export),
-                context.getString(R.string.fallback_row_data_linecode_import),
-                context.getString(R.string.fallback_row_data_archive)
-        };
-        if ("keepAlive".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_keep_alive_wake_lock),
-                context.getString(R.string.fallback_row_keep_alive_foreground),
-                context.getString(R.string.fallback_row_keep_alive_fake_music),
-                context.getString(R.string.fallback_row_keep_alive_battery_whitelist)
-        };
-        if ("sshSettings".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_ssh_host),
-                context.getString(R.string.fallback_row_ssh_port),
-                context.getString(R.string.fallback_row_ssh_username),
-                context.getString(R.string.fallback_row_ssh_private_key),
-                context.getString(R.string.fallback_row_ssh_test)
-        };
-        if ("termuxIntegration".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_termux_grant),
-                context.getString(R.string.fallback_row_termux_run_command_perm),
-                context.getString(R.string.fallback_row_termux_auto_ssh)
-        };
-        if ("about".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_about_version),
-                context.getString(R.string.screen_about_open_source_licenses)
-        };
-        if ("modelAddOptions".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_model_add_custom_api),
-                context.getString(R.string.fallback_row_model_add_local_gguf),
-                context.getString(R.string.fallback_row_model_add_openai_provider),
-                context.getString(R.string.fallback_row_model_add_codex_preset)
-        };
-        if ("tutorial".equals(screenId)) return new String[] {
-                context.getString(R.string.fallback_row_tutorial_beginner),
-                context.getString(R.string.fallback_row_tutorial_pro),
-                context.getString(R.string.fallback_row_tutorial_tools)
-        };
-        if (screenId != null && screenId.startsWith("extension:")) return new String[] {
-                context.getString(R.string.fallback_row_extension_add),
-                context.getString(R.string.fallback_row_extension_installed),
-                context.getString(R.string.fallback_row_extension_enabled),
-                context.getString(R.string.fallback_row_extension_manage)
-        };
-        return new String[] {context.getString(R.string.fallback_row_default), context.getString(R.string.fallback_row_default_subtitle)};
-    }
-
-    @SuppressWarnings("deprecation")
-    private void installSystemBarInsetsHandling() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            return;
-        }
-        setOnApplyWindowInsetsListener((view, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsets.Type.systemBars());
-            Insets ime = insets.getInsets(WindowInsets.Type.ime());
-            int bottomInset = Math.max(systemBars.bottom, ime.bottom);
-            contentView.setPadding(0, systemBars.top, 0, bottomInset);
-            screenHost.setPadding(0, systemBars.top, 0, bottomInset);
-            return insets;
-        });
-        post(this::requestApplyInsets);
+        String title = SimpleScreenContent.title(context, screenId);
+        String subtitle = SimpleScreenContent.subtitle(context, screenId);
+        String[] rows = SimpleScreenContent.rows(context, screenId);
+        return new SimpleSettingsScreenView(context, title, subtitle, rows, this::handleScreenBack);
     }
 }

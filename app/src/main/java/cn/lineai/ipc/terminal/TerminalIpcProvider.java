@@ -65,6 +65,18 @@ public final class TerminalIpcProvider extends BaseIpcProvider {
         return getService().writeFile(path, data);
     }
 
+    public byte[] readFileChunk(String path, long offset, int size) throws RemoteException {
+        return getService().readFileChunk(path, offset, size);
+    }
+
+    public boolean writeFileChunk(String path, long offset, byte[] data) throws RemoteException {
+        return getService().writeFileChunk(path, offset, data);
+    }
+
+    public long getFileSize(String path) throws RemoteException {
+        return getService().getFileSize(path);
+    }
+
     public boolean deleteFile(String path) throws RemoteException {
         return getService().deleteFile(path);
     }

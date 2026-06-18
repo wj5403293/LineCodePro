@@ -95,6 +95,6 @@ public final class TodoUpdateTool extends BaseTool {
         } else {
             summary = "TODO 列表已更新，共 " + total + " 项，已完成 " + done + " 项。";
         }
-        return new ToolResult("", getName(), summary, false);
+        return ok(summary);
     }
 }

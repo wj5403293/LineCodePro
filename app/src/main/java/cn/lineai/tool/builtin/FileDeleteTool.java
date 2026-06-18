@@ -86,8 +86,9 @@ public final class FileDeleteTool extends BaseTool {
                 builder.append("- ").append(error).append('\n');
             }
         }
-        return new ToolResult("", getName(), builder.length() == 0 ? "没有删除任何文件" : builder.toString().trim(),
-                errors.size() > 0 && deleted.isEmpty());
+        boolean isError = errors.size() > 0 && deleted.isEmpty();
+        String content = builder.length() == 0 ? "没有删除任何文件" : builder.toString().trim();
+        return isError ? error(content) : ok(content);
     }
 
     private ArrayList<String> paths(JSONObject input) {

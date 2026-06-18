@@ -2,40 +2,42 @@ package cn.lineai;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.Manifest;
 import android.content.Intent;
-import android.database.Cursor;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.OpenableColumns;
-import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.mvp.MainCoordinator;
 import cn.lineai.ui.MainChatView;
+import cn.lineai.ui.component.PermissionUiHelper;
+import cn.lineai.ui.component.SafPickerDelegate;
 import cn.lineai.ui.theme.LineTheme;
 
 @SuppressWarnings("deprecation")
 public final class MainActivity extends Activity implements MainChatView.WorkspaceHost {
-    private static final int REQUEST_OPEN_WORKSPACE_TREE = 7001;
-    private static final int REQUEST_LEGACY_STORAGE = 7002;
-    private static final int REQUEST_OPEN_DOCUMENT = 7003;
-    private static final int REQUEST_CREATE_DOCUMENT = 7004;
-
     private MainCoordinator presenter;
     private MainChatView mainView;
     private MainChatView.DocumentPickCallback documentPickCallback;
     private MainChatView.DocumentCreateCallback documentCreateCallback;
+    private SafPickerDelegate safPickerDelegate;
+    private PermissionUiHelper permissionUiHelper;
     private Object backCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         configureWindow();
+
+        safPickerDelegate = new SafPickerDelegate(this);
+        permissionUiHelper = new PermissionUiHelper(this);
+        permissionUiHelper.setListener((requestCode, grantResults) -> {
+            if (requestCode == PermissionUiHelper.REQUEST_LEGACY_STORAGE && presenter != null) {
+                presenter.onStoragePermissionResult();
+            }
+        });
 
         presenter = new MainCoordinator(this);
         mainView = new MainChatView(this, presenter);
@@ -62,38 +64,23 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_OPEN_DOCUMENT) {
-            handleDocumentResult(resultCode, data);
+        if (safPickerDelegate.onActivityResult(requestCode, resultCode, data)) {
             return;
         }
-        if (requestCode == REQUEST_CREATE_DOCUMENT) {
-            handleCreateDocumentResult(resultCode, data);
-            return;
-        }
-        if (requestCode != REQUEST_OPEN_WORKSPACE_TREE) {
+        if (requestCode != SafPickerDelegate.REQUEST_OPEN_DOCUMENT_TREE) {
             return;
         }
         if (resultCode != RESULT_OK || data == null || data.getData() == null) {
             presenter.onExternalProjectPickerCancelled();
             return;
         }
-        Uri uri = data.getData();
-        int flags = data.getFlags();
-        if ((flags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
-            takePersistableReadPermission(uri);
-        }
-        if ((flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
-            takePersistableWritePermission(uri);
-        }
-        presenter.onExternalProjectTreePicked(uri.toString());
+        presenter.onExternalProjectTreePicked(data.getData().toString());
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_LEGACY_STORAGE && presenter != null) {
-            presenter.onStoragePermissionResult();
-        }
+        permissionUiHelper.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     @Override
@@ -197,140 +184,78 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
 
     @Override
     public void openExternalProjectPicker() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
-        startActivityForResult(intent, REQUEST_OPEN_WORKSPACE_TREE);
+        safPickerDelegate.openDocumentTree(new SafPickerDelegate.TreePickCallback() {
+            @Override
+            public void onTreePicked(String uri) {
+                if (presenter != null) {
+                    presenter.onExternalProjectTreePicked(uri);
+                }
+            }
+
+            @Override
+            public void onCancelled() {
+                if (presenter != null) {
+                    presenter.onExternalProjectPickerCancelled();
+                }
+            }
+        });
     }
 
     @Override
     public void openManageAllFilesPermissionSettings() {
-        Intent intent;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-        } else {
-            intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(Uri.parse("package:" + getPackageName()));
-        }
-        try {
-            startActivity(intent);
-        } catch (RuntimeException e) {
-            startActivity(new Intent(Settings.ACTION_SETTINGS));
-        }
+        permissionUiHelper.openManageAllFilesAccessSettings();
     }
 
     @Override
     public void requestLegacyStoragePermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            openManageAllFilesPermissionSettings();
-            return;
-        }
-        requestPermissions(new String[] {
-                Manifest.permission.READ_EXTERNAL_STORAGE,
-                Manifest.permission.WRITE_EXTERNAL_STORAGE
-        }, REQUEST_LEGACY_STORAGE);
+        permissionUiHelper.requestLegacyStoragePermissions();
     }
 
     @Override
     public void openDocumentPicker(String mimeType, String[] extensions, MainChatView.DocumentPickCallback callback) {
         documentPickCallback = callback;
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType(mimeType == null || mimeType.length() == 0 ? "*/*" : mimeType);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        if (extensions != null && extensions.length > 0) {
-            intent.putExtra(Intent.EXTRA_TITLE, extensions[0]);
-        }
-        startActivityForResult(intent, REQUEST_OPEN_DOCUMENT);
+        safPickerDelegate.openDocument(mimeType, extensions, new SafPickerDelegate.DocumentPickCallback() {
+            @Override
+            public void onDocumentPicked(String uri, String displayName) {
+                MainChatView.DocumentPickCallback pending = documentPickCallback;
+                documentPickCallback = null;
+                if (pending != null) {
+                    pending.onDocumentPicked(uri, displayName);
+                }
+            }
+
+            @Override
+            public void onCancelled() {
+                MainChatView.DocumentPickCallback pending = documentPickCallback;
+                documentPickCallback = null;
+                if (pending != null) {
+                    pending.onDocumentPickCancelled();
+                }
+            }
+        });
     }
 
     @Override
     public void createDocument(String mimeType, String displayName, MainChatView.DocumentCreateCallback callback) {
         documentCreateCallback = callback;
-        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType(mimeType == null || mimeType.length() == 0 ? "application/octet-stream" : mimeType);
-        intent.putExtra(Intent.EXTRA_TITLE, displayName == null || displayName.length() == 0 ? "LineCode.linecode" : displayName);
-        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivityForResult(intent, REQUEST_CREATE_DOCUMENT);
-    }
-
-    private void handleDocumentResult(int resultCode, Intent data) {
-        MainChatView.DocumentPickCallback callback = documentPickCallback;
-        documentPickCallback = null;
-        if (callback == null) {
-            return;
-        }
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
-            callback.onDocumentPickCancelled();
-            return;
-        }
-        Uri uri = data.getData();
-        int flags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
-        if (flags != 0) {
-            takePersistableReadPermission(uri);
-        }
-        callback.onDocumentPicked(uri.toString(), displayName(uri));
-    }
-
-    private void handleCreateDocumentResult(int resultCode, Intent data) {
-        MainChatView.DocumentCreateCallback callback = documentCreateCallback;
-        documentCreateCallback = null;
-        if (callback == null) {
-            return;
-        }
-        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
-            callback.onDocumentCreateCancelled();
-            return;
-        }
-        Uri uri = data.getData();
-        int flags = data.getFlags();
-        if ((flags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
-            takePersistableReadPermission(uri);
-        }
-        if ((flags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
-            takePersistableWritePermission(uri);
-        }
-        callback.onDocumentCreated(uri.toString(), displayName(uri));
-    }
-
-    private void takePersistableReadPermission(Uri uri) {
-        try {
-            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-        }
-    }
-
-    private void takePersistableWritePermission(Uri uri) {
-        try {
-            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-        }
-    }
-
-    private String displayName(Uri uri) {
-        if (uri == null) {
-            return "";
-        }
-        Cursor cursor = null;
-        try {
-            cursor = getContentResolver().query(uri, new String[] {OpenableColumns.DISPLAY_NAME}, null, null, null);
-            if (cursor != null && cursor.moveToFirst()) {
-                String name = cursor.getString(0);
-                if (name != null && name.length() > 0) {
-                    return name;
+        safPickerDelegate.createDocument(mimeType, displayName, new SafPickerDelegate.DocumentCreateCallback() {
+            @Override
+            public void onDocumentCreated(String uri, String displayName) {
+                MainChatView.DocumentCreateCallback pending = documentCreateCallback;
+                documentCreateCallback = null;
+                if (pending != null) {
+                    pending.onDocumentCreated(uri, displayName);
                 }
             }
-        } catch (Exception ignored) {
-        } finally {
-            if (cursor != null) {
-                cursor.close();
+
+            @Override
+            public void onCancelled() {
+                MainChatView.DocumentCreateCallback pending = documentCreateCallback;
+                documentCreateCallback = null;
+                if (pending != null) {
+                    pending.onDocumentCreateCancelled();
+                }
             }
-        }
-        String path = uri.getLastPathSegment();
-        return path == null ? "skill.zip" : path;
+        });
     }
 }

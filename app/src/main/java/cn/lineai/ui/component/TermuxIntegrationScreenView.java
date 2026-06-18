@@ -13,6 +13,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.ssh.SshService;
+import cn.lineai.ssh.TermuxHelper;
 import cn.lineai.ui.theme.LineTheme;
 import java.util.regex.Pattern;
 
@@ -55,7 +56,7 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
 
         LinearLayout commandCard = card(context);
         commandCard.addView(title(context, context.getString(R.string.screen_termux_section_intent)));
-        TextView command = LineTheme.text(context, SshService.TERMUX_ALLOW_EXTERNAL_APPS_COMMAND, LineTheme.FONT_XS, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        TextView command = LineTheme.text(context, TermuxHelper.TERMUX_ALLOW_EXTERNAL_APPS_COMMAND, LineTheme.FONT_XS, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
         command.setTypeface(Typeface.MONOSPACE);
         command.setTextIsSelectable(true);
         command.setLineSpacing(LineTheme.dp(context, 3), 1f);
@@ -105,7 +106,7 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
             setStatus(context.getString(R.string.screen_termux_status_unable_title), context.getString(R.string.screen_termux_status_unable_message), true);
             return;
         }
-        ((Activity) context).requestPermissions(new String[] {SshService.TERMUX_RUN_COMMAND_PERMISSION}, REQUEST_TERMUX_RUN_COMMAND);
+        ((Activity) context).requestPermissions(new String[] {TermuxHelper.TERMUX_RUN_COMMAND_PERMISSION}, REQUEST_TERMUX_RUN_COMMAND);
         setStatus(context.getString(R.string.screen_termux_status_requested_title), context.getString(R.string.screen_termux_status_requested_message), false);
     }
 
@@ -125,7 +126,7 @@ public final class TermuxIntegrationScreenView extends ScreenScaffoldView {
         setStatus(context.getString(R.string.screen_termux_status_setup_title), context.getString(R.string.screen_termux_status_setup_message), false);
         new Thread(() -> {
             try {
-                SshService.TermuxSetupResult setup = sshService.setupTermuxOpenSsh(15 * 60 * 1000);
+                TermuxHelper.TermuxSetupResult setup = sshService.setupTermuxOpenSsh(15 * 60 * 1000);
                 String testOutput = sshService.testConnection(setup.getConfig());
                 mainHandler.post(() -> {
                     setSetupRunning(false);

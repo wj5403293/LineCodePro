@@ -11,9 +11,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-public final class FileTreeRepository {
+public final class FileTreeRepository implements FileTreeStore {
     private static final int MAX_CHILDREN_PER_DIR = 300;
 
+    @Override
     public FileTreeNode buildTree(String rootPath, Set<String> expandedPaths) {
         File root = new File(rootPath == null ? "" : rootPath);
         String displayName = root.getName().length() == 0 ? "home" : root.getName();
@@ -23,6 +24,7 @@ public final class FileTreeRepository {
         return buildNode(root, displayName, true, expandedPaths == null ? Collections.emptySet() : expandedPaths);
     }
 
+    @Override
     public FileTreeNode buildReadableTree(String rootPath, Set<String> expandedPaths) {
         File root = new File(rootPath == null ? "" : rootPath);
         String displayName = root.getName().length() == 0 ? root.getAbsolutePath() : root.getName();
@@ -35,14 +37,17 @@ public final class FileTreeRepository {
         return buildReadableNode(root, displayName, true, expandedPaths == null ? Collections.emptySet() : expandedPaths);
     }
 
+    @Override
     public boolean isDirectory(String path) {
         return path != null && new File(path).isDirectory();
     }
 
+    @Override
     public boolean exists(String path) {
         return path != null && new File(path).exists();
     }
 
+    @Override
     public void createFile(String parentPath, String name) throws Exception {
         File parent = requireDirectory(parentPath);
         String cleanName = cleanName(name);
@@ -59,6 +64,7 @@ public final class FileTreeRepository {
         }
     }
 
+    @Override
     public void createDirectory(String parentPath, String name) throws Exception {
         File parent = requireDirectory(parentPath);
         String cleanName = cleanName(name);
@@ -71,6 +77,7 @@ public final class FileTreeRepository {
         }
     }
 
+    @Override
     public String rename(String path, String newName) throws Exception {
         File source = requireExisting(path);
         String cleanName = cleanName(newName);
@@ -88,11 +95,13 @@ public final class FileTreeRepository {
         return target.getAbsolutePath();
     }
 
+    @Override
     public void delete(String path) throws Exception {
         File target = requireExisting(path);
         deleteRecursively(target);
     }
 
+    @Override
     public String copyInto(String sourcePath, String targetDirectoryPath) throws Exception {
         File source = requireExisting(sourcePath);
         File targetDirectory = requireDirectory(targetDirectoryPath);

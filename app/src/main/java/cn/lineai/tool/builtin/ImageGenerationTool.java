@@ -2,6 +2,7 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
 import cn.lineai.model.ModelProtocolType;
@@ -14,7 +15,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class ImageGenerationTool extends BaseTool {
-    private final ToolSettingsRepository settingsRepository;
+    private final ToolSettingsStore settingsRepository;
     private final ModelRepository modelRepository;
     private final ImageApiClient apiClient;
     private final ImageResponseParser responseParser;

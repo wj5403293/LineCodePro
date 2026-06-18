@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public final class LearningContextRepository extends BaseRepository {
+public final class LearningContextRepository extends BaseRepository implements LearningContextStore {
     private static final int SCAN_LIMIT = 120;
     private static final int OVERVIEW_LIMIT = 200;
     private static final double WORKING_MEMORY_BOOST = 0.30;
@@ -33,6 +33,7 @@ public final class LearningContextRepository extends BaseRepository {
         this.conversationIndexer = new ConversationIndexer(database);
     }
 
+    @Override
     public synchronized String buildLearningContext(String projectId, String userInput, String excludeConversationId) {
         List<MemoryRanker.Candidate> workingMemory = MemoryRanker.rank(readWorkingMemory(projectId), userInput, 5, true, WORKING_MEMORY_BOOST);
         List<MemoryRanker.Candidate> memories = MemoryRanker.rank(readMemories(projectId), userInput, 6, false);
@@ -53,6 +54,7 @@ public final class LearningContextRepository extends BaseRepository {
         return template().render(values);
     }
 
+    @Override
     public synchronized MemoryOverviewState getOverview(String projectId) {
         String safeProjectId = safe(projectId);
         return new MemoryOverviewState(
@@ -65,10 +67,12 @@ public final class LearningContextRepository extends BaseRepository {
         );
     }
 
+    @Override
     public synchronized void saveMemory(String id, String scope, String projectId, String content) {
         saveMemoryInternal(id, scope, projectId, content, "manual", 1.0);
     }
 
+    @Override
     public synchronized void saveExtractedMemory(String scope, String projectId, String content, double confidence) {
         String normalizedScope = normalizeScope(scope);
         String existingId = findSimilarMemoryId(normalizedScope, projectId, content);
@@ -107,6 +111,7 @@ public final class LearningContextRepository extends BaseRepository {
         database.getWritableDatabase().insertWithOnConflict("memories", null, values, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
+    @Override
     public synchronized void deleteMemory(String id) {
         String safeId = safe(id);
         if (safeId.length() == 0) {
@@ -120,6 +125,7 @@ public final class LearningContextRepository extends BaseRepository {
         }
     }
 
+    @Override
     public synchronized void indexConversation(String projectId, ConversationRecord conversation) {
         conversationIndexer.indexConversation(projectId, conversation);
     }

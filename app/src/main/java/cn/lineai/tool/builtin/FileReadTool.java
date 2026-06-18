@@ -41,8 +41,8 @@ public final class FileReadTool extends BaseTool {
                         .put("file_path", new JSONObject().put("type", "string").put("description", "文件的绝对或相对路径"))
                         .put("start_line", new JSONObject().put("type", "number").put("description", "起始行号，从 1 开始，包含该行"))
                         .put("end_line", new JSONObject().put("type", "number").put("description", "结束行号，从 1 开始，包含该行"))
-                        .put("offset", new JSONObject().put("type", "number").put("description", "兼容旧参数：起始行偏移，从 0 开始"))
-                        .put("limit", new JSONObject().put("type", "number").put("description", "兼容旧参数：最大读取行数，默认 2000")))
+                        .put("offset", new JSONObject().put("type", "number").put("description", "起始行偏移（0-based），与 start_line 互斥"))
+                        .put("limit", new JSONObject().put("type", "number").put("description", "最大读取行数，默认 2000")))
                 .put("required", new org.json.JSONArray().put("file_path"));
     }
 

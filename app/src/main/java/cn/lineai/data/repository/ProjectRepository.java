@@ -104,28 +104,6 @@ public final class ProjectRepository extends BaseRepository implements ProjectSt
         return projects.isEmpty() ? defaultProjectForMode(mode) : projects.get(0);
     }
 
-    public synchronized ProjectRecord getSelectedProjectLegacy() {
-        Cursor cursor = database.getReadableDatabase().query(
-                "projects",
-                null,
-                "selected = 1",
-                null,
-                null,
-                null,
-                "updated_at DESC",
-                "1"
-        );
-        try {
-            if (cursor.moveToFirst()) {
-                return readProject(cursor);
-            }
-        } finally {
-            cursor.close();
-        }
-        List<ProjectRecord> projects = getProjects();
-        return projects.isEmpty() ? defaultProject() : projects.get(0);
-    }
-
     public synchronized void save(ProjectRecord project) {
         ensureProjectPath(project);
         ContentValues values = valuesFor(project);

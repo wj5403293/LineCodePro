@@ -2,6 +2,7 @@ package cn.lineai.mvp;
 
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.ChatMode;
 import cn.lineai.model.SheetOption;
 import java.util.ArrayList;
@@ -30,9 +31,9 @@ public final class PermissionModeController {
     }
 
     private static final class ToolSettingsPermissionStore implements PermissionStore {
-        private final ToolSettingsRepository repository;
+        private final ToolSettingsStore repository;
 
-        ToolSettingsPermissionStore(ToolSettingsRepository repository) {
+        ToolSettingsPermissionStore(ToolSettingsStore repository) {
             this.repository = repository;
         }
 
@@ -75,7 +76,7 @@ public final class PermissionModeController {
     private final Host host;
 
     public PermissionModeController(
-            ToolSettingsRepository toolSettingsRepository,
+            ToolSettingsStore toolSettingsRepository,
             ChatModeRepository chatModeRepository,
             Host host
     ) {

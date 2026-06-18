@@ -2,6 +2,7 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.ipc.IpcProviderType;
 import cn.lineai.ipc.terminal.TerminalIpcProvider;
@@ -17,7 +18,7 @@ import org.json.JSONObject;
 
 public final class ShellExecuteTool extends BaseTool {
     private final SshService sshService;
-    private final ToolSettingsRepository settingsRepository;
+    private final ToolSettingsStore settingsRepository;
     private final IpcProviderManager ipcProviderManager;
 
     public ShellExecuteTool(Context context) {

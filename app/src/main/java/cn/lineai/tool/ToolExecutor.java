@@ -2,7 +2,7 @@ package cn.lineai.tool;
 
 import cn.lineai.data.repository.DiffRecord;
 import cn.lineai.data.repository.DiffStore;
-import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.tool.builtin.FileIo;
 import cn.lineai.tool.builtin.FileToolPathPolicy;
 import java.io.File;
@@ -10,14 +10,14 @@ import org.json.JSONObject;
 
 public final class ToolExecutor {
     private final ToolRegistry registry;
-    private final ToolSettingsRepository settingsRepository;
+    private final ToolSettingsStore settingsRepository;
     private final DiffStore diffRepository;
 
-    public ToolExecutor(ToolRegistry registry, ToolSettingsRepository settingsRepository) {
+    public ToolExecutor(ToolRegistry registry, ToolSettingsStore settingsRepository) {
         this(registry, settingsRepository, null);
     }
 
-    public ToolExecutor(ToolRegistry registry, ToolSettingsRepository settingsRepository, DiffStore diffRepository) {
+    public ToolExecutor(ToolRegistry registry, ToolSettingsStore settingsRepository, DiffStore diffRepository) {
         this.registry = registry;
         this.settingsRepository = settingsRepository;
         this.diffRepository = diffRepository;

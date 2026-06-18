@@ -14,8 +14,6 @@ public interface ProjectStore {
 
     ProjectRecord getSelectedProject(String executionMode);
 
-    ProjectRecord getSelectedProjectLegacy();
-
     void save(ProjectRecord project);
 
     void setSelected(String id);

@@ -11,12 +11,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public final class IpcProviderRepository extends BaseRepository {
+public final class IpcProviderRepository extends BaseRepository implements IpcProviderStore {
 
     public IpcProviderRepository(Context context) {
         super(LineCodeDatabase.getInstance(context.getApplicationContext()));
     }
 
+    @Override
     public synchronized List<IpcProviderConfig> getProviders() {
         ArrayList<IpcProviderConfig> providers = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
@@ -34,6 +35,7 @@ public final class IpcProviderRepository extends BaseRepository {
         return providers;
     }
 
+    @Override
     public synchronized List<IpcProviderConfig> getProvidersByType(String providerType) {
         ArrayList<IpcProviderConfig> providers = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
@@ -51,10 +53,12 @@ public final class IpcProviderRepository extends BaseRepository {
         return providers;
     }
 
+    @Override
     public synchronized List<IpcProviderConfig> getProvidersByType(IpcProviderType type) {
         return getProvidersByType(type.getId());
     }
 
+    @Override
     public synchronized IpcProviderConfig saveProvider(IpcProviderConfig input) {
         long now = System.currentTimeMillis();
         String id = input.getId() == null || input.getId().length() == 0
@@ -93,6 +97,7 @@ public final class IpcProviderRepository extends BaseRepository {
         return saved;
     }
 
+    @Override
     public synchronized void setProviderEnabled(String id, boolean enabled) {
         ContentValues values = new ContentValues();
         values.put("enabled", enabled ? 1 : 0);
@@ -101,6 +106,7 @@ public final class IpcProviderRepository extends BaseRepository {
                 "ipc_providers", values, "id = ?", new String[] {id == null ? "" : id});
     }
 
+    @Override
     public synchronized void deleteProvider(String id) {
         database.getWritableDatabase().delete(
                 "ipc_providers", "id = ?", new String[] {id == null ? "" : id});

@@ -5,9 +5,9 @@ import cn.lineai.tool.ToolCategory;
 import org.json.JSONObject;
 
 /**
- * 工具调用工具集合的门面：保留原有方法签名以兼容调用方与测试，
- * 具体实现委托到 {@link ToolCallInputParser}、{@link ToolCallPathDisplay}、
- * {@link ToolCallJsonFormatter} 与 {@link ToolCategory}。
+ * 工具调用工具集合的门面：聚合 {@link ToolCallInputParser}、
+ * {@link ToolCallPathDisplay}、{@link ToolCallJsonFormatter}、
+ * {@link ToolCategory} 的静态方法，调用方只需 import 这一个类。
  */
 final class ToolCallUtils {
     private ToolCallUtils() {

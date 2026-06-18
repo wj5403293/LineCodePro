@@ -1,6 +1,6 @@
 package cn.lineai.mvp;
 
-import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.ToolCall;
@@ -14,12 +14,12 @@ import java.util.List;
 public final class ToolRunController {
     private final ToolExecutionCoordinator executionCoordinator;
     private final ToolRegistry toolRegistry;
-    private final ToolSettingsRepository toolSettingsRepository;
+    private final ToolSettingsStore toolSettingsRepository;
 
     public ToolRunController(
             ToolExecutionCoordinator executionCoordinator,
             ToolRegistry toolRegistry,
-            ToolSettingsRepository toolSettingsRepository
+            ToolSettingsStore toolSettingsRepository
     ) {
         this.executionCoordinator = executionCoordinator;
         this.toolRegistry = toolRegistry;

@@ -16,19 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public final class ToolSettingsRepository {
-    public static final String KEY_PERMISSION_MODE = "@lineai_permission_mode";
-    public static final String KEY_MCP_EXECUTION_MODE = "@lineai_mcp_execution_mode";
-    public static final String KEY_IMAGE_UNDERSTANDING_MODEL_ID = "@lineai_image_understanding_model_id";
-    public static final String KEY_IMAGE_GENERATION_MODEL_ID = "@lineai_image_generation_model_id";
-    private static final String KEY_MCP_PREFIX = "@linecode_mcp_enabled_";
+public final class ToolSettingsRepository implements ToolSettingsStore {
 
-    public static final String PERMISSION_READONLY = "readonly";
-    public static final String PERMISSION_AUTO = "auto";
-    public static final String PERMISSION_CONFIRM = "confirm";
-    public static final String EXECUTION_LOCAL = "local";
-    public static final String EXECUTION_SSH = "ssh";
-    public static final String EXECUTION_TERMINAL_PROVIDER = "terminal_provider";
+    private static final String KEY_MCP_PREFIX = "@linecode_mcp_enabled_";
 
     private static final McpToolConfig[] DEFAULT_CONFIGS = new McpToolConfig[] {
             new McpToolConfig("file_ops", "文件操作", "读取、写入、编辑和删除文件", true,
@@ -57,22 +47,27 @@ public final class ToolSettingsRepository {
         webSearchConfigRepository = new WebSearchConfigRepository(context);
     }
 
+    @Override
     public synchronized String getPermissionMode() {
         return normalizePermissionMode(settingsRepository.getString(KEY_PERMISSION_MODE, PERMISSION_AUTO));
     }
 
+    @Override
     public synchronized void setPermissionMode(String mode) {
         settingsRepository.setString(KEY_PERMISSION_MODE, normalizePermissionMode(mode));
     }
 
+    @Override
     public synchronized String getExecutionMode() {
         return normalizeExecutionMode(settingsRepository.getString(KEY_MCP_EXECUTION_MODE, EXECUTION_LOCAL));
     }
 
+    @Override
     public synchronized void setExecutionMode(String mode) {
         settingsRepository.setString(KEY_MCP_EXECUTION_MODE, normalizeExecutionMode(mode));
     }
 
+    @Override
     public synchronized List<McpToolConfig> getConfigs() {
         ArrayList<McpToolConfig> configs = new ArrayList<>();
         for (McpToolConfig config : DEFAULT_CONFIGS) {
@@ -82,6 +77,7 @@ public final class ToolSettingsRepository {
         return configs;
     }
 
+    @Override
     public synchronized McpSettingsState getMcpSettingsState() {
         return new McpSettingsState(
                 getExecutionMode(),
@@ -92,30 +88,37 @@ public final class ToolSettingsRepository {
         );
     }
 
+    @Override
     public synchronized WebSearchConfig getWebSearchConfig() {
         return webSearchConfigRepository.get();
     }
 
+    @Override
     public synchronized void setWebSearchConfig(WebSearchConfig config) {
         webSearchConfigRepository.save(config);
     }
 
+    @Override
     public synchronized String getImageUnderstandingModelId() {
         return settingsRepository.getString(KEY_IMAGE_UNDERSTANDING_MODEL_ID, "").trim();
     }
 
+    @Override
     public synchronized void setImageUnderstandingModelId(String modelId) {
         settingsRepository.setString(KEY_IMAGE_UNDERSTANDING_MODEL_ID, modelId == null ? "" : modelId.trim());
     }
 
+    @Override
     public synchronized String getImageGenerationModelId() {
         return settingsRepository.getString(KEY_IMAGE_GENERATION_MODEL_ID, "").trim();
     }
 
+    @Override
     public synchronized void setImageGenerationModelId(String modelId) {
         settingsRepository.setString(KEY_IMAGE_GENERATION_MODEL_ID, modelId == null ? "" : modelId.trim());
     }
 
+    @Override
     public synchronized void setMcpEnabled(String id, boolean enabled) {
         if (id == null || id.length() == 0) {
             return;
@@ -123,6 +126,7 @@ public final class ToolSettingsRepository {
         settingsRepository.setBoolean(KEY_MCP_PREFIX + id, enabled);
     }
 
+    @Override
     public synchronized Set<String> getEnabledToolNames() {
         String executionMode = getExecutionMode();
         String permissionMode = getPermissionMode();
@@ -164,6 +168,7 @@ public final class ToolSettingsRepository {
         return enabled;
     }
 
+    @Override
     public synchronized Set<String> getEnabledToolNames(Collection<BaseTool> implementedTools) {
         HashSet<String> enabled = new HashSet<>(getEnabledToolNames());
         HashSet<String> implementedNames = new HashSet<>();
@@ -184,6 +189,7 @@ public final class ToolSettingsRepository {
         return enabled;
     }
 
+    @Override
     public synchronized PermissionResult canExecuteTool(String toolName, ToolCategory category) {
         if (toolName == null || toolName.length() == 0) {
             return PermissionResult.denied("工具名为空");
@@ -201,6 +207,7 @@ public final class ToolSettingsRepository {
         return PermissionResult.allowed();
     }
 
+    @Override
     public synchronized boolean needsConfirmation(String toolName) {
         if ("file_delete".equals(toolName) || "shell_execute".equals(toolName)) {
             return true;
@@ -208,10 +215,12 @@ public final class ToolSettingsRepository {
         return PERMISSION_CONFIRM.equals(getPermissionMode());
     }
 
+    @Override
     public synchronized String buildToolPrompt(Set<String> implementedToolNames) {
         return buildToolPrompt(implementedToolNames, false);
     }
 
+    @Override
     public synchronized String buildToolPrompt(Set<String> implementedToolNames, boolean nativeToolProtocol) {
         Set<String> enabled = getEnabledToolNames();
         if (implementedToolNames != null) {
@@ -220,6 +229,7 @@ public final class ToolSettingsRepository {
         return renderToolPrompt(getExecutionMode(), getConfigs(), enabled, new LinkedHashMap<>(), nativeToolProtocol);
     }
 
+    @Override
     public synchronized String buildToolPrompt(Collection<BaseTool> implementedTools, boolean nativeToolProtocol) {
         Set<String> enabled = getEnabledToolNames();
         LinkedHashMap<String, BaseTool> toolByName = new LinkedHashMap<>();

@@ -1,6 +1,6 @@
 package cn.lineai.mvp;
 
-import cn.lineai.data.repository.IpcFileTreeRepository;
+import cn.lineai.data.repository.IpcFileTreeStore;
 import cn.lineai.model.FileTreeNode;
 
 public final class IpcFileTreeController extends RemoteFileTreeController {
@@ -23,9 +23,9 @@ public final class IpcFileTreeController extends RemoteFileTreeController {
     }
 
     private static final class RepositoryDirectoryStore implements DirectoryStore {
-        private final IpcFileTreeRepository repository;
+        private final IpcFileTreeStore repository;
 
-        RepositoryDirectoryStore(IpcFileTreeRepository repository) {
+        RepositoryDirectoryStore(IpcFileTreeStore repository) {
             this.repository = repository;
         }
 
@@ -38,7 +38,7 @@ public final class IpcFileTreeController extends RemoteFileTreeController {
     private final Host host;
 
     public IpcFileTreeController(
-            IpcFileTreeRepository repository,
+            IpcFileTreeStore repository,
             Host host,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher

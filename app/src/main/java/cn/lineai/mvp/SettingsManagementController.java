@@ -2,11 +2,11 @@ package cn.lineai.mvp;
 
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.InputSettingsRepository;
-import cn.lineai.data.repository.LearningContextRepository;
+import cn.lineai.data.repository.LearningContextStore;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ThemeSettingsRepository;
-import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.InputSettings;
 import cn.lineai.model.McpSettingsState;
@@ -101,19 +101,19 @@ public final class SettingsManagementController {
         private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
         private final InputSettingsRepository inputSettingsRepository;
         private final PromptTemplateRepository promptTemplateRepository;
-        private final LearningContextRepository learningContextRepository;
+        private final LearningContextStore learningContextRepository;
         private final OutputSettingsRepository outputSettingsRepository;
         private final ThemeSettingsRepository themeSettingsRepository;
-        private final ToolSettingsRepository toolSettingsRepository;
+        private final ToolSettingsStore toolSettingsRepository;
 
         RepositorySettingsStore(
                 AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
                 InputSettingsRepository inputSettingsRepository,
                 PromptTemplateRepository promptTemplateRepository,
-                LearningContextRepository learningContextRepository,
+                LearningContextStore learningContextRepository,
                 OutputSettingsRepository outputSettingsRepository,
                 ThemeSettingsRepository themeSettingsRepository,
-                ToolSettingsRepository toolSettingsRepository
+                ToolSettingsStore toolSettingsRepository
         ) {
             this.aiBehaviorSettingsRepository = aiBehaviorSettingsRepository;
             this.inputSettingsRepository = inputSettingsRepository;
@@ -287,10 +287,10 @@ public final class SettingsManagementController {
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
             InputSettingsRepository inputSettingsRepository,
             PromptTemplateRepository promptTemplateRepository,
-            LearningContextRepository learningContextRepository,
+            LearningContextStore learningContextRepository,
             OutputSettingsRepository outputSettingsRepository,
             ThemeSettingsRepository themeSettingsRepository,
-            ToolSettingsRepository toolSettingsRepository,
+            ToolSettingsStore toolSettingsRepository,
             Host host
     ) {
         this(

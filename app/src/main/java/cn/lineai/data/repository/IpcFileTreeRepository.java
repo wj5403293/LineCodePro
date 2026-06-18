@@ -13,7 +13,7 @@ import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class IpcFileTreeRepository {
+public final class IpcFileTreeRepository implements IpcFileTreeStore {
     private static final int MAX_CHILDREN_PER_DIR = 300;
     private static final String[] IGNORED_ENTRIES = {".git", "node_modules", ".gradle", "build", "dist"};
 
@@ -23,6 +23,7 @@ public final class IpcFileTreeRepository {
         this.ipcProviderManager = ipcProviderManager;
     }
 
+    @Override
     public FileTreeNode buildTree(String rootPath, Set<String> expandedPaths) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanPath = normalizePath(rootPath);
@@ -30,6 +31,7 @@ public final class IpcFileTreeRepository {
                 expandedPaths == null ? Collections.emptySet() : expandedPaths);
     }
 
+    @Override
     public FileTreeNode listDirectory(String directoryPath) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanPath = normalizePath(directoryPath);
@@ -41,16 +43,24 @@ public final class IpcFileTreeRepository {
                 listChildren(provider, cleanPath, Collections.emptySet()));
     }
 
+    @Override
     public byte[] readFileBytes(String path, long maxBytes) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanPath = normalizePath(path);
+        long actualSize = provider.getFileSize(cleanPath);
+        if (maxBytes > 0 && actualSize > maxBytes) {
+            throw new IllegalStateException(
+                    "文件过大，文件大小 " + actualSize + " 字节超出上限 " + maxBytes + " 字节: " + path);
+        }
         byte[] data = provider.readFile(cleanPath);
         if (maxBytes > 0 && data.length > maxBytes) {
-            throw new IllegalStateException("文件过大，当前上限为 " + (maxBytes / 1024L / 1024L) + " MB: " + path);
+            throw new IllegalStateException(
+                    "文件过大，文件大小 " + data.length + " 字节超出上限 " + maxBytes + " 字节: " + path);
         }
         return data;
     }
 
+    @Override
     public void createFile(String parentPath, String name) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanName = cleanName(name);
@@ -63,6 +73,7 @@ public final class IpcFileTreeRepository {
         }
     }
 
+    @Override
     public void createDirectory(String parentPath, String name) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanName = cleanName(name);
@@ -76,6 +87,7 @@ public final class IpcFileTreeRepository {
         }
     }
 
+    @Override
     public String rename(String path, String newName) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String cleanName = cleanName(newName);
@@ -92,6 +104,7 @@ public final class IpcFileTreeRepository {
         return targetPath;
     }
 
+    @Override
     public void delete(String path) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         if (!provider.fileExists(path)) {
@@ -104,6 +117,7 @@ public final class IpcFileTreeRepository {
         }
     }
 
+    @Override
     public String copyInto(String sourcePath, String targetDirectoryPath) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         String targetPath = join(targetDirectoryPath, basename(sourcePath));

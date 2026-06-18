@@ -8,7 +8,9 @@ import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.ai.prompt.StringTemplate;
 import cn.lineai.data.repository.ExtensionRepository;
+import cn.lineai.data.repository.ExtensionStore;
 import cn.lineai.data.repository.LearningContextRepository;
+import cn.lineai.data.repository.LearningContextStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.ModelConfig;
@@ -28,12 +30,12 @@ public final class MemoryExtractionService {
     private static final int MAX_SKILL_CONTENT_CHARS = 8000;
 
     private final Context context;
-    private final LearningContextRepository repository;
-    private final ExtensionRepository extensionRepository;
+    private final LearningContextStore repository;
+    private final ExtensionStore extensionRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final ModelClient modelClient = new ModelClient();
 
-    public MemoryExtractionService(Context context, LearningContextRepository repository) {
+    public MemoryExtractionService(Context context, LearningContextStore repository) {
         this.context = context.getApplicationContext();
         this.repository = repository;
         this.extensionRepository = new ExtensionRepository(this.context);

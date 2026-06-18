@@ -1,8 +1,8 @@
 package cn.lineai.mvp;
 
-import cn.lineai.data.repository.FileTreeRepository;
-import cn.lineai.data.repository.IpcFileTreeRepository;
-import cn.lineai.data.repository.SshFileTreeRepository;
+import cn.lineai.data.repository.FileTreeStore;
+import cn.lineai.data.repository.IpcFileTreeStore;
+import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.model.SheetOption;
 import java.util.ArrayList;
 
@@ -46,9 +46,9 @@ public final class FileOperationController {
     }
 
     private static final class LocalFileStore implements FileStore {
-        private final FileTreeRepository repository;
+        private final FileTreeStore repository;
 
-        LocalFileStore(FileTreeRepository repository) {
+        LocalFileStore(FileTreeStore repository) {
             this.repository = repository;
         }
 
@@ -79,9 +79,9 @@ public final class FileOperationController {
     }
 
     private static final class SshFileStore implements FileStore {
-        private final SshFileTreeRepository repository;
+        private final SshFileTreeStore repository;
 
-        SshFileStore(SshFileTreeRepository repository) {
+        SshFileStore(SshFileTreeStore repository) {
             this.repository = repository;
         }
 
@@ -112,9 +112,9 @@ public final class FileOperationController {
     }
 
     private static final class IpcFileStore implements FileStore {
-        private final IpcFileTreeRepository repository;
+        private final IpcFileTreeStore repository;
 
-        IpcFileStore(IpcFileTreeRepository repository) {
+        IpcFileStore(IpcFileTreeStore repository) {
             this.repository = repository;
         }
 
@@ -156,9 +156,9 @@ public final class FileOperationController {
     private boolean clipboardIpc;
 
     public FileOperationController(
-            FileTreeRepository fileTreeRepository,
-            SshFileTreeRepository sshFileTreeRepository,
-            IpcFileTreeRepository ipcFileTreeRepository,
+            FileTreeStore fileTreeRepository,
+            SshFileTreeStore sshFileTreeRepository,
+            IpcFileTreeStore ipcFileTreeRepository,
             Host host,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher

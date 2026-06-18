@@ -1,7 +1,7 @@
 package cn.lineai.mvp;
 
-import cn.lineai.data.repository.FileTreeRepository;
-import cn.lineai.data.repository.SshFileTreeRepository;
+import cn.lineai.data.repository.FileTreeStore;
+import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.model.FileTreeNode;
 import cn.lineai.model.InputAttachment;
 import java.util.HashSet;
@@ -22,8 +22,8 @@ public final class AttachmentPickerCoordinator {
         void showAttachmentPicker(String title, FileTreeNode tree, boolean loading, String message, String source);
     }
 
-    private final FileTreeRepository fileTreeRepository;
-    private final SshFileTreeRepository sshFileTreeRepository;
+    private final FileTreeStore fileTreeRepository;
+    private final SshFileTreeStore sshFileTreeRepository;
     private final BackgroundRunner backgroundRunner;
     private final UiDispatcher uiDispatcher;
     private final Host host;
@@ -38,8 +38,8 @@ public final class AttachmentPickerCoordinator {
     private int loadGeneration;
 
     public AttachmentPickerCoordinator(
-            FileTreeRepository fileTreeRepository,
-            SshFileTreeRepository sshFileTreeRepository,
+            FileTreeStore fileTreeRepository,
+            SshFileTreeStore sshFileTreeRepository,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher,
             Host host

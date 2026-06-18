@@ -15,6 +15,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,9 @@ import org.json.JSONObject;
 public final class TerminalProviderService extends Service {
     private static final String TAG = "TerminalProvider";
     private static final String SHELL = "/system/bin/sh";
+    // 单次分块传输的默认上限（1MB），避免 AIDL Binder 事务超限。
+    private static final int DEFAULT_CHUNK_SIZE = 1024 * 1024;
+    private static final int MAX_CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private final ITerminalProviderService.Stub binder = new ITerminalProviderService.Stub() {
@@ -181,15 +185,29 @@ public final class TerminalProviderService extends Service {
             if (!file.exists() || !file.isFile()) {
                 return new byte[0];
             }
-            try (InputStream is = new java.io.FileInputStream(file)) {
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                byte[] chunk = new byte[8192];
-                int read;
-                while ((read = is.read(chunk)) != -1) {
-                    buffer.write(chunk, 0, read);
+            long size = file.length();
+            if (size <= 0L) {
+                return new byte[0];
+            }
+            if (size > Integer.MAX_VALUE) {
+                Log.e(TAG, "readFile: 文件超过 int 范围: " + path);
+                return new byte[0];
+            }
+            int total = (int) size;
+            try {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream(total);
+                long offset = 0L;
+                while (offset < total) {
+                    int want = (int) Math.min((long) MAX_CHUNK_SIZE, (long) total - offset);
+                    byte[] chunk = readFileChunk(path, offset, want);
+                    if (chunk.length == 0) {
+                        break;
+                    }
+                    buffer.write(chunk);
+                    offset += chunk.length;
                 }
                 return buffer.toByteArray();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 Log.e(TAG, "readFile failed: " + path, e);
                 return new byte[0];
             }
@@ -200,21 +218,8 @@ public final class TerminalProviderService extends Service {
             if (path == null || path.length() == 0) {
                 return false;
             }
-            File file = new File(path);
-            File parent = file.getParentFile();
-            if (parent != null && !parent.exists()) {
-                if (!parent.mkdirs()) {
-                    return false;
-                }
-            }
-            try (FileOutputStream fos = new FileOutputStream(file)) {
-                fos.write(data == null ? new byte[0] : data);
-                fos.flush();
-                return true;
-            } catch (IOException e) {
-                Log.e(TAG, "writeFile failed: " + path, e);
-                return false;
-            }
+            byte[] payload = data == null ? new byte[0] : data;
+            return writeFileChunk(path, 0L, payload);
         }
 
         @Override
@@ -267,6 +272,94 @@ public final class TerminalProviderService extends Service {
                 return -1;
             }
             return file.length();
+        }
+
+        @Override
+        public byte[] readFileChunk(String path, long offset, int size) {
+            if (path == null || path.length() == 0) {
+                return new byte[0];
+            }
+            if (offset < 0L) {
+                Log.w(TAG, "readFileChunk: offset<0 已按 0 处理: " + path);
+                offset = 0L;
+            }
+            int want = size <= 0 ? DEFAULT_CHUNK_SIZE : size;
+            if (want > MAX_CHUNK_SIZE) {
+                want = MAX_CHUNK_SIZE;
+            }
+            File file = new File(path);
+            if (!file.exists() || !file.isFile()) {
+                return new byte[0];
+            }
+            long fileLength = file.length();
+            if (offset >= fileLength) {
+                return new byte[0];
+            }
+            long remaining = fileLength - offset;
+            int toRead = (int) Math.min((long) want, remaining);
+            byte[] out = new byte[toRead];
+            try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                raf.seek(offset);
+                int read = 0;
+                while (read < toRead) {
+                    int n = raf.read(out, read, toRead - read);
+                    if (n <= 0) {
+                        break;
+                    }
+                    read += n;
+                }
+                if (read < toRead) {
+                    byte[] trimmed = new byte[read];
+                    System.arraycopy(out, 0, trimmed, 0, read);
+                    return trimmed;
+                }
+                return out;
+            } catch (IOException e) {
+                Log.e(TAG, "readFileChunk failed: " + path + "@" + offset, e);
+                return new byte[0];
+            }
+        }
+
+        @Override
+        public boolean writeFileChunk(String path, long offset, byte[] data) {
+            if (path == null || path.length() == 0) {
+                return false;
+            }
+            byte[] payload = data == null ? new byte[0] : data;
+            File file = new File(path);
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) {
+                if (!parent.mkdirs()) {
+                    return false;
+                }
+            }
+            boolean append = offset < 0L;
+            if (append) {
+                try (FileOutputStream fos = new FileOutputStream(file, true)) {
+                    fos.write(payload);
+                    fos.flush();
+                    return true;
+                } catch (IOException e) {
+                    Log.e(TAG, "writeFileChunk(append) failed: " + path, e);
+                    return false;
+                }
+            }
+            if (offset < 0L) {
+                offset = 0L;
+            }
+            try (RandomAccessFile raf = new RandomAccessFile(file, "rw")) {
+                raf.seek(offset);
+                raf.write(payload);
+                return true;
+            } catch (IOException e) {
+                Log.e(TAG, "writeFileChunk failed: " + path + "@" + offset, e);
+                return false;
+            }
+        }
+
+        @Override
+        public long getFileSize(String path) {
+            return fileSize(path);
         }
 
         @Override

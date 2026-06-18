@@ -1,6 +1,6 @@
 package cn.lineai.mvp;
 
-import cn.lineai.data.repository.SshFileTreeRepository;
+import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.model.FileTreeNode;
 
 public final class SshFileTreeController extends RemoteFileTreeController {
@@ -23,9 +23,9 @@ public final class SshFileTreeController extends RemoteFileTreeController {
     }
 
     private static final class RepositoryDirectoryStore implements DirectoryStore {
-        private final SshFileTreeRepository repository;
+        private final SshFileTreeStore repository;
 
-        RepositoryDirectoryStore(SshFileTreeRepository repository) {
+        RepositoryDirectoryStore(SshFileTreeStore repository) {
             this.repository = repository;
         }
 
@@ -38,7 +38,7 @@ public final class SshFileTreeController extends RemoteFileTreeController {
     private final Host host;
 
     public SshFileTreeController(
-            SshFileTreeRepository repository,
+            SshFileTreeStore repository,
             Host host,
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher

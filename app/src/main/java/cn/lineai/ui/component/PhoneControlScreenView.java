@@ -1,17 +1,15 @@
 package cn.lineai.ui.component;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.data.repository.PhoneControlRepository;
 import cn.lineai.ui.theme.LineTheme;
-import java.util.ArrayList;
-import java.util.List;
 
 public final class PhoneControlScreenView extends ScreenScaffoldView {
 
@@ -20,70 +18,52 @@ public final class PhoneControlScreenView extends ScreenScaffoldView {
 
         void onOpenAccessibilitySettings();
 
-        void onPermissionAction(String permissionId);
+        void onPermissionEnabledChanged(String permissionId, boolean enabled);
     }
 
-    private final boolean imageModelSet;
     private final boolean accessibilityEnabled;
     private final boolean disclaimerAccepted;
     private final Listener listener;
     private final PhoneControlRepository phoneControlRepository;
-    private final List<View> interactiveViews = new ArrayList<>();
 
-    public PhoneControlScreenView(Context context, boolean imageModelSet, boolean accessibilityEnabled,
+    public PhoneControlScreenView(Context context, boolean accessibilityEnabled,
                                   boolean disclaimerAccepted, Listener listener) {
         super(context, context.getString(R.string.screen_phone_control_title), listener::onBack, null);
-        this.imageModelSet = imageModelSet;
         this.accessibilityEnabled = accessibilityEnabled;
         this.disclaimerAccepted = disclaimerAccepted;
         this.listener = listener;
         this.phoneControlRepository = new PhoneControlRepository(context);
 
         LinearLayout content = getContent();
-
-        if (!imageModelSet) {
-            content.addView(buildImageModelWarning(context));
-        }
+        LineTheme.padding(content, LineTheme.LG, 0, LineTheme.LG, 0);
 
         content.addView(buildAccessibilityRow(context));
 
         if (disclaimerAccepted && accessibilityEnabled) {
             content.addView(new SectionHeaderView(context, context.getString(R.string.screen_phone_control_permission_management)));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_screenshot, "screenshot", IconButtonView.ZAP));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_click, "click", IconButtonView.PLAY));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_swipe, "swipe", IconButtonView.SLIDERS_HORIZONTAL));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_long_press, "longPress", IconButtonView.CLOCK_3));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_view_hierarchy, "viewHierarchy", IconButtonView.SQUARE_FUNCTION));
-            content.addView(buildPermissionRow(context, R.string.screen_phone_control_permission_view_action, "viewAction", IconButtonView.WRENCH));
+
+            LinearLayout list = new LinearLayout(context);
+            list.setOrientation(VERTICAL);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_screenshot,
+                    R.string.screen_phone_control_permission_screenshot_desc, IconButtonView.ZAP,
+                    PhoneControlRepository.PERMISSION_SCREENSHOT, true);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_click,
+                    R.string.screen_phone_control_permission_click_desc, IconButtonView.PLAY,
+                    PhoneControlRepository.PERMISSION_CLICK, true);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_swipe,
+                    R.string.screen_phone_control_permission_swipe_desc, IconButtonView.SLIDERS_HORIZONTAL,
+                    PhoneControlRepository.PERMISSION_SWIPE, true);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_long_press,
+                    R.string.screen_phone_control_permission_long_press_desc, IconButtonView.CLOCK_3,
+                    PhoneControlRepository.PERMISSION_LONG_PRESS, true);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_view_hierarchy,
+                    R.string.screen_phone_control_permission_view_hierarchy_desc, IconButtonView.SQUARE_FUNCTION,
+                    PhoneControlRepository.PERMISSION_VIEW_HIERARCHY, true);
+            addPermissionSwitch(context, list, R.string.screen_phone_control_permission_view_action,
+                    R.string.screen_phone_control_permission_view_action_desc, IconButtonView.WRENCH,
+                    PhoneControlRepository.PERMISSION_VIEW_ACTION, false);
+            content.addView(list, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
-
-        if (!imageModelSet) {
-            setInteractiveEnabled(false);
-        }
-    }
-
-    private View buildImageModelWarning(Context context) {
-        LinearLayout warning = new LinearLayout(context);
-        warning.setOrientation(VERTICAL);
-        warning.setBackground(LineTheme.rounded(context, LineTheme.DANGER_MUTED, 12));
-        LineTheme.padding(warning, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        params.bottomMargin = LineTheme.dp(context, LineTheme.MD);
-        warning.setLayoutParams(params);
-
-        TextView title = LineTheme.text(context, context.getString(R.string.screen_phone_control_no_image_model),
-                LineTheme.FONT_MD, LineTheme.DANGER, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        warning.addView(title, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-
-        TextView desc = LineTheme.text(context, context.getString(R.string.screen_phone_control_image_model_required),
-                LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
-        desc.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        descParams.topMargin = LineTheme.dp(context, LineTheme.XS);
-        warning.addView(desc, descParams);
-
-        return warning;
     }
 
     private View buildAccessibilityRow(Context context) {
@@ -96,9 +76,45 @@ public final class PhoneControlScreenView extends ScreenScaffoldView {
         } else {
             desc = context.getString(R.string.screen_phone_control_accessibility_status_enabled);
         }
-        ActionRowView row = new ActionRowView(context, IconButtonView.SHIELD_CHECK, label, desc, false, true,
-                () -> onAccessibilityRowClicked(context));
-        interactiveViews.add(row);
+
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(LineTheme.dp(context, 68));
+        LineTheme.padding(row, LineTheme.LG, LineTheme.MD, LineTheme.LG, LineTheme.MD);
+        row.setClickable(true);
+        row.setOnClickListener(v -> onAccessibilityRowClicked(context));
+
+        IconButtonView icon = new IconButtonView(context, IconButtonView.SHIELD_CHECK);
+        icon.setIconColor(LineTheme.ACCENT);
+        icon.setIconSizeDp(20, 20);
+        icon.setClickable(false);
+        row.addView(icon, new LayoutParams(LineTheme.dp(context, 20), LineTheme.dp(context, 20)));
+
+        LinearLayout textWrap = new LinearLayout(context);
+        textWrap.setOrientation(VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        textParams.leftMargin = LineTheme.dp(context, LineTheme.MD);
+        textParams.rightMargin = LineTheme.dp(context, LineTheme.MD);
+        row.addView(textWrap, textParams);
+
+        TextView title = LineTheme.textMedium(context, label, LineTheme.FONT_MD, LineTheme.TEXT);
+        textWrap.addView(title, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        if (desc.length() > 0) {
+            TextView description = LineTheme.text(context, desc, LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            description.setLineSpacing(LineTheme.dp(context, 3), 1f);
+            LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            descParams.topMargin = LineTheme.dp(context, 2);
+            textWrap.addView(description, descParams);
+        }
+
+        IconButtonView chevron = new IconButtonView(context, IconButtonView.CHEVRON_RIGHT);
+        chevron.setIconColor(LineTheme.TEXT_TERTIARY);
+        chevron.setIconSizeDp(20, 17);
+        chevron.setClickable(false);
+        row.addView(chevron, new LayoutParams(LineTheme.dp(context, 20), LineTheme.dp(context, 20)));
+
         return row;
     }
 
@@ -111,30 +127,35 @@ public final class PhoneControlScreenView extends ScreenScaffoldView {
     }
 
     private void showDisclaimerDialog(Context context) {
-        new AlertDialog.Builder(context)
-                .setTitle(R.string.screen_phone_control_disclaimer_title)
-                .setMessage(R.string.screen_phone_control_disclaimer_text)
-                .setPositiveButton(R.string.screen_phone_control_disclaimer_agree, (dialog, which) -> {
+        LegalDialog.show(
+                context,
+                context.getString(R.string.screen_phone_control_disclaimer_title),
+                context.getString(R.string.screen_phone_control_disclaimer_text),
+                context.getString(R.string.screen_phone_control_disclaimer_agree),
+                context.getString(R.string.screen_phone_control_disclaimer_disagree),
+                () -> {
                     phoneControlRepository.setDisclaimerAccepted(true);
                     listener.onOpenAccessibilitySettings();
-                })
-                .setNegativeButton(R.string.screen_phone_control_disclaimer_disagree, null)
-                .setCancelable(true)
-                .show();
+                },
+                null
+        );
     }
 
-    private View buildPermissionRow(Context context, int labelRes, String permissionId, int iconType) {
-        ActionRowView row = new ActionRowView(context, iconType, context.getString(labelRes), null, false, false,
-                () -> listener.onPermissionAction(permissionId));
-        interactiveViews.add(row);
-        return row;
-    }
-
-    private void setInteractiveEnabled(boolean enabled) {
-        for (View view : interactiveViews) {
-            view.setEnabled(enabled);
-            view.setClickable(enabled);
-            view.setAlpha(enabled ? 1f : 0.45f);
+    private void addPermissionSwitch(Context context, LinearLayout list, int labelRes, int descRes,
+                                     int iconType, String permissionId, boolean divider) {
+        boolean checked = phoneControlRepository.isPermissionEnabled(permissionId);
+        SwitchRowView row = new SwitchRowView(context, iconType, context.getString(labelRes),
+                context.getString(descRes), checked, (buttonView, isChecked) -> {
+            phoneControlRepository.setPermissionEnabled(permissionId, isChecked);
+            if (listener != null) {
+                listener.onPermissionEnabledChanged(permissionId, isChecked);
+            }
+        });
+        list.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        if (divider) {
+            View line = new View(context);
+            line.setBackgroundColor(LineTheme.BORDER_LIGHT);
+            list.addView(line, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
         }
     }
 }

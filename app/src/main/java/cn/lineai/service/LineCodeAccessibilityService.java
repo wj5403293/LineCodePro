@@ -84,16 +84,40 @@ public final class LineCodeAccessibilityService extends AccessibilityService {
             return false;
         }
         List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByViewId(fullId);
-        boolean clicked = false;
-        if (nodes != null) {
-            for (AccessibilityNodeInfo node : nodes) {
-                if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                    clicked = true;
-                }
-                node.recycle();
-            }
-        }
+        boolean clicked = clickFirstClickableNode(nodes);
         root.recycle();
+        return clicked;
+    }
+
+    public boolean clickByText(String text) {
+        if (text == null || text.length() == 0) {
+            return false;
+        }
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) {
+            return false;
+        }
+        List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(text);
+        boolean clicked = clickFirstClickableNode(nodes);
+        root.recycle();
+        return clicked;
+    }
+
+    public boolean clickByCoordinates(int x, int y) {
+        return click(x, y);
+    }
+
+    private boolean clickFirstClickableNode(List<AccessibilityNodeInfo> nodes) {
+        if (nodes == null) {
+            return false;
+        }
+        boolean clicked = false;
+        for (AccessibilityNodeInfo node : nodes) {
+            if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                clicked = true;
+            }
+            node.recycle();
+        }
         return clicked;
     }
 

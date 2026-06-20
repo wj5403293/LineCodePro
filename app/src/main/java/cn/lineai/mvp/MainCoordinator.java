@@ -1952,8 +1952,21 @@ public final class MainCoordinator implements MainUiController {
     }
 
     @Override
-    public void onPhoneControlPermissionAction(String id) {
-        Toast.makeText(context, "TODO: " + (id == null ? "" : id), Toast.LENGTH_SHORT).show();
+    public void onPhoneControlPermissionEnabledChanged(String permissionId, boolean enabled) {
+        if (permissionId == null || permissionId.length() == 0) {
+            return;
+        }
+        toolRegistry.reloadExtensions();
+        refreshVisibleScreen("phoneControl");
+        render();
+    }
+
+    @Override
+    public void onResume(String currentScreenId) {
+        if ("phoneControl".equals(currentScreenId)) {
+            refreshVisibleScreen("phoneControl");
+            render();
+        }
     }
 
     private cn.lineai.ipc.IpcProviderConfig findIpcProvider(String id) {
@@ -2175,24 +2188,32 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void onModelTest(ModelConfig model) {
         backgroundTasks.execute("linecode-model-test", () -> {
+            long startTime = System.currentTimeMillis();
             try {
                 ModelCompletionResponse response = modelClient.complete(model,
-                        Collections.singletonList(new UserModelMessage("1+1等于多少？请只回答数字结果")));
-                String result = response.getText() == null ? "" : response.getText().trim();
+                        Collections.singletonList(new UserModelMessage("Calculate 1+1 and reply with any result.")));
+                long duration = System.currentTimeMillis() - startTime;
+                String rawText = response.getText() == null ? "" : response.getText().trim();
+                boolean hasData = rawText.length() > 0;
+                String summary = context.getString(hasData
+                        ? R.string.screen_model_add_test_success
+                        : R.string.screen_model_add_test_success_no_data, duration);
+                String message = summary + "\n\n" + context.getString(R.string.screen_model_add_test_raw_response) + "\n" + rawText;
                 mainThread.post(() -> {
                     if (view != null) {
                         view.showConfirmationDialog(
                                 context.getString(R.string.screen_model_add_test_result_title),
-                                result,
+                                message,
                                 context.getString(R.string.screen_model_add_test_result_confirm),
                                 false,
                                 "modelTestResult");
                     }
                 });
             } catch (Exception e) {
+                long duration = System.currentTimeMillis() - startTime;
                 String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                 mainThread.post(() -> Toast.makeText(context,
-                        context.getString(R.string.screen_model_add_test_error, message),
+                        context.getString(R.string.screen_model_add_test_error, message) + " (" + duration + "ms)",
                         Toast.LENGTH_LONG).show());
             }
         });

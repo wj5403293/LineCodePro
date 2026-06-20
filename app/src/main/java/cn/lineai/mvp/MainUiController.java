@@ -12,5 +12,7 @@ public interface MainUiController extends ChatController,
 
     void destroy();
 
-    void onPhoneControlPermissionAction(String id);
+    void onPhoneControlPermissionEnabledChanged(String permissionId, boolean enabled);
+
+    void onResume(String currentScreenId);
 }

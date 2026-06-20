@@ -21,6 +21,18 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
 
     private static final String KEY_MCP_PREFIX = "@linecode_mcp_enabled_";
 
+    private static final Map<String, String> PHONE_CONTROL_TOOL_PERMISSION_MAP;
+    static {
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("phone_screenshot", PhoneControlRepository.PERMISSION_SCREENSHOT);
+        map.put("phone_click", PhoneControlRepository.PERMISSION_CLICK);
+        map.put("phone_swipe", PhoneControlRepository.PERMISSION_SWIPE);
+        map.put("phone_long_press", PhoneControlRepository.PERMISSION_LONG_PRESS);
+        map.put("phone_view_hierarchy", PhoneControlRepository.PERMISSION_VIEW_HIERARCHY);
+        map.put("phone_click_view", PhoneControlRepository.PERMISSION_VIEW_ACTION);
+        PHONE_CONTROL_TOOL_PERMISSION_MAP = java.util.Collections.unmodifiableMap(map);
+    }
+
     private static final McpToolConfig[] DEFAULT_CONFIGS = new McpToolConfig[] {
             new McpToolConfig("file_ops", "文件操作", "读取、写入、编辑和删除文件", true,
                     new String[] {"file_read", "file_write", "file_edit", "file_delete", "glob", "list_dir"}),
@@ -29,7 +41,7 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
             new McpToolConfig("agent", "Agent", "分派 Agent 处理任务", true,
                     new String[] {"agent", "agent_pipeline"}),
             new McpToolConfig("phone_control", "手机控制", "通过无障碍服务控制本机操作", true,
-                    new String[] {"phone_screenshot", "phone_click", "phone_swipe", "phone_long_press", "phone_view_hierarchy", "phone_click_view_by_id"}),
+                    new String[] {"phone_screenshot", "phone_click", "phone_swipe", "phone_long_press", "phone_view_hierarchy", "phone_click_view"}),
             new McpToolConfig("todo", "任务清单", "维护当前会话的 TODO 列表，状态会注入到 system prompt", true,
                     new String[] {"todo_update"}),
             new McpToolConfig("image_understanding", "图片理解", "读取本地或 SSH 工作区图片并调用已选择的视觉模型理解内容", false,
@@ -44,10 +56,12 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
 
     private final SettingsRepository settingsRepository;
     private final WebSearchConfigRepository webSearchConfigRepository;
+    private final PhoneControlRepository phoneControlRepository;
 
     public ToolSettingsRepository(Context context) {
         settingsRepository = new SettingsRepository(context);
         webSearchConfigRepository = new WebSearchConfigRepository(context);
+        phoneControlRepository = new PhoneControlRepository(context);
     }
 
     @Override
@@ -161,8 +175,8 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
             }
             for (String tool : config.getTools()) {
                 ToolCategory category = getToolCategory(tool);
-                if (PERMISSION_READONLY.equals(permissionMode) && !isReadonlyAllowed(category)
-                        && !isReadonlyAlwaysAllowed(tool)) {
+                if (PERMISSION_READONLY.equals(permissionMode)
+                        && !isReadonlyToolAllowedForMode(executionMode, tool, category)) {
                     continue;
                 }
                 enabled.add(tool);
@@ -174,6 +188,15 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
             while (iterator.hasNext()) {
                 String tool = iterator.next();
                 if (tool != null && tool.startsWith("phone_")) {
+                    iterator.remove();
+                }
+            }
+        } else {
+            java.util.Iterator<String> iterator = enabled.iterator();
+            while (iterator.hasNext()) {
+                String tool = iterator.next();
+                String permissionId = PHONE_CONTROL_TOOL_PERMISSION_MAP.get(tool);
+                if (permissionId != null && !phoneControlRepository.isPermissionEnabled(permissionId)) {
                     iterator.remove();
                 }
             }
@@ -212,9 +235,9 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
                 return PermissionResult.denied("工具未启用或当前执行目标不可用: " + toolName);
             }
         }
+        String executionMode = getExecutionMode();
         if (PERMISSION_READONLY.equals(getPermissionMode())
-                && !isReadonlyAllowed(category)
-                && !isReadonlyAlwaysAllowed(toolName)) {
+                && !isReadonlyToolAllowedForMode(executionMode, toolName, category)) {
             return PermissionResult.denied("只读模式下不允许执行 " + toolName + "。请在权限设置中切换到自动或确认模式。");
         }
         return PermissionResult.allowed();
@@ -568,6 +591,18 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
 
     static boolean isReadonlyAlwaysAllowed(String toolName) {
         return "todo_update".equals(toolName);
+    }
+
+    static boolean isReadonlyToolAllowedForMode(String executionMode, String toolName, ToolCategory category) {
+        if (isReadonlyAllowed(category) || isReadonlyAlwaysAllowed(toolName)) {
+            return true;
+        }
+        if (!EXECUTION_SSH.equals(executionMode) && !EXECUTION_TERMINAL_PROVIDER.equals(executionMode)) {
+            return false;
+        }
+        return "shell_execute".equals(toolName)
+                || "agent".equals(toolName)
+                || "agent_pipeline".equals(toolName);
     }
 
     private boolean isEnabledExtensionTool(String toolName, ToolCategory category) {

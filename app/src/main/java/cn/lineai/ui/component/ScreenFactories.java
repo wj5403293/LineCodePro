@@ -491,10 +491,9 @@ public final class ScreenFactories {
         @Override
         public View createScreen(MainChatView view, MainUiController controller, Context context) {
             PhoneControlRepository repository = new PhoneControlRepository(context);
-            boolean imageModelSet = controller.getImageUnderstandingModelId().length() > 0;
             boolean accessibilityEnabled = repository.isAccessibilityEnabled();
             boolean disclaimerAccepted = repository.isDisclaimerAccepted();
-            return new PhoneControlScreenView(context, imageModelSet, accessibilityEnabled, disclaimerAccepted,
+            return new PhoneControlScreenView(context, accessibilityEnabled, disclaimerAccepted,
                     new PhoneControlScreenView.Listener() {
                 @Override
                 public void onBack() {
@@ -512,8 +511,8 @@ public final class ScreenFactories {
                 }
 
                 @Override
-                public void onPermissionAction(String permissionId) {
-                    controller.onPhoneControlPermissionAction(permissionId);
+                public void onPermissionEnabledChanged(String permissionId, boolean enabled) {
+                    controller.onPhoneControlPermissionEnabledChanged(permissionId, enabled);
                 }
             });
         }

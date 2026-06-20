@@ -49,7 +49,7 @@ public final class ChatMode {
         }
         if (CONTROL.equals(normalized)) {
             return "## 当前会话模式\n"
-                    + "当前模式：Control。仅允许使用手机控制工具（phone_screenshot, phone_click, phone_swipe, phone_long_press, phone_view_hierarchy, phone_click_view_by_id）。需要图像理解模型和无障碍权限。禁止文件操作、shell、agent 等其他工具。";
+                    + "当前模式：Control。仅允许使用手机控制工具（phone_screenshot, phone_click, phone_swipe, phone_long_press, phone_view_hierarchy, phone_click_view）。需要图像理解模型和无障碍权限。禁止文件操作、shell、agent 等其他工具。";
         }
         return "## 当前会话模式\n"
                 + "当前模式：Agent。\n"

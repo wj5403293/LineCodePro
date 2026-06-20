@@ -118,9 +118,15 @@
     <string name="screen_phone_control_permission_swipe">滑动</string>
     <string name="screen_phone_control_permission_long_press">长按</string>
     <string name="screen_phone_control_permission_view_hierarchy">查看 View 层级</string>
-    <string name="screen_phone_control_permission_view_action">View 操作（按 id 点击）</string>
-    <string name="screen_phone_control_no_image_model">请在工具设置中设置图像理解模型</string>
-    <string name="screen_phone_control_image_model_required">控制手机功能需要图像理解模型</string>
+    <string name="screen_phone_control_permission_view_action">View 操作</string>
+    <string name="screen_phone_control_permission_view_action_desc">按 id、文本或坐标点击 View</string>
+    <string name="screen_phone_control_permission_screenshot_desc">允许通过无障碍服务截图</string>
+    <string name="screen_phone_control_permission_click_desc">允许点击屏幕坐标</string>
+    <string name="screen_phone_control_permission_swipe_desc">允许滑动屏幕坐标</string>
+    <string name="screen_phone_control_permission_long_press_desc">允许长按屏幕坐标</string>
+    <string name="screen_phone_control_permission_view_hierarchy_desc">允许读取当前窗口层级</string>
+    <string name="screen_phone_control_no_image_model">未设置图像理解模型</string>
+    <string name="screen_phone_control_image_model_required">控制手机功能需要图像理解模型，请在工具设置中配置。</string>
 
     <string name="screen_llm_thinking_off_label">关闭</string>
     <string name="screen_llm_thinking_off_desc">不启用思考模式，响应更快</string>
@@ -164,6 +170,9 @@
     <string name="screen_model_add_test_button">测试</string>
     <string name="screen_model_add_test_result_title">测试结果</string>
     <string name="screen_model_add_test_result_confirm">确定</string>
+    <string name="screen_model_add_test_success">测试成功，响应时间：%1$d 毫秒，模型已返回数据。</string>
+    <string name="screen_model_add_test_success_no_data">测试成功，响应时间：%1$d 毫秒，模型返回内容为空。</string>
+    <string name="screen_model_add_test_raw_response">原始响应：</string>
     <string name="screen_model_add_test_error">测试失败：%1$s</string>
     <string name="screen_model_add_test_missing">请填写 Base URL、API Key 和 Model ID 后再测试</string>
 

@@ -360,13 +360,19 @@ public final class AgentExecutionController {
 
     public boolean isAgentToolAllowed(BaseTool tool, String type, Set<String> customToolNames, Set<String> allowedMcpToolNames) {
         String name = tool.getName();
-        if ("agent".equals(name) || "agent_pipeline".equals(name) || "file_delete".equals(name)) {
+        if ("agent".equals(name) || "agent_pipeline".equals(name)) {
             return false;
         }
         if (!allowedMcpToolNames.isEmpty() && allowedMcpToolNames.contains(name)) {
             return true;
         }
         if (!customToolNames.isEmpty() && !customToolNames.contains(name)) {
+            return false;
+        }
+        if (isRemoteExecutionMode()) {
+            return true;
+        }
+        if ("file_delete".equals(name)) {
             return false;
         }
         if (AgentTool.TYPE_EXPLORE.equals(type)) {
@@ -378,6 +384,15 @@ public final class AgentExecutionController {
         return tool.getCategory() == ToolCategory.READ
                 || tool.getCategory() == ToolCategory.WRITE
                 || "http_server".equals(name);
+    }
+
+    private boolean isRemoteExecutionMode() {
+        if (toolSettingsRepository == null) {
+            return false;
+        }
+        String executionMode = toolSettingsRepository.getExecutionMode();
+        return ToolSettingsRepository.EXECUTION_SSH.equals(executionMode)
+                || ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER.equals(executionMode);
     }
 
     public Set<String> toolNames(List<BaseTool> tools) {
@@ -440,7 +455,8 @@ public final class AgentExecutionController {
             return "你是一个代码探索 Agent。你的任务是快速定位和分析代码，回答用户的问题。\n"
                     + "规则：\n"
                     + "- 只读取代码，不做任何修改，不调用任何写入类工具。\n"
-                    + "- 优先使用只读工具搜索和读取关键文件。\n"
+                    + "- 优先使用只读工具搜索和读取关键文件；在 SSH Shell 或终端提供者模式下，可以使用 shell_execute 执行 pwd、ls、find、grep、rg、cat、head、tail、git diff、git status 等只读命令。\n"
+                    + "- 使用 shell_execute 时禁止执行写入、删除、移动、安装、启动服务、修改权限、重定向写文件或其它有副作用的命令。\n"
                     + "- 给出简洁准确的中文回答，并标注文件路径和必要的行号。";
         }
         return "你是一个编程 Agent。你的任务是完成边界清晰的编程子任务。\n"

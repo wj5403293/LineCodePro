@@ -118,9 +118,15 @@
     <string name="screen_phone_control_permission_swipe">Swipe</string>
     <string name="screen_phone_control_permission_long_press">Long press</string>
     <string name="screen_phone_control_permission_view_hierarchy">View hierarchy</string>
-    <string name="screen_phone_control_permission_view_action">View action (click by id)</string>
-    <string name="screen_phone_control_no_image_model">Please set an image understanding model in tool settings</string>
-    <string name="screen_phone_control_image_model_required">Phone control requires an image understanding model</string>
+    <string name="screen_phone_control_permission_view_action">View action</string>
+    <string name="screen_phone_control_permission_view_action_desc">Click View by id, text or coordinates</string>
+    <string name="screen_phone_control_permission_screenshot_desc">Allow taking screenshots via accessibility</string>
+    <string name="screen_phone_control_permission_click_desc">Allow tapping on screen coordinates</string>
+    <string name="screen_phone_control_permission_swipe_desc">Allow swiping on screen coordinates</string>
+    <string name="screen_phone_control_permission_long_press_desc">Allow long-pressing on screen coordinates</string>
+    <string name="screen_phone_control_permission_view_hierarchy_desc">Allow reading the current window hierarchy</string>
+    <string name="screen_phone_control_no_image_model">Image understanding model not set</string>
+    <string name="screen_phone_control_image_model_required">Phone control requires an image understanding model. Please configure it in tool settings.</string>
 
     <string name="screen_llm_thinking_off_label">Off</string>
     <string name="screen_llm_thinking_off_desc">Disable thinking mode, faster response</string>
@@ -164,6 +170,9 @@
     <string name="screen_model_add_test_button">Test</string>
     <string name="screen_model_add_test_result_title">Test result</string>
     <string name="screen_model_add_test_result_confirm">OK</string>
+    <string name="screen_model_add_test_success">Test successful. Response time: %1$d ms. Model returned data.</string>
+    <string name="screen_model_add_test_success_no_data">Test successful. Response time: %1$d ms. Model returned empty content.</string>
+    <string name="screen_model_add_test_raw_response">Raw response:</string>
     <string name="screen_model_add_test_error">Test failed: %1$s</string>
     <string name="screen_model_add_test_missing">Please fill in Base URL, API Key and Model ID before testing</string>
 

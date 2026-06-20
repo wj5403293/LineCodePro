@@ -36,6 +36,7 @@ public final class ImageUnderstandingTool extends BaseTool {
     private final SshFileTreeStore sshFileTreeRepository;
     private final ModelClient modelClient;
     private final IpcProviderManager ipcProviderManager;
+    private final Context context;
 
     public ImageUnderstandingTool() {
         this(null);
@@ -47,6 +48,7 @@ public final class ImageUnderstandingTool extends BaseTool {
 
     public ImageUnderstandingTool(Context context, IpcProviderManager ipcProviderManager) {
         Context appContext = context == null ? null : context.getApplicationContext();
+        this.context = appContext;
         settingsRepository = appContext == null ? null : new ToolSettingsRepository(appContext);
         modelRepository = appContext == null ? null : new ModelRepository(appContext);
         sshFileTreeRepository = appContext == null ? null : new SshFileTreeRepository(new SshService(appContext));
@@ -168,7 +170,7 @@ public final class ImageUnderstandingTool extends BaseTool {
             }
             return new ImageBytes(remotePath, sshFileTreeRepository.readFileBytes(remotePath, MAX_IMAGE_BYTES));
         }
-        File file = FileToolPathPolicy.resolve(context, path);
+        File file = resolveLocalImage(path, context);
         if (!file.exists()) {
             throw new IllegalStateException("图片文件不存在: " + path);
         }
@@ -179,6 +181,14 @@ public final class ImageUnderstandingTool extends BaseTool {
             throw new IllegalStateException("图片过大，当前上限为 10 MB: " + path);
         }
         return new ImageBytes(file.getAbsolutePath(), readBytes(file));
+    }
+
+    private File resolveLocalImage(String path, ToolContext context) throws Exception {
+        File rawFile = new File(path == null ? "" : path.trim());
+        if (rawFile.isAbsolute() && PhoneScreenshotCache.isInside(this.context, rawFile)) {
+            return rawFile.getCanonicalFile();
+        }
+        return FileToolPathPolicy.resolve(context, path);
     }
 
     private boolean isSshMode() {

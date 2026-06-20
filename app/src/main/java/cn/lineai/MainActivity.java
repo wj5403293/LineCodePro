@@ -17,6 +17,7 @@ import cn.lineai.ui.component.PermissionUiHelper;
 import cn.lineai.ui.component.SafPickerDelegate;
 import cn.lineai.ui.component.UserAgreementDialog;
 import cn.lineai.ui.theme.LineTheme;
+import cn.lineai.tool.builtin.PhoneScreenshotCache;
 
 @SuppressWarnings("deprecation")
 public final class MainActivity extends Activity implements MainChatView.WorkspaceHost {
@@ -32,6 +33,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         configureWindow();
+        PhoneScreenshotCache.clear(this);
 
         safPickerDelegate = new SafPickerDelegate(this);
         permissionUiHelper = new PermissionUiHelper(this);
@@ -71,6 +73,9 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
         super.onResume();
         if (presenter != null) {
             presenter.onStoragePermissionResult();
+            if (mainView != null) {
+                presenter.onResume(mainView.getCurrentScreenId());
+            }
         }
     }
 

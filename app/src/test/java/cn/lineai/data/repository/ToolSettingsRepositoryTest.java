@@ -66,6 +66,26 @@ public final class ToolSettingsRepositoryTest {
     }
 
     @Test
+    public void sshReadonlyKeepsRemoteShellAgentAndReadTools() {
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "shell_execute", ToolSettingsRepository.getToolCategory("shell_execute")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "agent", ToolSettingsRepository.getToolCategory("agent")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "agent_pipeline", ToolSettingsRepository.getToolCategory("agent_pipeline")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "todo_update", ToolSettingsRepository.getToolCategory("todo_update")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "image_understanding", ToolSettingsRepository.getToolCategory("image_understanding")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "web_search", ToolSettingsRepository.getToolCategory("web_search")));
+        Assert.assertTrue(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_SSH,
+                "web_fetch", ToolSettingsRepository.getToolCategory("web_fetch")));
+        Assert.assertFalse(ToolSettingsRepository.isReadonlyToolAllowedForMode(ToolSettingsRepository.EXECUTION_LOCAL,
+                "shell_execute", ToolSettingsRepository.getToolCategory("shell_execute")));
+    }
+
+    @Test
     public void nativeToolPromptForbidsInlineToolMarkup() {
         ToolRegistry registry = new ToolRegistry();
         Map<String, BaseTool> toolByName = new LinkedHashMap<>();

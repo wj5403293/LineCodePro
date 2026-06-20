@@ -31,7 +31,7 @@ public final class AgentExecutionControllerTest {
     }
 
     @Test
-    public void exploreRejectsShellExecute() {
+    public void localExploreRejectsShellExecute() {
         AgentExecutionController controller = new AgentExecutionController(
                 null, null, null, null, null, null);
 
@@ -124,7 +124,7 @@ public final class AgentExecutionControllerTest {
     }
 
     @Test
-    public void exploreAllowsReadToolsOnly() {
+    public void localExploreAllowsReadToolsOnly() {
         AgentExecutionController controller = new AgentExecutionController(
                 null, null, null, null, null, null);
 
@@ -139,7 +139,7 @@ public final class AgentExecutionControllerTest {
                 Collections.emptySet(),
                 Collections.emptySet()));
         assertFalse(controller.isAgentToolAllowed(
-                new FakeTool("http_server", ToolCategory.SYSTEM),
+                new FakeTool("shell_execute", ToolCategory.SYSTEM),
                 AgentTool.TYPE_EXPLORE,
                 Collections.emptySet(),
                 Collections.emptySet()));
@@ -163,7 +163,8 @@ public final class AgentExecutionControllerTest {
 
         String prompt = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE);
 
-        assertFalse(prompt.contains("shell_execute"));
+        assertTrue(prompt.contains("shell_execute"));
+        assertTrue(prompt.contains("只读命令"));
         assertTrue(prompt.contains("只读取代码"));
     }
 

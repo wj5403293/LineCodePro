@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneLongPressTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "在屏幕指定坐标执行长按操作。参数 x、y 为屏幕像素坐标，duration_ms 为按压时长（可选，默认 800）。";
+        return context == null ? "Long-press the specified screen coordinates." : context.getString(R.string.phone_tool_long_press_description);
     }
 
     @Override
@@ -53,6 +54,6 @@ public final class PhoneLongPressTool extends BaseTool {
         int y = input.optInt("y");
         int durationMs = input.optInt("duration_ms", 800);
         boolean success = service.longPress(x, y, durationMs);
-        return success ? ok("长按成功: (" + x + ", " + y + ")") : error("长按失败");
+        return success ? ok(this.context.getString(R.string.phone_tool_long_press_success, x, y)) : error(this.context.getString(R.string.phone_tool_long_press_failed));
     }
 }

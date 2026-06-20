@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneViewHierarchyTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "获取当前窗口的 View 层级结构，包含类名、resource id、文本、content description 和屏幕边界。";
+        return context == null ? "Get the current window View hierarchy." : context.getString(R.string.phone_tool_view_hierarchy_description);
     }
 
     @Override

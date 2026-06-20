@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneClickViewTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "点击当前窗口中的 View。支持按 resource id、显示文本或屏幕坐标定位。需要无障碍服务已开启。";
+        return context == null ? "Tap a View in the current window." : context.getString(R.string.phone_tool_click_view_description);
     }
 
     @Override
@@ -56,16 +57,16 @@ public final class PhoneClickViewTool extends BaseTool {
         int y = input.optInt("y", Integer.MIN_VALUE);
         if (resourceId.length() > 0) {
             boolean success = service.clickById(resourceId);
-            return success ? ok("点击 View 成功: " + resourceId) : error("点击 View 失败: " + resourceId);
+            return success ? ok(this.context.getString(R.string.phone_tool_click_view_success, resourceId)) : error(this.context.getString(R.string.phone_tool_click_view_failed, resourceId));
         }
         if (text.length() > 0) {
             boolean success = service.clickByText(text);
-            return success ? ok("点击 View 成功: " + text) : error("点击 View 失败: " + text);
+            return success ? ok(this.context.getString(R.string.phone_tool_click_view_success, text)) : error(this.context.getString(R.string.phone_tool_click_view_failed, text));
         }
         if (x != Integer.MIN_VALUE && y != Integer.MIN_VALUE) {
             boolean success = service.clickByCoordinates(x, y);
-            return success ? ok("点击坐标成功: (" + x + ", " + y + ")") : error("点击坐标失败: (" + x + ", " + y + ")");
+            return success ? ok(this.context.getString(R.string.phone_tool_click_point_success, x, y)) : error(this.context.getString(R.string.phone_tool_click_point_failed, x, y));
         }
-        return error("缺少定位参数，请提供 resource_id、text 或 x,y 坐标");
+        return error(this.context.getString(R.string.phone_tool_click_view_missing_target));
     }
 }

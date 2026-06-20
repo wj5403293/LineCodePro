@@ -29,7 +29,7 @@ public final class ToolCallReadView extends BaseToolCallView {
         removeAllViews();
         String name = toolCall == null ? "" : toolCall.getName();
         JSONObject input = ToolCallUtils.parseInput(toolCall);
-        String label = ToolCallUtils.displayInputLabel(name, input, projectPath);
+        String label = ToolCallUtils.displayInputLabel(getContext(), name, input, projectPath);
         String reviewState = result == null ? "" : result.getReviewState();
         boolean running = result == null
                 || "running".equals(reviewState)
@@ -88,7 +88,7 @@ public final class ToolCallReadView extends BaseToolCallView {
     private String actionLabel(String name) {
         if ("image_generation".equals(name)) return getContext().getString(R.string.tool_call_image_generation);
         if ("image_understanding".equals(name)) return getContext().getString(R.string.tool_call_image_understanding);
-        if (ToolCallUtils.isPhoneControlTool(name)) return ToolCallInputParser.phoneControlActionName(name);
+        if (ToolCallUtils.isPhoneControlTool(name)) return ToolCallInputParser.phoneControlActionName(getContext(), name);
         if ("web_search".equals(name)) return getContext().getString(R.string.tool_call_action_search);
         if ("web_fetch".equals(name)) return getContext().getString(R.string.tool_call_action_fetch);
         if ("glob".equals(name)) return getContext().getString(R.string.tool_call_action_match);

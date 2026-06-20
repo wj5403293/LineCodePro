@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneGlobalActionTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "执行系统全局动作。action 可选 back、home、exit_app、recents、notifications、quick_settings、power_dialog、lock_screen。";
+        return context == null ? "Run a system global action." : context.getString(R.string.phone_tool_global_action_description);
     }
 
     @Override
@@ -48,7 +49,7 @@ public final class PhoneGlobalActionTool extends BaseTool {
                                         .put("quick_settings")
                                         .put("power_dialog")
                                         .put("lock_screen"))
-                                .put("description", "要执行的系统动作")))
+                                .put("description", context == null ? "System action to run" : context.getString(R.string.phone_tool_global_action_param_desc))))
                 .put("required", new JSONArray().put("action"));
     }
 
@@ -60,9 +61,9 @@ public final class PhoneGlobalActionTool extends BaseTool {
         }
         String action = input.optString("action").trim();
         if (action.length() == 0) {
-            return error("缺少 action");
+            return error(context.getString(R.string.phone_tool_global_action_missing));
         }
         boolean success = service.performPhoneAction(action);
-        return success ? ok("系统动作成功: " + action) : error("系统动作失败或不支持: " + action);
+        return success ? ok(context.getString(R.string.phone_tool_global_action_success, action)) : error(context.getString(R.string.phone_tool_global_action_failed, action));
     }
 }

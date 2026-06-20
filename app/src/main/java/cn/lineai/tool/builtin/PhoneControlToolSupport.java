@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolResult;
@@ -15,9 +16,12 @@ final class PhoneControlToolSupport {
 
     static ToolResult unavailable(BaseTool tool, Context context) {
         if (context != null && LineCodeAccessibilityService.isServiceEnabled(context)) {
-            return toolError(tool, "无障碍服务已授权，但当前连接未就绪。请返回应用后重试，或关闭再开启 LineCode 无障碍服务。缺少前台连接时无法控制手机。");
+            return toolError(tool, context.getString(R.string.phone_tool_accessibility_not_ready));
         }
-        return toolError(tool, "无障碍服务未开启，请先在系统无障碍设置中开启 LineCode。");
+        if (context != null) {
+            return toolError(tool, context.getString(R.string.phone_tool_accessibility_disabled));
+        }
+        return toolError(tool, "Accessibility service is not enabled.");
     }
 
     private static ToolResult toolError(BaseTool tool, String message) {

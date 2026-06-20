@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneSwipeTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "从起始坐标滑动到结束坐标。参数 x1、y1 为起点，x2、y2 为终点，duration_ms 为滑动时长（可选，默认 300）。";
+        return context == null ? "Swipe between screen coordinates." : context.getString(R.string.phone_tool_swipe_description);
     }
 
     @Override
@@ -57,6 +58,6 @@ public final class PhoneSwipeTool extends BaseTool {
         int y2 = input.optInt("y2");
         int durationMs = input.optInt("duration_ms", 300);
         boolean success = service.swipe(x1, y1, x2, y2, durationMs);
-        return success ? ok("滑动成功: (" + x1 + ", " + y1 + ") -> (" + x2 + ", " + y2 + ")") : error("滑动失败");
+        return success ? ok(this.context.getString(R.string.phone_tool_swipe_success, x1, y1, x2, y2)) : error(this.context.getString(R.string.phone_tool_swipe_failed));
     }
 }

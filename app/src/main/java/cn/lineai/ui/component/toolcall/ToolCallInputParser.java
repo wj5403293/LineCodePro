@@ -1,5 +1,7 @@
 package cn.lineai.ui.component.toolcall;
 
+import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolCategory;
 import org.json.JSONObject;
@@ -36,12 +38,12 @@ final class ToolCallInputParser {
         return name == null ? "" : name;
     }
 
-    static String displayInputLabel(String name, JSONObject input, String workspacePath) {
+    static String displayInputLabel(Context context, String name, JSONObject input, String workspacePath) {
         if (input == null) {
             return name == null ? "" : name;
         }
         if (ToolCategory.isPhoneControlType(name)) {
-            return phoneControlLabel(name, input);
+            return phoneControlLabel(context, name, input);
         }
         if ("file_read".equals(name)) {
             String filePath = input.optString("file_path");
@@ -58,57 +60,59 @@ final class ToolCallInputParser {
         return inputLabel(name, input);
     }
 
-    private static String phoneControlLabel(String name, JSONObject input) {
+    private static String phoneControlLabel(Context context, String name, JSONObject input) {
         if ("phone_screenshot".equals(name)) {
-            return "保存当前屏幕截图";
+            return context.getString(R.string.tool_call_phone_summary_screenshot);
         }
         if ("phone_view_hierarchy".equals(name)) {
-            return "读取当前窗口 View 层级";
+            return context.getString(R.string.tool_call_phone_summary_view_hierarchy);
         }
         if ("phone_global_action".equals(name)) {
             String action = input.optString("action");
-            return action.length() == 0 ? "执行系统动作" : globalActionLabel(action);
+            return action.length() == 0
+                    ? context.getString(R.string.tool_call_phone_summary_global_action)
+                    : globalActionLabel(context, action);
         }
         if ("phone_click_view".equals(name)) {
             String resourceId = input.optString("resource_id");
             if (resourceId.length() > 0) {
-                return "点击 View：" + resourceId;
+                return context.getString(R.string.tool_call_phone_summary_click_view, resourceId);
             }
             String text = input.optString("text");
             if (text.length() > 0) {
-                return "点击文本：" + text;
+                return context.getString(R.string.tool_call_phone_summary_click_text, text);
             }
         }
         if ("phone_swipe".equals(name)) {
-            return "从 (" + input.optInt("x1") + ", " + input.optInt("y1") + ") 滑到 ("
-                    + input.optInt("x2") + ", " + input.optInt("y2") + ")";
+            return context.getString(R.string.tool_call_phone_summary_swipe,
+                    input.optInt("x1"), input.optInt("y1"), input.optInt("x2"), input.optInt("y2"));
         }
         if ("phone_click".equals(name) || "phone_long_press".equals(name) || "phone_click_view".equals(name)) {
-            return "坐标 (" + input.optInt("x") + ", " + input.optInt("y") + ")";
+            return context.getString(R.string.tool_call_phone_summary_point, input.optInt("x"), input.optInt("y"));
         }
         return name == null ? "" : name;
     }
 
-    static String phoneControlActionName(String name) {
-        if ("phone_screenshot".equals(name)) return "截图";
-        if ("phone_click".equals(name)) return "点击";
-        if ("phone_swipe".equals(name)) return "滑动";
-        if ("phone_long_press".equals(name)) return "长按";
-        if ("phone_view_hierarchy".equals(name)) return "查看 View 层级";
-        if ("phone_click_view".equals(name)) return "View 点击";
-        if ("phone_global_action".equals(name)) return "系统动作";
-        return "手机操作";
+    static String phoneControlActionName(Context context, String name) {
+        if ("phone_screenshot".equals(name)) return context.getString(R.string.tool_call_phone_action_screenshot);
+        if ("phone_click".equals(name)) return context.getString(R.string.tool_call_phone_action_click);
+        if ("phone_swipe".equals(name)) return context.getString(R.string.tool_call_phone_action_swipe);
+        if ("phone_long_press".equals(name)) return context.getString(R.string.tool_call_phone_action_long_press);
+        if ("phone_view_hierarchy".equals(name)) return context.getString(R.string.tool_call_phone_action_view_hierarchy);
+        if ("phone_click_view".equals(name)) return context.getString(R.string.tool_call_phone_action_click_view);
+        if ("phone_global_action".equals(name)) return context.getString(R.string.tool_call_phone_action_global_action);
+        return context.getString(R.string.tool_call_phone_action_default);
     }
 
-    private static String globalActionLabel(String action) {
-        if ("back".equals(action)) return "返回";
-        if ("home".equals(action)) return "回到主页";
-        if ("exit_app".equals(action)) return "退出当前应用";
-        if ("recents".equals(action)) return "打开最近任务";
-        if ("notifications".equals(action)) return "打开通知栏";
-        if ("quick_settings".equals(action)) return "打开快捷设置";
-        if ("power_dialog".equals(action)) return "打开电源菜单";
-        if ("lock_screen".equals(action)) return "锁定屏幕";
-        return "系统动作：" + action;
+    private static String globalActionLabel(Context context, String action) {
+        if ("back".equals(action)) return context.getString(R.string.tool_call_phone_global_back);
+        if ("home".equals(action)) return context.getString(R.string.tool_call_phone_global_home);
+        if ("exit_app".equals(action)) return context.getString(R.string.tool_call_phone_global_exit_app);
+        if ("recents".equals(action)) return context.getString(R.string.tool_call_phone_global_recents);
+        if ("notifications".equals(action)) return context.getString(R.string.tool_call_phone_global_notifications);
+        if ("quick_settings".equals(action)) return context.getString(R.string.tool_call_phone_global_quick_settings);
+        if ("power_dialog".equals(action)) return context.getString(R.string.tool_call_phone_global_power_dialog);
+        if ("lock_screen".equals(action)) return context.getString(R.string.tool_call_phone_global_lock_screen);
+        return context.getString(R.string.tool_call_phone_global_unknown, action);
     }
 }

@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -24,7 +25,7 @@ public final class PhoneClickTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "在屏幕指定坐标执行点击操作。参数 x、y 为屏幕像素坐标。";
+        return context == null ? "Tap the specified screen coordinates." : context.getString(R.string.phone_tool_click_description);
     }
 
     @Override
@@ -51,6 +52,6 @@ public final class PhoneClickTool extends BaseTool {
         int x = input.optInt("x");
         int y = input.optInt("y");
         boolean success = service.click(x, y);
-        return success ? ok("点击成功: (" + x + ", " + y + ")") : error("点击失败");
+        return success ? ok(this.context.getString(R.string.phone_tool_click_success, x, y)) : error(this.context.getString(R.string.phone_tool_click_failed));
     }
 }

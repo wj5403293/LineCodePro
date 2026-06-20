@@ -2,6 +2,7 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import cn.lineai.R;
 import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
@@ -28,7 +29,7 @@ public final class PhoneScreenshotTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "截取当前屏幕，保存到应用缓存目录并返回图片文件路径。需要无障碍服务已开启。";
+        return context == null ? "Capture the current screen and return the saved image path." : context.getString(R.string.phone_tool_screenshot_description);
     }
 
     @Override
@@ -47,7 +48,7 @@ public final class PhoneScreenshotTool extends BaseTool {
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
         if (this.context == null) {
-            return error("截图工具未接入应用上下文");
+            return error("Screenshot tool is missing app context");
         }
         LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
@@ -55,23 +56,23 @@ public final class PhoneScreenshotTool extends BaseTool {
         }
         Bitmap bitmap = service.takeScreenshot();
         if (bitmap == null) {
-            return error("截图失败");
+            return error(this.context.getString(R.string.phone_tool_screenshot_failed));
         }
         File dir = PhoneScreenshotCache.directory(this.context);
         if (!dir.exists() && !dir.mkdirs()) {
             bitmap.recycle();
-            return error("截图缓存目录创建失败");
+            return error(this.context.getString(R.string.phone_tool_screenshot_cache_dir_failed));
         }
         File file = new File(dir, String.format(Locale.ROOT, "screenshot-%d.png", System.currentTimeMillis()));
         FileOutputStream output = null;
         try {
             output = new FileOutputStream(file);
             if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                return error("截图保存失败");
+                return error(this.context.getString(R.string.phone_tool_screenshot_save_failed));
             }
             return ok(file.getAbsolutePath());
         } catch (Exception e) {
-            return error("截图保存失败: " + e.getMessage());
+            return error(this.context.getString(R.string.phone_tool_screenshot_save_failed_with_reason, e.getMessage()));
         } finally {
             if (output != null) {
                 try {

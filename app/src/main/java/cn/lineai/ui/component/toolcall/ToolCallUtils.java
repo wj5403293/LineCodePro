@@ -1,5 +1,6 @@
 package cn.lineai.ui.component.toolcall;
 
+import android.content.Context;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolCategory;
 import org.json.JSONObject;
@@ -21,8 +22,8 @@ final class ToolCallUtils {
         return ToolCallInputParser.inputLabel(name, input);
     }
 
-    static String displayInputLabel(String name, JSONObject input, String workspacePath) {
-        return ToolCallInputParser.displayInputLabel(name, input, workspacePath);
+    static String displayInputLabel(Context context, String name, JSONObject input, String workspacePath) {
+        return ToolCallInputParser.displayInputLabel(context, name, input, workspacePath);
     }
 
     static String workspaceDisplayPath(String workspacePath, String path) {

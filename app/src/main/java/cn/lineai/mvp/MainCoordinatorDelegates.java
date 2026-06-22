@@ -2,10 +2,14 @@ package cn.lineai.mvp;
 
 import cn.lineai.ipc.IpcProviderConfig;
 import cn.lineai.ipc.ScannedProvider;
+import cn.lineai.data.repository.ConversationRecord;
+import cn.lineai.data.repository.ConversationStore;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
+import cn.lineai.model.FileTreeNode;
+import cn.lineai.model.InputAttachment;
 import cn.lineai.model.InputSettings;
 import cn.lineai.model.McpRequestHeader;
 import cn.lineai.model.McpSettingsState;
@@ -36,6 +40,34 @@ abstract class MainCoordinatorDelegates implements MainUiController {
     protected abstract IpcProviderController ipcProviderDelegate();
 
     protected abstract ModelManagementController modelManagementDelegate();
+
+    protected abstract ChatInteractionController chatInteractionDelegate();
+
+    protected abstract FileTreeInteractionController fileTreeInteractionDelegate();
+
+    protected abstract FileOperationController fileOperationDelegate();
+
+    protected abstract DirectoryPickerController directoryPickerDelegate();
+
+    protected abstract AttachmentPickerCoordinator attachmentPickerDelegate();
+
+    protected abstract PermissionModeController permissionModeDelegate();
+
+    protected abstract ProjectWorkspaceController projectWorkspaceDelegate();
+
+    protected abstract OverlayActionController overlayActionDelegate();
+
+    protected abstract GenerationFlowController generationFlowDelegate();
+
+    protected abstract ToolReviewController toolReviewDelegate();
+
+    protected abstract ConversationStore conversationStoreDelegate();
+
+    protected abstract ChatSessionStore chatSessionDelegate();
+
+    protected abstract ModelInteractionController modelInteractionDelegate();
+
+    protected abstract StorageMaintenanceController storageMaintenanceDelegate();
 
     protected abstract void delegateShowScreen(String screenId);
 
@@ -72,6 +104,188 @@ abstract class MainCoordinatorDelegates implements MainUiController {
     @Override
     public void showModelManagement() {
         delegateShowScreen("models");
+    }
+
+    @Override
+    public void onProjectClick() {
+        projectWorkspaceDelegate().showProjectSheet();
+    }
+
+    @Override
+    public void onPermissionClick() {
+        permissionModeDelegate().showPermissionSheet();
+    }
+
+    @Override
+    public void onNewConversation() {
+        chatInteractionDelegate().newConversation();
+    }
+
+    @Override
+    public void onConversationSelected(String id) {
+        chatInteractionDelegate().selectConversation(id);
+    }
+
+    @Override
+    public void onConversationDeleted(String id) {
+        chatInteractionDelegate().deleteConversation(id);
+    }
+
+    @Override
+    public void onCurrentProjectRemoveRequested() {
+        projectWorkspaceDelegate().removeCurrentProject();
+    }
+
+    @Override
+    public void onFileNodeSelected(String path, boolean directory) {
+        fileTreeInteractionDelegate().handleNodeSelected(path, directory);
+    }
+
+    @Override
+    public void onFileNodeLongPressed(String path, String name, boolean directory, boolean root) {
+        fileOperationDelegate().showFileNodeActions(path, name, directory, root);
+    }
+
+    @Override
+    public void onFileTreeActivated() {
+        fileTreeInteractionDelegate().activate();
+    }
+
+    @Override
+    public void onFileTreeRefresh() {
+        fileTreeInteractionDelegate().refresh();
+    }
+
+    @Override
+    public void onDirectoryPickerNodeSelected(String path) {
+        directoryPickerDelegate().onNodeSelected(path);
+    }
+
+    @Override
+    public void onDirectoryPickerConfirmed() {
+        directoryPickerDelegate().onConfirmed();
+    }
+
+    @Override
+    public void onDirectoryPickerCancelled() {
+        directoryPickerDelegate().onCancelled();
+    }
+
+    @Override
+    public void onDialogInputSubmitted(String actionId, String value) {
+        overlayActionDelegate().handleDialogInput(actionId, value);
+    }
+
+    @Override
+    public void onDialogConfirmed(String actionId) {
+        overlayActionDelegate().handleDialogConfirmed(actionId);
+    }
+
+    @Override
+    public void onMoreClick() {
+        overlayActionDelegate().showMoreActions();
+    }
+
+    @Override
+    public void onSendMessage(String text) {
+        chatInteractionDelegate().sendMessage(text);
+    }
+
+    @Override
+    public void onSendMessage(String text, List<InputAttachment> attachments) {
+        chatInteractionDelegate().sendMessage(text, attachments);
+    }
+
+    @Override
+    public void onRecallMessage(String messageId) {
+        chatInteractionDelegate().recallMessage(messageId);
+    }
+
+    @Override
+    public void onAttachmentPickerRequested() {
+        attachmentPickerDelegate().onAttachmentPickerRequested();
+    }
+
+    @Override
+    public void onAttachmentPickerNodeSelected(String path, boolean directory) {
+        attachmentPickerDelegate().onAttachmentPickerNodeSelected(path, directory);
+    }
+
+    @Override
+    public void onAttachmentPickerCancelled() {
+        attachmentPickerDelegate().onAttachmentPickerCancelled();
+    }
+
+    @Override
+    public void onChatModeChanged(String mode) {
+        chatInteractionDelegate().changeChatMode(mode);
+    }
+
+    @Override
+    public void onStopGeneration() {
+        chatInteractionDelegate().stopGeneration();
+    }
+
+    @Override
+    public void onToolReview(String toolCallId, String state, String diffId) {
+        if (toolCallId == null || toolCallId.length() == 0) {
+            return;
+        }
+        if (generationFlowDelegate().isPendingToolReview(toolCallId)) {
+            generationFlowDelegate().handleToolReview(state);
+            return;
+        }
+        toolReviewDelegate().review(toolCallId, state, diffId);
+    }
+
+    @Override
+    public void onSheetOptionSelected(String id) {
+        overlayActionDelegate().handleSheetOption(id);
+    }
+
+    @Override
+    public List<ConversationRecord> getConversationMetas() {
+        return conversationStoreDelegate().getConversationMetas();
+    }
+
+    @Override
+    public String getCurrentConversationId() {
+        return chatSessionDelegate().getCurrentConversationId();
+    }
+
+    @Override
+    public FileTreeNode getFileTree() {
+        return fileTreeInteractionDelegate().getFileTree();
+    }
+
+    @Override
+    public boolean canRemoveCurrentProject() {
+        return projectWorkspaceDelegate().canRemoveCurrentProject();
+    }
+
+    @Override
+    public void onModelQuickSwitch(String modelId) {
+        modelInteractionDelegate().quickSwitch(modelId);
+    }
+
+    @Override
+    public void onModelTest(ModelConfig model) {
+        modelInteractionDelegate().testModel(model);
+    }
+
+    @Override
+    public void onExternalProjectTreePicked(String treeUri) {
+        projectWorkspaceDelegate().onExternalProjectTreePicked(treeUri);
+    }
+
+    @Override
+    public void onExternalProjectPickerCancelled() {
+        projectWorkspaceDelegate().onExternalProjectPickerCancelled();
+    }
+
+    @Override
+    public void onStoragePermissionResult() {
+        projectWorkspaceDelegate().onStoragePermissionResult();
     }
 
     @Override

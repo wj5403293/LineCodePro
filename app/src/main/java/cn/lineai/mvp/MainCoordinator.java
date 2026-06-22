@@ -114,7 +114,6 @@ public final class MainCoordinator implements MainUiController {
     private static final String TAG = "MainCoordinator";
     private static final long STREAM_RENDER_INTERVAL_MS = 80L;
     private static final long AGENT_PROGRESS_RENDER_INTERVAL_MS = 100L;
-    private static final String DIRECTORY_PICKER_MODE_SSH_REMOTE = "ssh_remote";
     private String agentTerminatedMessage() {
         return context.getString(R.string.message_agent_terminated);
     }
@@ -132,6 +131,11 @@ public final class MainCoordinator implements MainUiController {
     private final BackgroundTaskRunner backgroundTasks;
     private final ChatUiStateAssembler chatUiStateAssembler;
     private final ToolRunController toolRunController;
+    private final ToolMessageController toolMessageController;
+    private final ConversationPersistenceController conversationPersistenceController;
+    private final ExtensionDraftController extensionDraftController;
+    private final ModelPromptController modelPromptController;
+    private final DirectoryPickerController directoryPickerController;
     private final GenerationController generationController = new GenerationController();
     private final ModelManagementController modelManagementController;
     private final SettingsManagementController settingsManagementController;
@@ -252,13 +256,6 @@ public final class MainCoordinator implements MainUiController {
     private boolean pendingExternalProjectOpen;
     private PendingToolExecution pendingToolExecution;
     private String sessionAutoConfirmedConversationId = "";
-    private final Set<String> directoryPickerExpandedPaths = new HashSet<>();
-    private FileTreeNode directoryPickerTree;
-    private String directoryPickerMode = "";
-    private String directoryPickerSelectedPath = "";
-    private String directoryPickerRootPath = "";
-    private boolean directoryPickerLoading;
-    private String directoryPickerMessage = "";
     private final AttachmentPickerCoordinator attachmentPickerController;
     private boolean startupProjectAvailabilityChecked;
 
@@ -649,6 +646,129 @@ public final class MainCoordinator implements MainUiController {
                 contextManager
         );
         toolRunController = new ToolRunController(toolExecutionCoordinator, toolRegistry, toolSettingsRepository);
+        toolMessageController = new ToolMessageController(messages, this::nextId);
+        conversationPersistenceController = new ConversationPersistenceController(
+                context,
+                chatSessionStore,
+                messages,
+                conversationRepository,
+                aiBehaviorSettingsRepository,
+                learningContextRepository,
+                new ConversationPersistenceController.Host() {
+                    @Override
+                    public String projectPath() {
+                        return projectPath;
+                    }
+
+                    @Override
+                    public String defaultConversationTitle(Context context) {
+                        return context.getString(R.string.drawer_new_conversation);
+                    }
+                }
+        );
+        extensionDraftController = new ExtensionDraftController(
+                modelRepository,
+                modelClient,
+                toolRegistry,
+                toolSettingsRepository,
+                extensionRepository
+        );
+        modelPromptController = new ModelPromptController(
+                messages,
+                chatSessionStore,
+                aiBehaviorSettingsRepository,
+                chatModeRepository,
+                promptTemplateRepository,
+                learningContextRepository,
+                contextManager,
+                modelRepository,
+                extensionRepository,
+                systemPromptProvider,
+                toolSettingsRepository,
+                toolRegistry,
+                todoStateStore,
+                new ModelPromptController.Host() {
+                    @Override
+                    public String syncModePermission() {
+                        return MainCoordinator.this.syncModePermission();
+                    }
+
+                    @Override
+                    public String projectPath() {
+                        return projectPath;
+                    }
+
+                    @Override
+                    public String projectSource() {
+                        return projectSource;
+                    }
+
+                    @Override
+                    public boolean isTerminalProviderExecutionMode() {
+                        return MainCoordinator.this.isTerminalProviderExecutionMode();
+                    }
+                }
+        );
+        directoryPickerController = new DirectoryPickerController(
+                fileTreeRepository,
+                sshFileTreeRepository,
+                backgroundTasks::execute,
+                mainThread::post,
+                new DirectoryPickerController.Host() {
+                    @Override
+                    public boolean isViewAttached() {
+                        return view != null;
+                    }
+
+                    @Override
+                    public String projectPath() {
+                        return projectPath;
+                    }
+
+                    @Override
+                    public boolean isTermuxSshHost() {
+                        return MainCoordinator.this.isTermuxSshHost();
+                    }
+
+                    @Override
+                    public void applySelectedProject(String path, boolean ssh) {
+                        if (ssh) {
+                            ProjectRecord project = projectRepository.saveSshProject(path, WorkspacePaths.basename(path));
+                            applyProject(project);
+                            requestSshFileTreeLoad(true);
+                        } else {
+                            ProjectRecord project = projectRepository.saveExternalProject(path, WorkspacePaths.basename(path));
+                            applyProject(project);
+                        }
+                    }
+
+                    @Override
+                    public void hideDirectoryPicker() {
+                        if (view != null) {
+                            view.hideDirectoryPicker();
+                        }
+                    }
+
+                    @Override
+                    public void showDirectoryPicker(
+                            String title,
+                            String subtitle,
+                            FileTreeNode tree,
+                            String selectedPath,
+                            boolean loading,
+                            String message
+                    ) {
+                        if (view != null) {
+                            view.showDirectoryPicker(title, subtitle, tree, selectedPath, loading, message);
+                        }
+                    }
+
+                    @Override
+                    public void render() {
+                        MainCoordinator.this.render();
+                    }
+                }
+        );
         agentExecutionController = new AgentExecutionController(
                 modelClient,
                 aiBehaviorSettingsRepository,
@@ -893,45 +1013,17 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public void onDirectoryPickerNodeSelected(String path) {
-        if (path == null || path.length() == 0) {
-            return;
-        }
-        String selectedPath = path.trim();
-        directoryPickerRootPath = selectedPath;
-        directoryPickerSelectedPath = selectedPath;
-        directoryPickerExpandedPaths.clear();
-        directoryPickerExpandedPaths.add(selectedPath);
-        directoryPickerTree = rebuildDirectoryPickerTree(directoryPickerTree);
-        renderDirectoryPicker();
-        refreshDirectoryPicker();
+        directoryPickerController.onNodeSelected(path);
     }
 
     @Override
     public void onDirectoryPickerConfirmed() {
-        String selectedPath = directoryPickerSelectedPath == null ? "" : directoryPickerSelectedPath.trim();
-        if (selectedPath.length() == 0) {
-            return;
-        }
-        if (isSshDirectoryPicker()) {
-            ProjectRecord project = projectRepository.saveSshProject(selectedPath, WorkspacePaths.basename(selectedPath));
-            applyProject(project);
-            requestSshFileTreeLoad(true);
-        } else {
-            ProjectRecord project = projectRepository.saveExternalProject(selectedPath, WorkspacePaths.basename(selectedPath));
-            applyProject(project);
-        }
-        directoryPickerMode = "";
-        directoryPickerTree = null;
-        if (view != null) {
-            view.hideDirectoryPicker();
-        }
-        render();
+        directoryPickerController.onConfirmed();
     }
 
     @Override
     public void onDirectoryPickerCancelled() {
-        directoryPickerMode = "";
-        directoryPickerLoading = false;
+        directoryPickerController.onCancelled();
     }
 
     @Override
@@ -1787,66 +1879,12 @@ public final class MainCoordinator implements MainUiController {
 
     @Override
     public ExtensionAgentConfig onAgentDraftGenerated(String description) throws Exception {
-        ModelConfig selectedModel = modelRepository.getSelectedModel();
-        if (selectedModel == null) {
-            throw new IllegalStateException("缺少模型，请先在设置中添加并选择一个模型。");
-        }
-        String request = safe(description).trim();
-        if (request.length() == 0) {
-            throw new IllegalArgumentException("请先描述你想创建的 Agent。");
-        }
-        ArrayList<BaseTool> tools = getExtensionAvailableTools();
-        JSONArray toolList = new JSONArray();
-        HashSet<String> allowedTools = new HashSet<>();
-        for (BaseTool tool : tools) {
-            allowedTools.add(tool.getName());
-            toolList.put(new JSONObject()
-                    .put("name", tool.getName())
-                    .put("category", tool.getCategory().name().toLowerCase(Locale.ROOT))
-                    .put("description", tool.getDescription()));
-        }
-        JSONArray mcpList = agentMcpOptionsJson();
-        HashSet<String> allowedMcps = agentMcpOptionIds();
-        ArrayList<ModelMessage> messages = new ArrayList<>();
-        messages.add(new SystemModelMessage("你是 LineCode 的自定义 Agent 配置生成器。\n"
-                + "根据用户描述生成一个 Agent 配置草稿，只输出 JSON 对象，不要 Markdown，不要解释。\n"
-                + "JSON 字段必须是：name, slug, prompt, trigger, toolNames, mcpIds。\n"
-                + "name 使用简短中文名；slug 使用小写英文、数字、- 或 _，必须以小写字母开头。\n"
-                + "prompt 要写成可直接作为 Agent 系统提示词使用的中文说明，包含角色、任务边界、工作流程、输出要求和安全约束。\n"
-                + "trigger 用中文描述何时适合触发这个 Agent。\n"
-                + "toolNames 只能从可用工具 name 中选择；mcpIds 只能从可用 MCP id 中选择；不确定时优先选择 file_read 和 glob。"));
-        messages.add(new UserModelMessage(new JSONObject()
-                .put("userNeed", request)
-                .put("availableTools", toolList)
-                .put("availableMcp", mcpList)
-                .toString(2)));
-        ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
-        JSONObject draft = extractJsonObject(response.getText());
-        String name = draft.optString("name").trim();
-        String slug = normalizeAgentSlug(draft.optString("slug", name));
-        String prompt = draft.optString("prompt").trim();
-        String trigger = draft.optString("trigger").trim();
-        if (name.length() == 0 || slug.length() == 0 || prompt.length() == 0) {
-            throw new IllegalStateException("AI 返回的配置缺少 name、slug 或 prompt。");
-        }
-        List<String> selectedTools = filteredStringArray(draft.optJSONArray("toolNames"), allowedTools);
-        if (selectedTools.isEmpty()) {
-            selectedTools = defaultAgentTools(allowedTools);
-        }
-        List<String> selectedMcps = filteredStringArray(draft.optJSONArray("mcpIds"), allowedMcps);
-        return new ExtensionAgentConfig("", true, name, slug, prompt, trigger, selectedTools, selectedMcps, 0, 0);
+        return extensionDraftController.generateAgentDraft(description);
     }
 
     @Override
     public ArrayList<BaseTool> getExtensionAvailableTools() {
-        toolRegistry.reloadExtensions();
-        ArrayList<BaseTool> tools = new ArrayList<>();
-        for (BaseTool tool : toolRegistry.getAll()) {
-            if (tool != null && !ToolRegistry.isExtensionToolName(tool.getName())) {
-                tools.add(tool);
-            }
-        }
-        return tools;
+        return extensionDraftController.getAvailableTools();
     }
 
     @Override
@@ -1994,49 +2032,6 @@ public final class MainCoordinator implements MainUiController {
         return null;
     }
 
-    private JSONArray agentMcpOptionsJson() throws Exception {
-        JSONArray array = new JSONArray();
-        for (McpToolConfig config : toolSettingsRepository.getConfigs()) {
-            JSONArray tools = new JSONArray();
-            for (String tool : config.getTools()) {
-                tools.put(tool);
-            }
-            array.put(new JSONObject()
-                    .put("id", "builtin:" + config.getId())
-                    .put("name", config.getName())
-                    .put("description", tools.toString()));
-        }
-        for (ExtensionMcpConfig mcp : extensionRepository.getMcpExtensions()) {
-            if (!mcp.isEnabled()) {
-                continue;
-            }
-            JSONArray tools = new JSONArray();
-            for (McpToolSummary tool : mcp.getTools()) {
-                if (tool.isEnabled()) {
-                    tools.put(tool.getName());
-                }
-            }
-            array.put(new JSONObject()
-                    .put("id", "custom:" + mcp.getId())
-                    .put("name", mcp.getName())
-                    .put("description", tools.toString()));
-        }
-        return array;
-    }
-
-    private HashSet<String> agentMcpOptionIds() {
-        HashSet<String> ids = new HashSet<>();
-        for (McpToolConfig config : toolSettingsRepository.getConfigs()) {
-            ids.add("builtin:" + config.getId());
-        }
-        for (ExtensionMcpConfig mcp : extensionRepository.getMcpExtensions()) {
-            if (mcp.isEnabled()) {
-                ids.add("custom:" + mcp.getId());
-            }
-        }
-        return ids;
-    }
-
     private void reloadAfterLineCodeImport() {
         toolRegistry.reloadExtensions();
         applyProject(projectRepository.ensureSelectedProjectPath(toolSettingsRepository.getExecutionMode()));
@@ -2052,89 +2047,6 @@ public final class MainCoordinator implements MainUiController {
         }
         refreshVisibleScreen("data");
         render();
-    }
-
-    private JSONObject extractJsonObject(String text) throws Exception {
-        String source = safe(text);
-        int fenceStart = source.indexOf("```");
-        if (fenceStart >= 0) {
-            int contentStart = source.indexOf('\n', fenceStart);
-            int fenceEnd = contentStart < 0 ? -1 : source.indexOf("```", contentStart + 1);
-            if (contentStart >= 0 && fenceEnd > contentStart) {
-                source = source.substring(contentStart + 1, fenceEnd);
-            }
-        }
-        int start = source.indexOf('{');
-        int end = source.lastIndexOf('}');
-        if (start < 0 || end <= start) {
-            throw new IllegalStateException("AI 没有返回有效 JSON。");
-        }
-        return new JSONObject(source.substring(start, end + 1));
-    }
-
-    private List<String> filteredStringArray(JSONArray array, Set<String> allowed) {
-        if (array == null || allowed == null || allowed.isEmpty()) {
-            return Collections.emptyList();
-        }
-        ArrayList<String> values = new ArrayList<>();
-        for (int i = 0; i < array.length(); i++) {
-            String value = array.optString(i).trim();
-            if (allowed.contains(value) && !values.contains(value)) {
-                values.add(value);
-            }
-        }
-        return values;
-    }
-
-    private List<String> defaultAgentTools(Set<String> allowed) {
-        ArrayList<String> values = new ArrayList<>();
-        if (allowed.contains("file_read")) {
-            values.add("file_read");
-        }
-        if (allowed.contains("glob")) {
-            values.add("glob");
-        }
-        if (values.isEmpty() && !allowed.isEmpty()) {
-            values.add(allowed.iterator().next());
-        }
-        return values;
-    }
-
-    private String normalizeAgentSlug(String value) {
-        String raw = safe(value).trim().toLowerCase(Locale.ROOT);
-        StringBuilder builder = new StringBuilder();
-        boolean lastDash = false;
-        for (int i = 0; i < raw.length() && builder.length() < 48; i++) {
-            char ch = raw.charAt(i);
-            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_') {
-                builder.append(ch);
-                lastDash = false;
-            } else if (ch == '-') {
-                if (!lastDash && builder.length() > 0) {
-                    builder.append(ch);
-                    lastDash = true;
-                }
-            } else if (!lastDash && builder.length() > 0) {
-                builder.append('-');
-                lastDash = true;
-            }
-        }
-        String clean = builder.toString();
-        while (clean.endsWith("-") || clean.endsWith("_")) {
-            clean = clean.substring(0, clean.length() - 1);
-        }
-        if (clean.length() == 0) {
-            clean = "custom-agent";
-        }
-        char first = clean.charAt(0);
-        if (first < 'a' || first > 'z') {
-            clean = "agent-" + clean;
-        }
-        return clean;
-    }
-
-    private String safe(String value) {
-        return value == null ? "" : value;
     }
 
     @Override
@@ -2348,21 +2260,6 @@ public final class MainCoordinator implements MainUiController {
         sshFileTreeController.invalidateFileTree();
     }
 
-    private void requestOpenExternalProject() {
-        if (view == null) {
-            return;
-        }
-        if (isSshExecutionMode()) {
-            startSshDirectoryPicker();
-            return;
-        }
-        requestOpenLocalProjectForCurrentMode();
-    }
-
-    private void requestOpenLocalProjectForCurrentMode() {
-        requestOpenLocalProjectSaf();
-    }
-
     private void requestOpenLocalProjectSaf() {
         pendingExternalProjectOpen = true;
         if (view == null) {
@@ -2426,130 +2323,8 @@ public final class MainCoordinator implements MainUiController {
         }
     }
 
-    private void startLocalDirectoryPicker(String mode) {
-        directoryPickerMode = ToolSettingsRepository.normalizeExecutionMode(mode);
-        directoryPickerRootPath = defaultExternalStorageRoot();
-        directoryPickerSelectedPath = directoryPickerRootPath;
-        directoryPickerExpandedPaths.clear();
-        directoryPickerExpandedPaths.add(directoryPickerRootPath);
-        refreshDirectoryPicker();
-    }
-
     private void startSshDirectoryPicker() {
-        directoryPickerMode = DIRECTORY_PICKER_MODE_SSH_REMOTE;
-        directoryPickerRootPath = projectPath.length() == 0 ? "." : projectPath;
-        directoryPickerSelectedPath = directoryPickerRootPath;
-        directoryPickerExpandedPaths.clear();
-        directoryPickerExpandedPaths.add(directoryPickerRootPath);
-        refreshDirectoryPicker();
-    }
-
-    private void refreshDirectoryPicker() {
-        if (view == null || directoryPickerMode.length() == 0) {
-            return;
-        }
-        if (isRemoteSshDirectoryPicker()) {
-            refreshSshDirectoryPicker();
-            return;
-        }
-        try {
-            directoryPickerLoading = false;
-            directoryPickerMessage = "";
-            directoryPickerTree = fileTreeRepository.buildReadableTree(directoryPickerRootPath, directoryPickerExpandedPaths);
-        } catch (RuntimeException e) {
-            directoryPickerTree = null;
-            directoryPickerMessage = e.getMessage();
-        }
-        renderDirectoryPicker();
-    }
-
-    private void refreshSshDirectoryPicker() {
-        directoryPickerLoading = true;
-        directoryPickerMessage = "正在读取 SSH 目录...";
-        renderDirectoryPicker();
-        String root = directoryPickerRootPath;
-        HashSet<String> expanded = new HashSet<>(directoryPickerExpandedPaths);
-        backgroundTasks.execute("linecode-ssh-directory-picker", () -> {
-            try {
-                FileTreeNode tree = sshFileTreeRepository.buildTree(root, expanded);
-                mainThread.post(() -> {
-                    directoryPickerTree = tree;
-                    String previousRoot = directoryPickerRootPath;
-                    String previousSelected = directoryPickerSelectedPath;
-                    directoryPickerRootPath = tree.getPath();
-                    if (directoryPickerSelectedPath.length() == 0
-                            || isSamePickerPath(previousSelected, root)
-                            || isSshHomeAlias(previousSelected)) {
-                        directoryPickerSelectedPath = tree.getPath();
-                    }
-                    if (isSamePickerPath(previousRoot, root) || isSshHomeAlias(previousRoot)) {
-                        directoryPickerExpandedPaths.add(tree.getPath());
-                    }
-                    directoryPickerExpandedPaths.add(tree.getPath());
-                    directoryPickerTree = rebuildDirectoryPickerTree(directoryPickerTree);
-                    directoryPickerLoading = false;
-                    directoryPickerMessage = "";
-                    renderDirectoryPicker();
-                });
-            } catch (Exception e) {
-                mainThread.post(() -> {
-                    directoryPickerLoading = false;
-                    directoryPickerMessage = e.getMessage();
-                    renderDirectoryPicker();
-                });
-            }
-        });
-    }
-
-    private FileTreeNode rebuildDirectoryPickerTree(FileTreeNode node) {
-        if (node == null) {
-            return null;
-        }
-        ArrayList<FileTreeNode> children = new ArrayList<>();
-        List<FileTreeNode> rawChildren = node.getChildren();
-        for (int i = 0; i < rawChildren.size(); i++) {
-            children.add(rebuildDirectoryPickerTree(rawChildren.get(i)));
-        }
-        boolean expanded = node.isDirectory()
-                && (node.isExpanded() || directoryPickerExpandedPaths.contains(node.getPath()));
-        return new FileTreeNode(node.getName(), node.getPath(), node.isDirectory(), expanded, children);
-    }
-
-    private String normalizePickerPath(String path) {
-        String value = path == null ? "" : path.trim();
-        while (value.length() > 1 && value.endsWith("/")) {
-            value = value.substring(0, value.length() - 1);
-        }
-        return value;
-    }
-
-    private boolean isSamePickerPath(String left, String right) {
-        return normalizePickerPath(left).equals(normalizePickerPath(right));
-    }
-
-    private boolean isSshHomeAlias(String path) {
-        String value = path == null ? "" : path.trim();
-        return value.length() == 0 || ".".equals(value) || "~".equals(value);
-    }
-
-    private void renderDirectoryPicker() {
-        if (view == null) {
-            return;
-        }
-        boolean sshMode = isSshDirectoryPicker();
-        String title = sshMode ? "选择 SSH 工作区" : "选择本地工作区";
-        String subtitle = directoryPickerSelectedPath.length() == 0 ? directoryPickerRootPath : directoryPickerSelectedPath;
-        view.showDirectoryPicker(title, subtitle, directoryPickerTree, directoryPickerSelectedPath, directoryPickerLoading, directoryPickerMessage);
-    }
-
-    private boolean isRemoteSshDirectoryPicker() {
-        return DIRECTORY_PICKER_MODE_SSH_REMOTE.equals(directoryPickerMode)
-                || (ToolSettingsRepository.EXECUTION_SSH.equals(directoryPickerMode) && !isTermuxSshHost());
-    }
-
-    private boolean isSshDirectoryPicker() {
-        return DIRECTORY_PICKER_MODE_SSH_REMOTE.equals(directoryPickerMode)
-                || ToolSettingsRepository.EXECUTION_SSH.equals(directoryPickerMode);
+        directoryPickerController.startSsh();
     }
 
     private void requestSshFileTreeLoad(boolean force) {
@@ -2697,15 +2472,6 @@ public final class MainCoordinator implements MainUiController {
         }
     }
 
-    private String defaultExternalStorageRoot() {
-        File primary = new File("/storage/emulated/0");
-        if (primary.isDirectory()) {
-            return primary.getAbsolutePath();
-        }
-        File storage = new File("/storage");
-        return storage.isDirectory() ? storage.getAbsolutePath() : "/";
-    }
-
     private String basename(String path) {
         return WorkspacePaths.basename(path == null ? "" : path);
     }
@@ -2747,64 +2513,11 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private ArrayList<ModelMessage> buildModelMessages(String userInput) {
-        return buildModelMessages(userInput, 0);
+        return modelPromptController.buildModelMessages(userInput);
     }
 
     private ArrayList<ModelMessage> buildModelMessages(String userInput, int usedToolCallCount) {
-        ArrayList<ModelMessage> modelMessages = new ArrayList<>();
-        String activeChatMode = syncModePermission();
-        AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
-        String learningContext = aiSettings.isLearningModeEnabled()
-                ? learningContextRepository.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
-                : "";
-        ModelConfig selectedModel = modelRepository.getSelectedModel();
-        String promptHomePath = promptHomePath();
-        String extensionContext = extensionRepository.buildExtensionPrompt(projectPath);
-        String attachmentContext = buildAttachmentPrompt(messages);
-        String systemContext = joinPromptContext(joinPromptContext(learningContext, attachmentContext), extensionContext);
-        String systemPrompt = systemPromptProvider.build(
-                promptHomePath,
-                aiSettings.getToneMode(),
-                chatModePromptContext(activeChatMode),
-                systemContext,
-                buildToolPrompt(selectedModel, usedToolCallCount),
-                selectedModel,
-                renderTodoStateForPrompt()
-        );
-        modelMessages.add(new SystemModelMessage(systemPrompt));
-        int contextTokens = selectedModel == null
-                ? ModelContextParser.parse("").getContextTokens()
-                : ModelContextParser.parse(selectedModel.getModelId()).getContextTokens();
-        int reservedTokens = contextManager.estimateTokens(systemPrompt) + 2048;
-        boolean includeReasoning = aiSettings.isPreserveReasoningEnabled();
-        List<ChatMessage> contextWindow = contextManager.selectWindow(messages, contextTokens, reservedTokens, includeReasoning);
-        for (ChatMessage message : contextWindow) {
-            modelMessages.add(toModelMessage(message, includeReasoning));
-        }
-        return modelMessages;
-    }
-
-    private String renderTodoStateForPrompt() {
-        if (todoStateStore == null || todoStateStore.isEmpty()) {
-            return "";
-        }
-        java.util.List<cn.lineai.model.TodoItem> snapshot = todoStateStore.snapshot();
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < snapshot.size(); i++) {
-            cn.lineai.model.TodoItem item = snapshot.get(i);
-            if (item == null) {
-                continue;
-            }
-            builder.append(i + 1)
-                    .append(". [")
-                    .append(item.getStatus())
-                    .append("] ")
-                    .append(item.getContent());
-            if (i < snapshot.size() - 1) {
-                builder.append('\n');
-            }
-        }
-        return builder.toString();
+        return modelPromptController.buildModelMessages(userInput, usedToolCallCount);
     }
 
     private void resetTodoState() {
@@ -2813,125 +2526,8 @@ public final class MainCoordinator implements MainUiController {
         }
     }
 
-    private String chatModePromptContext(String mode) {
-        String normalized = ChatMode.normalize(mode);
-        if (ChatMode.CHAT.equals(normalized)) {
-            return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_CHAT);
-        }
-        if (ChatMode.PLAN.equals(normalized)) {
-            return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_PLAN);
-        }
-        if (ChatMode.CONTROL.equals(normalized)) {
-            return ChatMode.promptContext(ChatMode.CONTROL);
-        }
-        return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_AGENT);
-    }
-
-    private ModelMessage toModelMessage(ChatMessage message, boolean includeReasoning) {
-        if (message.getRole() == ChatMessage.Role.SYSTEM) {
-            return new SystemModelMessage(message.getContent());
-        }
-        if (message.getRole() == ChatMessage.Role.TOOL) {
-            return new ToolModelMessage(
-                    modelToolContent(message),
-                    message.getToolCallId(),
-                    message.getToolName(),
-                    message.isError()
-            );
-        }
-        if (message.getRole() == ChatMessage.Role.USER) {
-            return new UserModelMessage(message.getContent(), message.getResponseInputItemJson());
-        }
-        return new AssistantModelMessage(MessageContentSanitizer.forModel(message),
-                includeReasoning ? message.getReasoningContent() : "",
-                message.getToolCalls());
-    }
-
-    private String buildToolPrompt(ModelConfig selectedModel, int usedToolCallCount) {
-        syncModePermission();
-        if (!hasRemainingToolCalls(selectedModel, usedToolCallCount)) {
-            return "## 可用工具\n当前模型的工具调用次数限制已用尽，当前没有可用工具。";
-        }
-        toolRegistry.reloadExtensions();
-        String prompt = toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), supportsNativeTools(selectedModel));
-        int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
-        if (limit == ModelConfig.UNLIMITED_TOOL_CALLS) {
-            return prompt + "\n\n工具调用次数限制：不限制。";
-        }
-        int used = Math.max(0, usedToolCallCount);
-        int remaining = Math.max(0, limit - used);
-        return prompt + "\n\n工具调用次数限制：最多 " + limit + " 次；已使用 " + used + " 次；剩余 " + remaining + " 次。";
-    }
-
-    private String buildAttachmentPrompt(List<ChatMessage> history) {
-        if (history == null || history.isEmpty()) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        int sectionCount = 0;
-        for (ChatMessage message : history) {
-            if (message == null || message.getRole() != ChatMessage.Role.USER || !message.hasAttachments()) {
-                continue;
-            }
-            String label = recallText(message.getContent(), message.getAttachments()).trim();
-            if (label.length() == 0) {
-                label = "用户消息 " + (sectionCount + 1);
-            }
-            if (builder.length() > 0) {
-                builder.append("\n\n");
-            }
-            builder.append("### ").append(label).append('\n');
-            for (InputAttachment attachment : message.getAttachments()) {
-                builder.append("- ")
-                        .append(attachment.getName())
-                        .append(" (")
-                        .append(attachment.getSource())
-                        .append("): ")
-                        .append(attachment.getPath())
-                        .append('\n');
-            }
-            sectionCount++;
-        }
-        if (sectionCount == 0) {
-            return "";
-        }
-        return "## 附加文件位置\n"
-                + "这些路径来自用户在输入框左侧选择的文件；除非用户明确要求，不要在回复中原样复述。\n"
-                + builder.toString().trim();
-    }
-
-    private String joinPromptContext(String first, String second) {
-        String left = first == null ? "" : first.trim();
-        String right = second == null ? "" : second.trim();
-        if (left.length() == 0) {
-            return right;
-        }
-        if (right.length() == 0) {
-            return left;
-        }
-        return left + "\n\n" + right;
-    }
-
     private String promptHomePath() {
-        if (isTerminalProviderExecutionMode() && projectPath.length() == 0) {
-            return "~";
-        }
-        if (WorkspacePaths.SOURCE_SSH.equals(projectSource) && projectPath.length() == 0) {
-            return "~";
-        }
-        return projectPath;
-    }
-
-    private boolean supportsNativeTools(ModelConfig selectedModel) {
-        if (selectedModel == null) {
-            return false;
-        }
-        ModelProtocolType type = selectedModel.getProtocolType();
-        if (type == ModelProtocolType.OPENAI_COMPATIBLE) {
-            return OpenAiCompatibleCapabilities.supportsNativeTools(selectedModel);
-        }
-        return type == ModelProtocolType.ANTHROPIC_MESSAGES
-                || type == ModelProtocolType.CODEX_RESPONSES;
+        return modelPromptController.promptHomePath();
     }
 
     private void appendAssistantDelta(int generationId, String assistantId, String textDelta, String reasoningDelta) {
@@ -2980,21 +2576,8 @@ public final class MainCoordinator implements MainUiController {
         render();
     }
 
-    private String modelToolContent(ChatMessage message) {
-        return MessageContentSanitizer.toolContentForModel(message);
-    }
-
     private ModelRequestOptions requestOptions(AiBehaviorSettings aiSettings, ModelConfig selectedModel, int usedToolCallCount) {
-        syncModePermission();
-        toolRegistry.reloadExtensions();
-        Set<String> enabledToolNames = toolSettingsRepository.getEnabledToolNames(toolRegistry.getAll());
-        return new ModelRequestOptions(
-                aiSettings.getReasoningEffort(),
-                aiSettings.isPreserveReasoningEnabled(),
-                hasRemainingToolCalls(selectedModel, usedToolCallCount)
-                        ? toolRegistry.getByNameSet(enabledToolNames)
-                        : new ArrayList<BaseTool>()
-        );
+        return modelPromptController.requestOptions(aiSettings, selectedModel, usedToolCallCount);
     }
 
     private void finishGeneration(
@@ -3548,100 +3131,15 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private void addOrReplaceToolResults(List<ToolResult> results) {
-        if (results == null) {
-            return;
-        }
-        for (ToolResult result : results) {
-            addOrReplaceToolResult(result);
-        }
+        toolMessageController.addOrReplaceToolResults(results);
     }
 
     private void addOrReplaceToolResult(ToolResult result) {
-        if (result == null || result.getToolCallId().length() == 0) {
-            return;
-        }
-        int index = findToolMessageIndex(result.getToolCallId());
-        String messageId = index >= 0 ? messages.get(index).getId() : nextId();
-        ChatMessage message = ChatMessage.toolResult(
-                messageId,
-                result.getContent(),
-                result.getToolCallId(),
-                result.getToolName(),
-                result.isError(),
-                result.getDiffId(),
-                result.getReviewState(),
-                result.getReviewMessage()
-        );
-        if (index >= 0) {
-            messages.set(index, message);
-        } else {
-            messages.add(message);
-        }
-        appendInlineToolResultToAssistant(result);
-    }
-
-    private void appendInlineToolResultToAssistant(ToolResult result) {
-        if (!isFinalSuccessfulImageGenerationResult(result)) {
-            return;
-        }
-        String markdown = imageGenerationDisplayMarkdown(result.getContent());
-        if (markdown.length() == 0) {
-            return;
-        }
-        int assistantIndex = findAssistantMessageIndexForToolCall(result.getToolCallId());
-        if (assistantIndex < 0) {
-            return;
-        }
-        ChatMessage assistant = messages.get(assistantIndex);
-        if (assistant.getContent().contains(markdown)) {
-            return;
-        }
-        String current = assistant.getContent().trim();
-        String nextContent = current.length() == 0 ? markdown : current + "\n\n" + markdown;
-        messages.set(assistantIndex, assistant.withContent(nextContent, assistant.getReasoningContent(), assistant.isStreaming()));
-    }
-
-    private boolean isFinalSuccessfulImageGenerationResult(ToolResult result) {
-        return result != null
-                && "image_generation".equals(result.getToolName())
-                && !result.isError()
-                && result.getContent().trim().length() > 0
-                && result.getReviewState().length() == 0;
-    }
-
-    private String imageGenerationDisplayMarkdown(String content) {
-        return MessageContentSanitizer.imageGenerationDisplayMarkdown(content);
+        toolMessageController.addOrReplaceToolResult(result);
     }
 
     private int findToolMessageIndex(String toolCallId) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return -1;
-        }
-        for (int i = 0; i < messages.size(); i++) {
-            ChatMessage message = messages.get(i);
-            if (message.getRole() == ChatMessage.Role.TOOL && toolCallId.equals(message.getToolCallId())) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private int findAssistantMessageIndexForToolCall(String toolCallId) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return -1;
-        }
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessage message = messages.get(i);
-            if (message.getRole() != ChatMessage.Role.ASSISTANT || !message.hasToolCalls()) {
-                continue;
-            }
-            for (ToolCall call : message.getToolCalls()) {
-                if (toolCallId.equals(call.getId())) {
-                    return i;
-                }
-            }
-        }
-        return -1;
+        return toolMessageController.findToolMessageIndex(toolCallId);
     }
 
     private String rejectedToolMessage(ToolCall call) {
@@ -3853,197 +3351,11 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private String findToolMessageDiffId(String toolCallId) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return "";
-        }
-        for (ChatMessage message : messages) {
-            if (message.getRole() == ChatMessage.Role.TOOL
-                    && toolCallId.equals(message.getToolCallId())
-                    && message.getDiffId().length() > 0) {
-                return message.getDiffId();
-            }
-            if (message.getRole() == ChatMessage.Role.TOOL) {
-                String nestedDiffId = findNestedToolDiffId(message.getContent(), toolCallId);
-                if (nestedDiffId.length() > 0) {
-                    return nestedDiffId;
-                }
-            }
-        }
-        return "";
+        return toolMessageController.findToolMessageDiffId(toolCallId);
     }
 
     private void updateToolReview(String toolCallId, String diffId, String reviewState, String reviewMessage) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return;
-        }
-        for (int i = 0; i < messages.size(); i++) {
-            ChatMessage message = messages.get(i);
-            ChatMessage next = message;
-            if (message.getRole() == ChatMessage.Role.TOOL && toolCallId.equals(message.getToolCallId())) {
-                String resolvedDiffId = diffId == null || diffId.length() == 0 ? message.getDiffId() : diffId;
-                next = next.withToolReview(resolvedDiffId, reviewState, reviewMessage);
-            }
-            if (message.getRole() == ChatMessage.Role.TOOL) {
-                String updatedContent = updateNestedToolReviewContent(
-                        next.getContent(),
-                        toolCallId,
-                        diffId,
-                        reviewState,
-                        reviewMessage
-                );
-                if (!updatedContent.equals(next.getContent())) {
-                    next = next.withContent(updatedContent, next.getReasoningContent(), next.isStreaming());
-                }
-            }
-            if (next != message) {
-                messages.set(i, next);
-            }
-        }
-    }
-
-    private String findNestedToolDiffId(String content, String toolCallId) {
-        if (content == null || content.trim().length() == 0) {
-            return "";
-        }
-        try {
-            return findNestedToolDiffId(new JSONObject(content), toolCallId);
-        } catch (Exception ignored) {
-            return "";
-        }
-    }
-
-    private String findNestedToolDiffId(JSONObject object, String toolCallId) {
-        if (object == null) {
-            return "";
-        }
-        String diffId = findToolCallArrayDiffId(object.optJSONArray("tool_calls"), toolCallId);
-        if (diffId.length() > 0) {
-            return diffId;
-        }
-        JSONArray agents = object.optJSONArray("agents");
-        if (agents == null) {
-            return "";
-        }
-        for (int i = 0; i < agents.length(); i++) {
-            JSONObject agent = agents.optJSONObject(i);
-            diffId = findToolCallArrayDiffId(agent == null ? null : agent.optJSONArray("tool_calls"), toolCallId);
-            if (diffId.length() > 0) {
-                return diffId;
-            }
-        }
-        return "";
-    }
-
-    private String findToolCallArrayDiffId(JSONArray calls, String toolCallId) {
-        if (calls == null) {
-            return "";
-        }
-        for (int i = 0; i < calls.length(); i++) {
-            JSONObject item = calls.optJSONObject(i);
-            if (item == null) {
-                continue;
-            }
-            if (toolCallId.equals(item.optString("id"))) {
-                JSONObject result = item.optJSONObject("result");
-                return result == null ? "" : result.optString("diff_id");
-            }
-            String diffId = findNestedToolDiffId(item, toolCallId);
-            if (diffId.length() > 0) {
-                return diffId;
-            }
-        }
-        return "";
-    }
-
-    private String updateNestedToolReviewContent(
-            String content,
-            String toolCallId,
-            String diffId,
-            String reviewState,
-            String reviewMessage
-    ) {
-        if (content == null || content.trim().length() == 0) {
-            return content == null ? "" : content;
-        }
-        try {
-            JSONObject object = new JSONObject(content);
-            return updateNestedToolReview(object, toolCallId, diffId, reviewState, reviewMessage)
-                    ? object.toString()
-                    : content;
-        } catch (Exception ignored) {
-            return content;
-        }
-    }
-
-    private boolean updateNestedToolReview(
-            JSONObject object,
-            String toolCallId,
-            String diffId,
-            String reviewState,
-            String reviewMessage
-    ) throws Exception {
-        if (object == null) {
-            return false;
-        }
-        boolean changed = updateToolCallArrayReview(
-                object.optJSONArray("tool_calls"),
-                toolCallId,
-                diffId,
-                reviewState,
-                reviewMessage
-        );
-        JSONArray agents = object.optJSONArray("agents");
-        if (agents != null) {
-            for (int i = 0; i < agents.length(); i++) {
-                JSONObject agent = agents.optJSONObject(i);
-                if (agent == null) {
-                    continue;
-                }
-                changed = updateToolCallArrayReview(
-                        agent.optJSONArray("tool_calls"),
-                        toolCallId,
-                        diffId,
-                        reviewState,
-                        reviewMessage
-                ) || changed;
-            }
-        }
-        return changed;
-    }
-
-    private boolean updateToolCallArrayReview(
-            JSONArray calls,
-            String toolCallId,
-            String diffId,
-            String reviewState,
-            String reviewMessage
-    ) throws Exception {
-        if (calls == null) {
-            return false;
-        }
-        boolean changed = false;
-        for (int i = 0; i < calls.length(); i++) {
-            JSONObject item = calls.optJSONObject(i);
-            if (item == null) {
-                continue;
-            }
-            if (toolCallId.equals(item.optString("id"))) {
-                JSONObject result = item.optJSONObject("result");
-                if (result == null) {
-                    result = new JSONObject();
-                    item.put("result", result);
-                }
-                String resolvedDiffId = diffId == null || diffId.length() == 0
-                        ? result.optString("diff_id")
-                        : diffId;
-                result.put("diff_id", resolvedDiffId == null ? "" : resolvedDiffId);
-                result.put("review_state", reviewState == null ? "" : reviewState);
-                result.put("review_message", reviewMessage == null ? "" : reviewMessage);
-                changed = true;
-            }
-            changed = updateNestedToolReview(item, toolCallId, diffId, reviewState, reviewMessage) || changed;
-        }
-        return changed;
+        toolMessageController.updateToolReview(toolCallId, diffId, reviewState, reviewMessage);
     }
 
     private void refreshFileTreeAfterRevert(String filePath) {
@@ -4060,80 +3372,28 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private void loadCurrentConversation() {
-        ConversationRecord conversation = conversationRepository.getCurrentConversation();
-        if (conversation != null) {
-            applyConversation(conversation);
-        }
+        conversationPersistenceController.loadCurrentConversation();
     }
 
     private void loadConversation(String id) {
-        ConversationRecord conversation = conversationRepository.getConversation(id);
-        if (conversation == null) {
-            return;
-        }
-        applyConversation(conversation);
-        conversationRepository.setCurrentConversationId(conversation.getId());
+        conversationPersistenceController.loadConversation(id);
         lastMessageModelId = "";
     }
 
     private void applyConversation(ConversationRecord conversation) {
-        chatSessionStore.applyConversation(conversation);
+        conversationPersistenceController.applyConversation(conversation);
     }
 
     private void ensureCurrentConversation() {
-        chatSessionStore.ensureCurrentConversation(System.currentTimeMillis());
+        conversationPersistenceController.ensureCurrentConversation();
     }
 
     private void persistCurrentConversation() {
-        String currentConversationId = chatSessionStore.getCurrentConversationId();
-        if (currentConversationId.length() == 0) {
-            return;
-        }
-        if (messages.isEmpty()) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        ArrayList<MessageRecord> records = new ArrayList<>();
-        for (ChatMessage message : messages) {
-            records.add(new MessageRecord(
-                    message.getId(),
-                    message.getRole(),
-                    message.getContent(),
-                    message.getReasoningContent(),
-                    now,
-                    false,
-                    message.isHidden(),
-                    message.isExcludeFromContext(),
-                    message.getToolCallId(),
-                    message.getToolName(),
-                    message.isError(),
-                    messageRawJson(message)
-            ));
-        }
-        ConversationRecord conversation = new ConversationRecord(
-                currentConversationId,
-                deriveTitle(),
-                projectPath,
-                chatSessionStore.getCurrentConversationCreatedAt() > 0 ? chatSessionStore.getCurrentConversationCreatedAt() : now,
-                now,
-                true,
-                "",
-                records
-        );
-        conversationRepository.saveConversation(conversation);
-        if (aiBehaviorSettingsRepository.get().isLearningModeEnabled()) {
-            learningContextRepository.indexConversation(projectPath, conversation);
-        }
+        conversationPersistenceController.persistCurrentConversation();
     }
 
     private String deriveTitle() {
-        for (ChatMessage message : messages) {
-            if (message.getRole() == ChatMessage.Role.USER && message.getContent().trim().length() > 0) {
-                String firstLine = message.getContent().trim().replace('\n', ' ');
-                return firstLine.length() > 28 ? firstLine.substring(0, 28) + "..." : firstLine;
-            }
-        }
-        return context.getString(R.string.drawer_new_conversation);
+        return conversationPersistenceController.deriveTitle();
     }
 
     private String nextId() {
@@ -4141,46 +3401,7 @@ public final class MainCoordinator implements MainUiController {
     }
 
     private String messageRawJson(ChatMessage message) {
-        if (message == null) {
-            return "";
-        }
-        try {
-            JSONObject object = new JSONObject();
-            if (message.getRole() == ChatMessage.Role.TOOL) {
-                object.put("diff_id", message.getDiffId());
-                object.put("review_state", message.getReviewState());
-                object.put("review_message", message.getReviewMessage());
-            }
-            if (message.hasToolCalls()) {
-                JSONArray array = new JSONArray();
-                for (ToolCall call : message.getToolCalls()) {
-                    array.put(new JSONObject()
-                            .put("id", call.getId())
-                            .put("name", call.getName())
-                            .put("arguments", call.getArguments()));
-                }
-                object.put("tool_calls", array);
-            }
-            if (message.isCompactBlock()) {
-                object.put("compact_status", message.getCompactStatus());
-            }
-            if (message.getResponseInputItemJson().length() > 0) {
-                object.put("response_input_item_json", message.getResponseInputItemJson());
-            }
-            if (message.hasAttachments()) {
-                JSONArray array = new JSONArray();
-                for (InputAttachment attachment : message.getAttachments()) {
-                    array.put(new JSONObject()
-                            .put("name", attachment.getName())
-                            .put("path", attachment.getPath())
-                            .put("source", attachment.getSource()));
-                }
-                object.put("attachments", array);
-            }
-            return object.length() == 0 ? "" : object.toString();
-        } catch (Exception ignored) {
-            return "";
-        }
+        return conversationPersistenceController.messageRawJson(message);
     }
 
     @Override

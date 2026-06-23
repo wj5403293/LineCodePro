@@ -72,23 +72,96 @@ public final class ContextManager {
         int used = 0;
 
         for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessage message = messages.get(i);
-            if (message.isExcludeFromContext()
-                    || (message.getContent().trim().length() == 0
-                    && message.getReasoningContent().trim().length() == 0
-                    && !message.hasToolCalls())) {
+            MessageGroup group = groupEndingAt(messages, i, includeReasoning);
+            if (group.isEmpty()) {
                 continue;
             }
-            int cost = estimateTokens(message, includeReasoning);
-            if (!selected.isEmpty() && used + cost > budget) {
+            if (!selected.isEmpty() && used + group.cost > budget) {
                 break;
             }
-            selected.add(message);
-            used += cost;
+            for (int j = group.messages.size() - 1; j >= 0; j--) {
+                selected.add(group.messages.get(j));
+            }
+            used += group.cost;
+            i = group.startIndex;
         }
 
         Collections.reverse(selected);
         return selected;
+    }
+
+    private MessageGroup groupEndingAt(List<ChatMessage> messages, int endIndex, boolean includeReasoning) {
+        ChatMessage message = messages.get(endIndex);
+        if (!isContextMessage(message)) {
+            return MessageGroup.empty(endIndex);
+        }
+        int startIndex = endIndex;
+        if (message.getRole() == ChatMessage.Role.TOOL) {
+            String toolCallId = message.getToolCallId();
+            for (int i = endIndex - 1; i >= 0; i--) {
+                ChatMessage candidate = messages.get(i);
+                if (candidate.getRole() == ChatMessage.Role.ASSISTANT && candidate.hasToolCalls()
+                        && hasToolCall(candidate, toolCallId)) {
+                    startIndex = i;
+                    break;
+                }
+                if (candidate.getRole() != ChatMessage.Role.TOOL || !isContextMessage(candidate)) {
+                    break;
+                }
+            }
+        }
+        ArrayList<ChatMessage> group = new ArrayList<>();
+        int cost = 0;
+        for (int i = startIndex; i <= endIndex; i++) {
+            ChatMessage current = messages.get(i);
+            if (!isContextMessage(current)) {
+                continue;
+            }
+            group.add(current);
+            cost += estimateTokens(current, includeReasoning);
+        }
+        return new MessageGroup(startIndex, group, cost);
+    }
+
+    private boolean isContextMessage(ChatMessage message) {
+        return message != null
+                && !message.isExcludeFromContext()
+                && (message.getContent().trim().length() > 0
+                || message.getReasoningContent().trim().length() > 0
+                || message.hasToolCalls()
+                || message.getRole() == ChatMessage.Role.TOOL);
+    }
+
+    private boolean hasToolCall(ChatMessage message, String toolCallId) {
+        if (message == null || toolCallId == null || toolCallId.length() == 0) {
+            return false;
+        }
+        for (cn.lineai.tool.ToolCall call : message.getToolCalls()) {
+            if (call != null && toolCallId.equals(call.getId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static final class MessageGroup {
+        private final int startIndex;
+        private final ArrayList<ChatMessage> messages;
+        private final int cost;
+
+        MessageGroup(int startIndex, ArrayList<ChatMessage> messages, int cost) {
+            this.startIndex = startIndex;
+            this.messages = messages;
+            this.cost = cost;
+        }
+
+        static MessageGroup empty(int index) {
+            return new MessageGroup(index, new ArrayList<>(), 0);
+        }
+
+        boolean isEmpty() {
+            return messages.isEmpty();
+        }
     }
 
     private int estimateToolCalls(ChatMessage message) {

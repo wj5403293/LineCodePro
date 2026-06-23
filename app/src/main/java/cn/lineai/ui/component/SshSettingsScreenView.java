@@ -112,7 +112,7 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     setTesting(false);
-                    setStatus(context.getString(R.string.screen_ssh_status_failed_title), e.getMessage(), true);
+                    setStatus(context.getString(R.string.screen_ssh_status_failed_title), describeException(e), true);
                 });
             }
         }, "linecode-ssh-test").start();
@@ -157,6 +157,18 @@ public final class SshSettingsScreenView extends ScreenScaffoldView {
                 8,
                 error ? LineTheme.DANGER : LineTheme.CODE_BORDER
         ));
+    }
+
+    private String describeException(Exception error) {
+        if (error == null) {
+            return "未知错误";
+        }
+        String message = error.getMessage();
+        if (message != null && message.trim().length() > 0) {
+            return message.trim();
+        }
+        String name = error.getClass().getSimpleName();
+        return name.length() == 0 ? "未知错误" : name;
     }
 
     private LinearLayout button(Context context, String label, int iconType, boolean primary, View.OnClickListener listener) {

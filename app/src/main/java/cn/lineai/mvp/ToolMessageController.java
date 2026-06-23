@@ -222,6 +222,39 @@ final class ToolMessageController {
         }
     }
 
+    void addTerminatedResultsForUnfinishedToolCalls(String terminatedMessage) {
+        String terminatedContent = terminatedMessage == null || terminatedMessage.trim().length() == 0
+                ? "工具执行已终止。"
+                : terminatedMessage;
+        ArrayList<ToolResult> results = new ArrayList<>();
+        for (ChatMessage message : messages) {
+            if (message.getRole() != ChatMessage.Role.ASSISTANT || !message.hasToolCalls()) {
+                continue;
+            }
+            for (ToolCall call : message.getToolCalls()) {
+                if (call == null || call.getId().length() == 0) {
+                    continue;
+                }
+                int resultIndex = findToolMessageIndex(call.getId());
+                if (resultIndex < 0 || isUnfinishedToolMessage(messages.get(resultIndex))) {
+                    results.add(new ToolResult(call.getId(), call.getName(), terminatedContent, true));
+                }
+            }
+        }
+        addOrReplaceToolResults(results);
+    }
+
+    private boolean isUnfinishedToolMessage(ChatMessage message) {
+        if (message == null || message.getRole() != ChatMessage.Role.TOOL) {
+            return true;
+        }
+        String state = message.getReviewState();
+        if ("running".equals(state) || "pending".equals(state)) {
+            return true;
+        }
+        return "accepted".equals(state) && message.getContent().trim().length() == 0;
+    }
+
     private String updateNestedToolReviewContent(
             String content,
             String toolCallId,

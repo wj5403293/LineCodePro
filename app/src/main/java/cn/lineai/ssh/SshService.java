@@ -183,6 +183,7 @@ public final class SshService {
             // 主线程不再使用 Thread.sleep(100) 主动轮询输出，仅周期性地把累积的缓冲推给监听器，
             // 并在通道关闭/超时后 join 读线程。
             long lastEmitAt = 0L;
+            boolean interruptedWhileExecuting = false;
             while (!channel.isClosed()) {
                 if (System.currentTimeMillis() - startedAt > timeoutMs) {
                     throw new IllegalStateException(context.getString(R.string.ssh_error_command_timeout));
@@ -202,20 +203,27 @@ public final class SshService {
                     channel.getExitStatus();
                 } catch (Exception ignored) {
                 }
-                Thread.sleep(20L);
+                try {
+                    Thread.sleep(20L);
+                } catch (InterruptedException e) {
+                    interruptedWhileExecuting = true;
+                    if (!finishSoonAfterInterrupt(channel, Math.min(1000L, timeoutMs))) {
+                        throw e;
+                    }
+                }
             }
 
-            // 等待读线程把剩余字节抽完
-            readersDone.await(2L, TimeUnit.SECONDS);
+            // 等待读线程把剩余字节抽完。命令通道已经关闭后，即使当前线程被中断，
+            // 也继续读取退出码，避免成功命令被收尾阶段的 InterruptedException 误标为失败。
+            boolean interruptedWhileDraining = interruptedWhileExecuting;
             try {
-                stdoutReader.join(500L);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
+                readersDone.await(2L, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                interruptedWhileDraining = true;
             }
-            try {
-                stderrReader.join(500L);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
+            if (!interruptedWhileDraining) {
+                interruptedWhileDraining = joinReader(stdoutReader) || interruptedWhileDraining;
+                interruptedWhileDraining = joinReader(stderrReader) || interruptedWhileDraining;
             }
 
             if (listener != null) {
@@ -228,7 +236,13 @@ public final class SshService {
             String combined = combine(output.toString(), error.toString(), "exit status: " + exitStatus);
             success = true;
             if (exitStatus == 0) {
+                if (interruptedWhileDraining) {
+                    Thread.currentThread().interrupt();
+                }
                 return combined;
+            }
+            if (interruptedWhileDraining) {
+                Thread.currentThread().interrupt();
             }
             throw new IllegalStateException("exit status " + exitStatus + "\n" + combined);
         } catch (Exception e) {
@@ -275,6 +289,31 @@ public final class SshService {
         thread.setDaemon(true);
         thread.start();
         return thread;
+    }
+
+    private boolean joinReader(Thread reader) {
+        try {
+            reader.join(500L);
+            return false;
+        } catch (InterruptedException e) {
+            return true;
+        }
+    }
+
+    private boolean finishSoonAfterInterrupt(ChannelExec channel, long waitMs) {
+        long deadline = System.currentTimeMillis() + Math.max(0L, waitMs);
+        while (!channel.isClosed() && System.currentTimeMillis() < deadline) {
+            try {
+                channel.getExitStatus();
+            } catch (Exception ignored) {
+            }
+            try {
+                Thread.sleep(20L);
+            } catch (InterruptedException ignored) {
+                return channel.isClosed();
+            }
+        }
+        return channel.isClosed();
     }
 
     private Session createRawSession(SshConfig config, int timeoutMs) throws Exception {

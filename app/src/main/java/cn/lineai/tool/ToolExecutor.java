@@ -47,16 +47,23 @@ public final class ToolExecutor {
         if (tool.requiresConfirmation() && settingsRepository.needsConfirmation(tool.getName()) && !confirmed) {
             return new ToolResult(toolCall.getId(), tool.getName(), "工具需要确认后才能执行: " + tool.getName(), true);
         }
+        JSONObject input;
         try {
-            JSONObject input = toolCall.getArguments().trim().length() == 0
+            input = toolCall.getArguments().trim().length() == 0
                     ? new JSONObject()
                     : new JSONObject(toolCall.getArguments());
+        } catch (Exception e) {
+            restoreInterrupt(e);
+            return new ToolResult(toolCall.getId(), tool.getName(), "参数解析失败: " + describeException(e), true);
+        }
+        try {
             ToolResult result = shouldRecordDiff(tool)
                     ? executeWithDiff(tool, input, callContext)
                     : tool.execute(input, callContext);
             return result.withCall(toolCall.getId(), tool.getName());
         } catch (Exception e) {
-            return new ToolResult(toolCall.getId(), tool.getName(), "参数解析失败: " + e.getMessage(), true);
+            restoreInterrupt(e);
+            return new ToolResult(toolCall.getId(), tool.getName(), "工具执行失败: " + describeException(e), true);
         }
     }
 
@@ -79,7 +86,8 @@ public final class ToolExecutor {
                 oldContent = FileIo.readUtf8(file);
             }
         } catch (Exception e) {
-            return new ToolResult("", tool.getName(), "无法读取原文件: " + path + "\n" + e.getMessage(), true);
+            restoreInterrupt(e);
+            return new ToolResult("", tool.getName(), "无法读取原文件: " + path + "\n" + describeException(e), true);
         }
 
         ToolResult result = tool.execute(input, context);
@@ -98,5 +106,23 @@ public final class ToolExecutor {
             return result.withDiffId(diff.getId());
         }
         return result;
+    }
+
+    private static void restoreInterrupt(Exception error) {
+        if (error instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String describeException(Exception error) {
+        if (error == null) {
+            return "未知错误";
+        }
+        String message = error.getMessage();
+        if (message != null && message.trim().length() > 0) {
+            return message.trim();
+        }
+        String name = error.getClass().getSimpleName();
+        return name.length() == 0 ? "未知错误" : name;
     }
 }

@@ -460,7 +460,7 @@ final class GenerationFlowController {
             } catch (Exception ignored) {
             }
         }
-        addTerminatedResultsForUnfinishedAgents(terminatedMessage);
+        addTerminatedResultsForUnfinishedToolCalls(terminatedMessage);
     }
 
     private void appendAssistantDelta(int generationId, String assistantId, String textDelta, String reasoningDelta) {
@@ -615,7 +615,8 @@ final class GenerationFlowController {
                     ToolResult result = futures.get(i).get();
                     resultById.put(call.getId(), result);
                 } catch (Exception e) {
-                    resultById.put(call.getId(), new ToolResult(call.getId(), call.getName(), "执行失败: " + e.getMessage(), true));
+                    restoreInterrupt(e);
+                    resultById.put(call.getId(), new ToolResult(call.getId(), call.getName(), "执行失败: " + describeException(e), true));
                 }
             }
             executor.shutdownNow();
@@ -746,10 +747,11 @@ final class GenerationFlowController {
                         ))
                         .withReview("accepted", "");
             } catch (Exception e) {
+                restoreInterrupt(e);
                 result = new ToolResult(
                         pending.getToolCall().getId(),
                         pending.getToolCall().getName(),
-                        "执行失败: " + e.getMessage(),
+                        "执行失败: " + describeException(e),
                         true,
                         "",
                         "accepted",
@@ -979,22 +981,8 @@ final class GenerationFlowController {
         return merged;
     }
 
-    private void addTerminatedResultsForUnfinishedAgents(String terminatedMessage) {
-        ArrayList<ToolResult> terminatedResults = new ArrayList<>();
-        for (ChatMessage message : messages) {
-            if (message.getRole() != ChatMessage.Role.ASSISTANT || !message.hasToolCalls()) {
-                continue;
-            }
-            for (ToolCall call : message.getToolCalls()) {
-                if (call == null || toolMessageController.findToolMessageIndex(call.getId()) >= 0) {
-                    continue;
-                }
-                if ("agent".equals(call.getName()) || "agent_pipeline".equals(call.getName())) {
-                    terminatedResults.add(new ToolResult(call.getId(), call.getName(), terminatedMessage, true));
-                }
-            }
-        }
-        toolMessageController.addOrReplaceToolResults(terminatedResults);
+    void addTerminatedResultsForUnfinishedToolCalls(String terminatedMessage) {
+        toolMessageController.addTerminatedResultsForUnfinishedToolCalls(terminatedMessage);
     }
 
     private void addOrReplaceToolResult(ToolResult result) {
@@ -1015,6 +1003,28 @@ final class GenerationFlowController {
             return "用户拒绝执行此工具。";
         }
         return "用户拒绝删除：" + reason;
+    }
+
+    private static void restoreInterrupt(Exception error) {
+        if (error instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String describeException(Exception error) {
+        if (error == null) {
+            return "未知错误";
+        }
+        String message = error.getMessage();
+        if (message != null && message.trim().length() > 0) {
+            return message.trim();
+        }
+        Throwable cause = error.getCause();
+        if (cause != null && cause.getMessage() != null && cause.getMessage().trim().length() > 0) {
+            return cause.getMessage().trim();
+        }
+        String name = error.getClass().getSimpleName();
+        return name.length() == 0 ? "未知错误" : name;
     }
 
     private int findMessageIndex(String id) {

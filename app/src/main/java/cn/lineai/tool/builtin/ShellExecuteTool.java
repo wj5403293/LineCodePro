@@ -129,16 +129,18 @@ public final class ShellExecuteTool extends BaseTool {
                 }
             });
             String output = streamedOutput.toString().trim();
-            if (!result.isSuccess() && output.length() == 0) {
-                return error("命令执行失败，退出码: " + result.getExitCode());
+            if (!result.isSuccess()) {
+                String message = "命令执行失败，退出码: " + result.getExitCode();
+                return error(output.length() == 0 ? message : output + "\n" + message);
             }
             return ok(output.length() == 0 ? "命令执行完成，无输出" : output);
         } catch (Exception e) {
+            restoreInterrupt(e);
             String existing;
             synchronized (streamedOutput) {
                 existing = streamedOutput.toString().trim();
             }
-            String message = "命令执行失败: " + e.getMessage();
+            String message = "命令执行失败: " + describeException(e);
             return error(existing.length() == 0 ? message : existing + "\n" + message);
         }
     }
@@ -166,16 +168,35 @@ public final class ShellExecuteTool extends BaseTool {
             });
             return ok(output.length() == 0 ? "命令执行完成，无输出" : output);
         } catch (Exception e) {
+            restoreInterrupt(e);
             String existing;
             synchronized (streamedOutput) {
                 existing = streamedOutput.toString().trim();
             }
-            String message = "命令执行失败: " + e.getMessage();
+            String message = "命令执行失败: " + describeException(e);
             return error(existing.length() == 0 ? message : existing + "\n" + message);
         }
     }
 
     private String shellQuote(String value) {
         return "'" + value.replace("'", "'\\''") + "'";
+    }
+
+    private static void restoreInterrupt(Exception error) {
+        if (error instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static String describeException(Exception error) {
+        if (error == null) {
+            return "未知错误";
+        }
+        String message = error.getMessage();
+        if (message != null && message.trim().length() > 0) {
+            return message.trim();
+        }
+        String name = error.getClass().getSimpleName();
+        return name.length() == 0 ? "未知错误" : name;
     }
 }

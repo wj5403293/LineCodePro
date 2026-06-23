@@ -1,5 +1,34 @@
 # 更新日志
 
+## v1.1.4
+
+### 架构与维护
+
+- **MVP 控制器继续拆分** - 将聊天交互、生成流程、模型提示、会话持久化、上下文压缩、目录选择、扩展草稿、扩展管理、IPC Provider、文件树交互、项目工作区、模型交互、覆盖层动作、工具审批、工具消息与存储维护等职责拆到独立控制器，`MainCoordinator` 进一步收敛为协调入口，降低后续功能改动的冲突面
+- **屏幕缓存与刷新机制** - `MainChatView` 新增屏幕缓存，切换设置/模型/扩展等页面时复用已构建视图；同时新增 `invalidateScreen` 刷新入口，支持在数据变化后精准重建当前页面
+- **模型列表错误日志** - 查询模型列表与压缩模型列表失败时会写入错误日志中心，并对 API key 等敏感字段脱敏，方便定位第三方模型服务返回异常
+
+### Tool Call 与上下文
+
+- **停止生成时补齐 tool 消息** - 用户停止生成或工具执行被中断时，会为所有未完成的 `tool_call` 追加错误态 `tool` 结果，并替换仍处于 `running`、`pending` 或空内容 `accepted` 状态的工具结果，避免后续请求因缺少 tool 消息而触发模型协议顺序错误
+- **上下文窗口保持工具调用分组** - `ContextManager` 选择上下文窗口时会把 assistant 的 `tool_calls` 与对应 `tool` 结果作为一组保留，避免只保留 tool 结果或只保留 assistant tool_call 导致 OpenAI/Responses 等协议拒绝请求
+
+### SSH 与 Shell 修复
+
+- **SSH 成功命令不再误报错误** - 修复 SSH 命令已成功结束但收尾读取阶段被中断时误标为失败、界面显示 `错误:null` 的问题；命令通道关闭后会继续读取退出码和剩余输出，再恢复线程中断状态
+- **工具执行错误文案更准确** - `ToolExecutor` 区分参数解析失败与工具执行失败；异常无 message 时显示异常类型或“未知错误”，不再把 `null` 拼进用户可见错误
+- **Shell 退出码展示修复** - IPC/终端提供者 shell 返回非 0 退出码且已有输出时，会同时保留命令输出和退出码，便于判断失败原因
+- **SSH 设置页错误显示修复** - SSH 连接测试失败时会显示可读异常描述，避免无 message 异常显示空白或 `null`
+- **主题页面文案修复** - 修复 Release 资源裁剪后主题页面显示 `color_background`、`starter_high_contrast` 等带下划线 ID 的问题；主题模式、创作起点、颜色项和“当前编辑”标签改为直接引用多语言资源，中文环境下正常显示中文名称
+
+### 测试
+
+- 新增 `ToolMessageControllerTest` 覆盖停止生成时为所有未完成 tool call 补齐结果、保留已完成结果、替换 running 结果
+- 新增 `ToolExecutorTest` 覆盖无 message 异常不再渲染 `null`
+- 扩展 `ContextManagerTest` 覆盖 assistant tool_calls 与 tool 结果在上下文窗口中的成组保留
+
+---
+
 ## v1.1.3
 
 ### 新功能

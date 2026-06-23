@@ -31,34 +31,34 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         void onCustomThemeColorsSaved(Map<String, String> colors);
     }
 
-    private static final String[][] THEMES = new String[][] {
-            {ThemePalette.MODE_SYSTEM, "system", "system_desc", String.valueOf(IconButtonView.MONITOR)},
-            {ThemePalette.MODE_LIGHT, "light", "light_desc", String.valueOf(IconButtonView.SUN)},
-            {ThemePalette.MODE_DARK, "dark", "dark_desc", String.valueOf(IconButtonView.MOON)},
-            {ThemePalette.MODE_COFFEE, "coffee", "coffee_desc", String.valueOf(IconButtonView.COFFEE)},
-            {ThemePalette.MODE_VSCODE, "vscode", "vscode_desc", String.valueOf(IconButtonView.CODE)},
-            {ThemePalette.MODE_GITHUB_DARK, "github_dark", "github_dark_desc", String.valueOf(IconButtonView.GIT_BRANCH)},
-            {ThemePalette.MODE_GRUVBOX, "gruvbox", "gruvbox_desc", String.valueOf(IconButtonView.CODE)},
-            {ThemePalette.MODE_HIGH_CONTRAST, "high_contrast", "high_contrast_desc", String.valueOf(IconButtonView.CONTRAST)},
-            {ThemePalette.MODE_CUSTOM, "custom", "custom_desc", String.valueOf(IconButtonView.PAINTBRUSH)}
+    private static final ThemeOption[] THEMES = new ThemeOption[] {
+            new ThemeOption(ThemePalette.MODE_SYSTEM, R.string.screen_theme_system, R.string.screen_theme_system_desc, IconButtonView.MONITOR),
+            new ThemeOption(ThemePalette.MODE_LIGHT, R.string.screen_theme_light, R.string.screen_theme_light_desc, IconButtonView.SUN),
+            new ThemeOption(ThemePalette.MODE_DARK, R.string.screen_theme_dark, R.string.screen_theme_dark_desc, IconButtonView.MOON),
+            new ThemeOption(ThemePalette.MODE_COFFEE, R.string.screen_theme_coffee, R.string.screen_theme_coffee_desc, IconButtonView.COFFEE),
+            new ThemeOption(ThemePalette.MODE_VSCODE, R.string.screen_theme_vscode, R.string.screen_theme_vscode_desc, IconButtonView.CODE),
+            new ThemeOption(ThemePalette.MODE_GITHUB_DARK, R.string.screen_theme_github_dark, R.string.screen_theme_github_dark_desc, IconButtonView.GIT_BRANCH),
+            new ThemeOption(ThemePalette.MODE_GRUVBOX, R.string.screen_theme_gruvbox, R.string.screen_theme_gruvbox_desc, IconButtonView.CODE),
+            new ThemeOption(ThemePalette.MODE_HIGH_CONTRAST, R.string.screen_theme_high_contrast, R.string.screen_theme_high_contrast_desc, IconButtonView.CONTRAST),
+            new ThemeOption(ThemePalette.MODE_CUSTOM, R.string.screen_theme_custom, R.string.screen_theme_custom_desc, IconButtonView.PAINTBRUSH)
     };
 
-    private static final String[][] COLOR_FIELDS = new String[][] {
-            {ThemePalette.KEY_BG, "color_background", "color_background_desc"},
-            {ThemePalette.KEY_SURFACE_ELEVATED, "color_panel", "color_panel_desc"},
-            {ThemePalette.KEY_SURFACE_LIGHT, "color_panel_light", "color_panel_light_desc"},
-            {ThemePalette.KEY_INPUT_BG, "color_input", "color_input_desc"},
-            {ThemePalette.KEY_TEXT, "color_text", "color_text_desc"},
-            {ThemePalette.KEY_TEXT_SECONDARY, "color_text_secondary", "color_text_secondary_desc"},
-            {ThemePalette.KEY_TEXT_TERTIARY, "color_text_tertiary", "color_text_tertiary_desc"},
-            {ThemePalette.KEY_ACCENT, "color_accent", "color_accent_desc"},
-            {ThemePalette.KEY_USER_BUBBLE, "color_user_bubble", "color_user_bubble_desc"},
-            {ThemePalette.KEY_AI_BUBBLE, "color_ai_bubble", "color_ai_bubble_desc"},
-            {ThemePalette.KEY_BORDER, "color_border", "color_border_desc"},
-            {ThemePalette.KEY_CODE_BG, "color_code_background", "color_code_background_desc"},
-            {ThemePalette.KEY_DANGER, "color_danger", "color_danger_desc"},
-            {ThemePalette.KEY_WARNING, "color_warning", "color_warning_desc"},
-            {ThemePalette.KEY_SUCCESS, "color_success", "color_success_desc"}
+    private static final ColorField[] COLOR_FIELDS = new ColorField[] {
+            new ColorField(ThemePalette.KEY_BG, R.string.screen_theme_color_background, R.string.screen_theme_color_background_desc),
+            new ColorField(ThemePalette.KEY_SURFACE_ELEVATED, R.string.screen_theme_color_panel, R.string.screen_theme_color_panel_desc),
+            new ColorField(ThemePalette.KEY_SURFACE_LIGHT, R.string.screen_theme_color_panel_light, R.string.screen_theme_color_panel_light_desc),
+            new ColorField(ThemePalette.KEY_INPUT_BG, R.string.screen_theme_color_input, R.string.screen_theme_color_input_desc),
+            new ColorField(ThemePalette.KEY_TEXT, R.string.screen_theme_color_text, R.string.screen_theme_color_text_desc),
+            new ColorField(ThemePalette.KEY_TEXT_SECONDARY, R.string.screen_theme_color_text_secondary, R.string.screen_theme_color_text_secondary_desc),
+            new ColorField(ThemePalette.KEY_TEXT_TERTIARY, R.string.screen_theme_color_text_tertiary, R.string.screen_theme_color_text_tertiary_desc),
+            new ColorField(ThemePalette.KEY_ACCENT, R.string.screen_theme_color_accent, R.string.screen_theme_color_accent_desc),
+            new ColorField(ThemePalette.KEY_USER_BUBBLE, R.string.screen_theme_color_user_bubble, R.string.screen_theme_color_user_bubble_desc),
+            new ColorField(ThemePalette.KEY_AI_BUBBLE, R.string.screen_theme_color_ai_bubble, R.string.screen_theme_color_ai_bubble_desc),
+            new ColorField(ThemePalette.KEY_BORDER, R.string.screen_theme_color_border, R.string.screen_theme_color_border_desc),
+            new ColorField(ThemePalette.KEY_CODE_BG, R.string.screen_theme_color_code_background, R.string.screen_theme_color_code_background_desc),
+            new ColorField(ThemePalette.KEY_DANGER, R.string.screen_theme_color_danger, R.string.screen_theme_color_danger_desc),
+            new ColorField(ThemePalette.KEY_WARNING, R.string.screen_theme_color_warning, R.string.screen_theme_color_warning_desc),
+            new ColorField(ThemePalette.KEY_SUCCESS, R.string.screen_theme_color_success, R.string.screen_theme_color_success_desc)
     };
 
     private static final String[] SWATCHES = new String[] {
@@ -153,27 +153,17 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         SettingsSectionView themes = new SettingsSectionView(context, getResources().getString(R.string.screen_theme_section_themes));
         String currentMode = ThemePalette.normalizeMode(themeMode);
         for (int i = 0; i < THEMES.length; i++) {
-            String mode = THEMES[i][0];
-            String label = themeString(THEMES[i][1]);
-            String desc = themeString(THEMES[i][2]);
+            ThemeOption option = THEMES[i];
             themes.addRow(new OptionRowView(
                     context,
-                    Integer.parseInt(THEMES[i][3]),
-                    label,
-                    desc,
-                    mode.equals(currentMode),
-                    () -> listener.onThemeModeChanged(mode)
+                    option.iconType,
+                    getResources().getString(option.labelResId),
+                    getResources().getString(option.descResId),
+                    option.mode.equals(currentMode),
+                    () -> listener.onThemeModeChanged(option.mode)
             ), i < THEMES.length - 1);
         }
         content.addView(themes, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-    }
-
-    private String themeString(String key) {
-        int resId = getResources().getIdentifier("screen_theme_" + key, "string", getContext().getPackageName());
-        if (resId == 0) {
-            return key;
-        }
-        return getResources().getString(resId);
     }
 
     private void addCustomHeader(LinearLayout content) {
@@ -243,23 +233,23 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         starterPanel.addView(LineTheme.textMedium(context, getResources().getString(R.string.screen_theme_starter_section), LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY), new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         GridLayout grid = new GridLayout(context);
         grid.setColumnCount(3);
-        addStarter(grid, "default", "starter_default", IconButtonView.PAINTBRUSH, ThemePalette.forMode(ThemePalette.MODE_CUSTOM));
-        addStarter(grid, ThemePalette.MODE_LIGHT, "starter_light", IconButtonView.SUN, ThemePalette.forMode(ThemePalette.MODE_LIGHT));
-        addStarter(grid, ThemePalette.MODE_DARK, "starter_dark", IconButtonView.MOON, ThemePalette.forMode(ThemePalette.MODE_DARK));
-        addStarter(grid, ThemePalette.MODE_COFFEE, "starter_coffee", IconButtonView.COFFEE, ThemePalette.forMode(ThemePalette.MODE_COFFEE));
-        addStarter(grid, ThemePalette.MODE_VSCODE, "starter_vscode", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_VSCODE));
-        addStarter(grid, ThemePalette.MODE_GITHUB_DARK, "starter_github", IconButtonView.GIT_BRANCH, ThemePalette.forMode(ThemePalette.MODE_GITHUB_DARK));
-        addStarter(grid, ThemePalette.MODE_GRUVBOX, "starter_gruvbox", IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_GRUVBOX));
-        addStarter(grid, ThemePalette.MODE_HIGH_CONTRAST, "starter_high_contrast", IconButtonView.CONTRAST, ThemePalette.forMode(ThemePalette.MODE_HIGH_CONTRAST));
+        addStarter(grid, "default", R.string.screen_theme_starter_default, IconButtonView.PAINTBRUSH, ThemePalette.forMode(ThemePalette.MODE_CUSTOM));
+        addStarter(grid, ThemePalette.MODE_LIGHT, R.string.screen_theme_starter_light, IconButtonView.SUN, ThemePalette.forMode(ThemePalette.MODE_LIGHT));
+        addStarter(grid, ThemePalette.MODE_DARK, R.string.screen_theme_starter_dark, IconButtonView.MOON, ThemePalette.forMode(ThemePalette.MODE_DARK));
+        addStarter(grid, ThemePalette.MODE_COFFEE, R.string.screen_theme_starter_coffee, IconButtonView.COFFEE, ThemePalette.forMode(ThemePalette.MODE_COFFEE));
+        addStarter(grid, ThemePalette.MODE_VSCODE, R.string.screen_theme_starter_vscode, IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_VSCODE));
+        addStarter(grid, ThemePalette.MODE_GITHUB_DARK, R.string.screen_theme_starter_github, IconButtonView.GIT_BRANCH, ThemePalette.forMode(ThemePalette.MODE_GITHUB_DARK));
+        addStarter(grid, ThemePalette.MODE_GRUVBOX, R.string.screen_theme_starter_gruvbox, IconButtonView.CODE, ThemePalette.forMode(ThemePalette.MODE_GRUVBOX));
+        addStarter(grid, ThemePalette.MODE_HIGH_CONTRAST, R.string.screen_theme_starter_high_contrast, IconButtonView.CONTRAST, ThemePalette.forMode(ThemePalette.MODE_HIGH_CONTRAST));
         if (!savedCustomColors.isEmpty()) {
-            addStarter(grid, "saved", "starter_saved", IconButtonView.SAVE, ThemePalette.forMode(ThemePalette.MODE_CUSTOM).withCustomColors(savedCustomColors));
+            addStarter(grid, "saved", R.string.screen_theme_starter_saved, IconButtonView.SAVE, ThemePalette.forMode(ThemePalette.MODE_CUSTOM).withCustomColors(savedCustomColors));
         }
         LinearLayout.LayoutParams gridParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         gridParams.topMargin = LineTheme.dp(context, LineTheme.SM);
         starterPanel.addView(grid, gridParams);
     }
 
-    private void addStarter(GridLayout grid, String id, String label, int iconType, ThemePalette palette) {
+    private void addStarter(GridLayout grid, String id, int labelResId, int iconType, ThemePalette palette) {
         Context context = grid.getContext();
         boolean active = id.equals(activeStarter);
         LinearLayout button = new LinearLayout(context);
@@ -295,7 +285,7 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 14), LineTheme.dp(context, 14));
         iconParams.topMargin = LineTheme.dp(context, 6);
         button.addView(starterIcon, iconParams);
-        TextView text = LineTheme.text(context, themeString(label), LineTheme.FONT_XS,
+        TextView text = LineTheme.text(context, getResources().getString(labelResId), LineTheme.FONT_XS,
                 active ? LineTheme.ACCENT : LineTheme.TEXT_SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         textParams.topMargin = LineTheme.dp(context, 4);
@@ -364,7 +354,14 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
         Context context = getContext();
         editorGroup.removeAllViews();
         for (int i = 0; i < COLOR_FIELDS.length; i++) {
-            editorGroup.addView(colorRow(context, COLOR_FIELDS[i][0], themeString(COLOR_FIELDS[i][1]), themeString(COLOR_FIELDS[i][2]), i < COLOR_FIELDS.length - 1),
+            ColorField field = COLOR_FIELDS[i];
+            editorGroup.addView(colorRow(
+                            context,
+                            field.key,
+                            getResources().getString(field.labelResId),
+                            getResources().getString(field.descResId),
+                            i < COLOR_FIELDS.length - 1
+                    ),
                     new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
     }
@@ -500,12 +497,38 @@ public final class ThemeSettingsScreenView extends ScreenScaffoldView {
     }
 
     private String labelFor(String key) {
-        for (String[] field : COLOR_FIELDS) {
-            if (field[0].equals(key)) {
-                return field[1];
+        for (ColorField field : COLOR_FIELDS) {
+            if (field.key.equals(key)) {
+                return getResources().getString(field.labelResId);
             }
         }
         return key;
+    }
+
+    private static final class ThemeOption {
+        private final String mode;
+        private final int labelResId;
+        private final int descResId;
+        private final int iconType;
+
+        ThemeOption(String mode, int labelResId, int descResId, int iconType) {
+            this.mode = mode;
+            this.labelResId = labelResId;
+            this.descResId = descResId;
+            this.iconType = iconType;
+        }
+    }
+
+    private static final class ColorField {
+        private final String key;
+        private final int labelResId;
+        private final int descResId;
+
+        ColorField(String key, int labelResId, int descResId) {
+            this.key = key;
+            this.labelResId = labelResId;
+            this.descResId = descResId;
+        }
     }
 
     private Map<String, String> createThemeDraft(ThemePalette base, Map<String, String> stored) {

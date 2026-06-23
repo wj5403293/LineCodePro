@@ -9,7 +9,7 @@
 
 [![许可证: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84.svg)](app/build.gradle.kts)
-[![当前版本: 1.0.3](https://img.shields.io/badge/version-1.0.3-success.svg)](app/build.gradle.kts)
+[![当前版本: 1.1.4](https://img.shields.io/badge/version-1.1.4-success.svg)](app/build.gradle.kts)
 [![Java 11 only](https://img.shields.io/badge/code-Java%2011-orange.svg)](#项目结构)
 
 ---
@@ -19,17 +19,18 @@
 1. [LineCode Pro 是什么？](#linecode-pro-是什么)
 2. [它能做什么](#它能做什么)
 3. [功能亮点](#功能亮点)
-4. [项目结构](#项目结构)
-5. [安装](#安装)
-6. [上手指南](#上手指南)
-7. [执行模式](#执行模式)
-8. [支持的模型协议](#支持的模型协议)
-9. [工具系统](#工具系统)
-10. [扩展 LineCode](#扩展-linecode)
-11. [从源码构建](#从源码构建)
-12. [隐私与安全](#隐私与安全)
-13. [参与贡献](#参与贡献)
-14. [许可证](#许可证)
+4. [近期更新](#近期更新)
+5. [项目结构](#项目结构)
+6. [安装](#安装)
+7. [上手指南](#上手指南)
+8. [执行模式](#执行模式)
+9. [支持的模型协议](#支持的模型协议)
+10. [工具系统](#工具系统)
+11. [扩展 LineCode](#扩展-linecode)
+12. [从源码构建](#从源码构建)
+13. [隐私与安全](#隐私与安全)
+14. [参与贡献](#参与贡献)
+15. [许可证](#许可证)
 
 ---
 
@@ -101,6 +102,20 @@ LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作
 - **记忆与上下文。** 长对话自动总结；长期知识会在下一次会话注入。
 - **默认隐私优先。** URL 白名单、严格 `network_security_config.xml`、导出文件去敏、内置浏览器默认关闭 JavaScript。
 - **纯 Java 写在骨子里。** 无 Kotlin 运行时、无 XML 布局 —— App 全部由 Java 11 写成，便于审计。
+
+---
+
+## 近期更新
+
+### v1.1.4
+
+- **MVP 控制器继续拆分。** 聊天流程、生成流程、模型提示、项目工作区、目录选择、IPC Provider 绑定、扩展编辑、工具审批、工具消息、存储维护、覆盖层动作等职责现在由独立控制器负责，`MainCoordinator` 更接近协调入口。
+- **Tool Call 中断安全。** 用户停止生成或执行被打断时，所有未完成的 `tool_call` 都会补齐对应的错误态 `tool` 消息；`running`、`pending`、空内容 `accepted` 工具结果也会被终止结果替换，避免下一轮请求出现模型协议顺序错误。
+- **上下文窗口保持协议完整。** 上下文裁剪时会把 assistant 的 `tool_calls` 和对应工具结果成组保留，避免只留下其中一边导致 OpenAI/Responses 等协议拒绝请求。
+- **SSH 与 Shell 错误处理修复。** SSH 远端命令已经成功结束但收尾读取被中断时，不再显示 `错误:null`；工具执行会区分参数解析失败和运行失败，不再把 `null` 渲染到界面；IPC Shell 非 0 退出会保留输出和退出码。
+- **页面缓存与诊断。** 设置、模型、扩展等页面支持缓存与精准失效刷新；模型列表查询失败会写入错误日志中心，并对敏感字段脱敏。
+
+完整更新历史见 [`update.md`](update.md)。
 
 ---
 

@@ -33,8 +33,6 @@
 - 不要把同一个目录分配给一个 Agent，又把该目录下的文件分配给另一个 Agent；这仍然是重叠写入范围。需要共享上下文时使用只读 `read_scope`，不要共享 `write_scope`。
 - Agent 输出回来后，你要负责整合结果、检查冲突、必要时读取关键文件确认，不要盲目把多个 Agent 的改动当作已经一致。
 
-{{TOOLS_CONTEXT}}
-
 ## 工具调用循环
 每次工具返回后，你必须继续分析结果并决定下一步：
 1. 成功时，检查是否已经满足用户目标；如果还没有，继续读取、修改或验证。
@@ -71,6 +69,8 @@
 {{CHAT_MODE_CONTEXT}}
 
 {{WORK_DIRECTORY_CONTEXT}}
+
+{{TOOLS_CONTEXT}}
 
 {{LEARNING_CONTEXT}}
 

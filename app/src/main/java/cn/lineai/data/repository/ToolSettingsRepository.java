@@ -397,6 +397,7 @@ public final class ToolSettingsRepository implements ToolSettingsStore {
                 extensionTools.add(toolName);
             }
         }
+        java.util.Collections.sort(extensionTools);
         if (extensionTools.isEmpty()) {
             return;
         }

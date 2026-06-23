@@ -216,17 +216,10 @@ final class ModelPromptController {
     private String buildToolPrompt(ModelConfig selectedModel, int usedToolCallCount) {
         host.syncModePermission();
         if (!hasRemainingToolCalls(selectedModel, usedToolCallCount)) {
-            return "## 可用工具\n当前模型的工具调用次数限制已用尽，当前没有可用工具。";
+            return "## 可用工具\n当前没有可用工具。";
         }
         toolRegistry.reloadExtensions();
-        String prompt = toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), supportsNativeTools(selectedModel));
-        int limit = selectedModel == null ? ModelConfig.DEFAULT_TOOL_CALL_LIMIT : selectedModel.getToolCallLimit();
-        if (limit == ModelConfig.UNLIMITED_TOOL_CALLS) {
-            return prompt + "\n\n工具调用次数限制：不限制。";
-        }
-        int used = Math.max(0, usedToolCallCount);
-        int remaining = Math.max(0, limit - used);
-        return prompt + "\n\n工具调用次数限制：最多 " + limit + " 次；已使用 " + used + " 次；剩余 " + remaining + " 次。";
+        return toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), supportsNativeTools(selectedModel));
     }
 
     private String buildAttachmentPrompt(List<ChatMessage> history) {

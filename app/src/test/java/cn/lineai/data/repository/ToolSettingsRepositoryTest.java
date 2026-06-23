@@ -345,6 +345,27 @@ public final class ToolSettingsRepositoryTest {
     }
 
     @Test
+    public void extensionToolsAreRenderedInStableNameOrder() {
+        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        BaseTool beta = new NamedDummyCustomMcpTool("mcpx_beta_lookup");
+        BaseTool alpha = new NamedDummyCustomMcpTool("mcpx_alpha_lookup");
+        toolByName.put(beta.getName(), beta);
+        toolByName.put(alpha.getName(), alpha);
+        Set<String> enabled = new java.util.HashSet<>();
+        enabled.add(beta.getName());
+        enabled.add(alpha.getName());
+
+        String prompt = ToolSettingsRepository.renderToolPrompt(
+                java.util.Collections.<McpToolConfig>emptyList(),
+                enabled,
+                toolByName,
+                true
+        );
+
+        Assert.assertTrue(prompt.indexOf("mcpx_alpha_lookup") < prompt.indexOf("mcpx_beta_lookup"));
+    }
+
+    @Test
     public void terminalProviderToolPromptEmptyEnabledReturnsNoToolsMessage() {
         String prompt = ToolSettingsRepository.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
@@ -361,6 +382,41 @@ public final class ToolSettingsRepositoryTest {
         @Override
         public String getName() {
             return "mcpx_test_lookup";
+        }
+
+        @Override
+        public String getDescription() {
+            return "调用测试 MCP";
+        }
+
+        @Override
+        public ToolCategory getCategory() {
+            return ToolCategory.SYSTEM;
+        }
+
+        @Override
+        public JSONObject getParameters() throws org.json.JSONException {
+            return new JSONObject()
+                    .put("type", "object")
+                    .put("properties", new JSONObject());
+        }
+
+        @Override
+        public ToolResult execute(JSONObject input, ToolContext context) {
+            return new ToolResult("", getName(), "", false);
+        }
+    }
+
+    private static final class NamedDummyCustomMcpTool extends BaseTool {
+        private final String name;
+
+        NamedDummyCustomMcpTool(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getName() {
+            return name;
         }
 
         @Override

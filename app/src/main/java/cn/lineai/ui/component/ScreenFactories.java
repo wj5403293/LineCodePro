@@ -1,5 +1,6 @@
 package cn.lineai.ui.component;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.provider.Settings;
@@ -456,6 +457,9 @@ public final class ScreenFactories {
     public static final class KeepAliveSettingsScreenFactory implements ScreenFactory {
         @Override
         public View createScreen(MainChatView view, MainUiController controller, Context context) {
+            PermissionUiHelper permissionUiHelper = context instanceof Activity
+                    ? new PermissionUiHelper((Activity) context)
+                    : null;
             return new KeepAliveSettingsScreenView(context, new KeepAliveSettingsScreenView.Listener() {
                 @Override
                 public void onBack() {
@@ -466,7 +470,7 @@ public final class ScreenFactories {
                 public void onSettingsChanged() {
                     controller.onKeepAliveSettingsChanged();
                 }
-            });
+            }, permissionUiHelper);
         }
 
         @Override

@@ -25,6 +25,7 @@ public final class PermissionUiHelper {
 
     /** Request code used for legacy storage permission requests. */
     public static final int REQUEST_LEGACY_STORAGE = 7002;
+    public static final int REQUEST_POST_NOTIFICATIONS = 7003;
 
     /** Listener notified when a runtime permission batch has been resolved. */
     public interface OnPermissionResult {
@@ -69,6 +70,18 @@ public final class PermissionUiHelper {
                 Manifest.permission.READ_EXTERNAL_STORAGE,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         }, REQUEST_LEGACY_STORAGE);
+    }
+
+    public boolean hasPostNotificationsPermission() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    public void requestPostNotificationsPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || hasPostNotificationsPermission()) {
+            return;
+        }
+        activity.requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
     }
 
     /**

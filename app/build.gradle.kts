@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-val releaseVersionName = "1.1.4"
+val releaseVersionName = "1.1.5"
 val releaseApkName = "LineCode Pro $releaseVersionName.APK"
 val releaseIdsigName = "$releaseApkName.idsig"
 val releaseSigningProperties = Properties()
@@ -67,11 +67,6 @@ val generateReleaseObfuscationDictionary by tasks.registering {
     }
 }
 
-val purgeReleaseSymbolFiles by tasks.registering(Delete::class) {
-    delete(layout.buildDirectory.dir("outputs/mapping/release"))
-    delete(layout.buildDirectory.dir("outputs/native-debug-symbols/release"))
-}
-
 val exportReleaseApk by tasks.registering(Copy::class) {
     from(layout.buildDirectory.dir("outputs/apk/release"))
     include("*.apk", "*.apk.idsig", "*.idsig")
@@ -108,7 +103,7 @@ android {
         applicationId = "cn.lineai"
         minSdk = 24
         targetSdk = 36
-        versionCode = 17
+        versionCode = 18
         versionName = releaseVersionName
     }
 
@@ -198,12 +193,6 @@ tasks.matching {
     it.name == "assembleRelease" || it.name == "bundleRelease"
 }.configureEach {
     dependsOn(validateReleaseSigning)
-}
-
-tasks.matching {
-    it.name == "assembleRelease" || it.name == "bundleRelease"
-}.configureEach {
-    finalizedBy(purgeReleaseSymbolFiles)
 }
 
 tasks.matching {

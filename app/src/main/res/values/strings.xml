@@ -684,6 +684,7 @@
     <string name="screen_keep_alive_foreground_desc">When on, a coding-in-progress notification stays visible</string>
     <string name="screen_keep_alive_fake_music_label">Silent audio playback</string>
     <string name="screen_keep_alive_fake_music_desc">Start a silent AudioTrack during background tasks</string>
+    <string name="screen_keep_alive_notification_permission_hint">Allow notifications so the keep-alive service can stay visible.</string>
     <string name="screen_keep_alive_ignore_battery_label">Ignore battery optimization</string>
     <string name="screen_keep_alive_ignore_battery_desc">Open the Android whitelist request screen</string>
 

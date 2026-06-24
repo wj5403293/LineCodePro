@@ -5,17 +5,27 @@ import android.os.Looper;
 
 public final class MainThreadDispatcher {
     private final Handler handler;
+    private final boolean dispatchInline;
 
     public MainThreadDispatcher() {
         this(new Handler(Looper.getMainLooper()));
     }
 
     MainThreadDispatcher(Handler handler) {
+        this(handler, false);
+    }
+
+    MainThreadDispatcher(Handler handler, boolean dispatchInline) {
         this.handler = handler;
+        this.dispatchInline = dispatchInline;
     }
 
     public void post(Runnable runnable) {
         if (runnable == null) {
+            return;
+        }
+        if (dispatchInline) {
+            runnable.run();
             return;
         }
         handler.post(runnable);
@@ -25,11 +35,19 @@ public final class MainThreadDispatcher {
         if (runnable == null) {
             return;
         }
+        if (dispatchInline) {
+            runnable.run();
+            return;
+        }
         handler.postDelayed(runnable, Math.max(0L, delayMillis));
     }
 
     public void dispatch(Runnable runnable) {
         if (runnable == null) {
+            return;
+        }
+        if (dispatchInline) {
+            runnable.run();
             return;
         }
         if (isMainThread()) {

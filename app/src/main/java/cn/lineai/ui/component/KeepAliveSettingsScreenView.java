@@ -8,6 +8,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
+import android.widget.Toast;
 import cn.lineai.R;
 import cn.lineai.data.repository.KeepAliveRepository;
 import cn.lineai.service.KeepAliveService;
@@ -20,11 +21,17 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
 
     private final KeepAliveRepository repository;
     private final Context context;
+    private final PermissionUiHelper permissionUiHelper;
 
     public KeepAliveSettingsScreenView(Context context, Listener listener) {
+        this(context, listener, null);
+    }
+
+    public KeepAliveSettingsScreenView(Context context, Listener listener, PermissionUiHelper permissionUiHelper) {
         super(context, context.getString(R.string.screen_keep_alive_title), listener::onBack, null);
         this.context = context;
         this.repository = new KeepAliveRepository(context);
+        this.permissionUiHelper = permissionUiHelper;
         LinearLayout content = getContent();
 
         KeepAliveRepository.KeepAliveSettings settings = repository.getSettings();
@@ -40,6 +47,7 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
 
         SwitchRowView foregroundSwitch = new SwitchRowView(context, IconButtonView.BELL, context.getString(R.string.screen_keep_alive_foreground_label), context.getString(R.string.screen_keep_alive_foreground_desc), settings.foregroundEnabled, (buttonView, enabled) -> {
             repository.setForegroundEnabled(enabled);
+            requestNotificationPermissionIfNeeded(enabled);
             updateService();
             listener.onSettingsChanged();
         });
@@ -47,6 +55,7 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
 
         SwitchRowView fakeAudioSwitch = new SwitchRowView(context, IconButtonView.MUSIC, context.getString(R.string.screen_keep_alive_fake_music_label), context.getString(R.string.screen_keep_alive_fake_music_desc), settings.fakeAudioEnabled, (buttonView, enabled) -> {
             repository.setFakeAudioEnabled(enabled);
+            requestNotificationPermissionIfNeeded(enabled);
             updateService();
             listener.onSettingsChanged();
         });
@@ -88,6 +97,14 @@ public final class KeepAliveSettingsScreenView extends ScreenScaffoldView {
         } else {
             KeepAliveService.stop(context);
         }
+    }
+
+    private void requestNotificationPermissionIfNeeded(boolean enabled) {
+        if (!enabled || permissionUiHelper == null || permissionUiHelper.hasPostNotificationsPermission()) {
+            return;
+        }
+        permissionUiHelper.requestPostNotificationsPermission();
+        Toast.makeText(context, R.string.screen_keep_alive_notification_permission_hint, Toast.LENGTH_SHORT).show();
     }
 
     public void updateStatus(String status) {

@@ -42,6 +42,8 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
         permissionUiHelper.setListener((requestCode, grantResults) -> {
             if (requestCode == PermissionUiHelper.REQUEST_LEGACY_STORAGE && presenter != null) {
                 presenter.onStoragePermissionResult();
+            } else if (requestCode == PermissionUiHelper.REQUEST_POST_NOTIFICATIONS && presenter != null) {
+                presenter.onKeepAliveSettingsChanged();
             }
         });
 

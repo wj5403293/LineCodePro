@@ -101,7 +101,7 @@ final class GenerationFlowController {
 
         @Override
         public void addOrReplaceToolResult(ToolResult result) {
-            mainThread.dispatch(() -> addOrReplaceToolResult(result));
+            mainThread.dispatch(() -> GenerationFlowController.this.addOrReplaceToolResult(result));
         }
 
         @Override

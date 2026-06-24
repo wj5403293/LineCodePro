@@ -55,9 +55,13 @@ final class StorageMaintenanceController {
 
     void applyKeepAliveSettings() {
         KeepAliveRepository.KeepAliveSettings settings = new KeepAliveRepository(context).getSettings();
-        KeepAliveService.start(context,
-                settings.wakeLockEnabled,
-                settings.foregroundEnabled,
-                settings.fakeAudioEnabled);
+        if (settings.wakeLockEnabled || settings.foregroundEnabled || settings.fakeAudioEnabled) {
+            KeepAliveService.start(context,
+                    settings.wakeLockEnabled,
+                    settings.foregroundEnabled,
+                    settings.fakeAudioEnabled);
+        } else {
+            KeepAliveService.stop(context);
+        }
     }
 }

@@ -1,5 +1,28 @@
 # 更新日志
 
+## v1.1.5
+
+### Tool Call 与提示词
+
+- **扩展工具顺序稳定** - 自定义 MCP / 扩展工具在工具提示词中按工具名排序输出，避免同一批工具因 Map/加载顺序变化导致提示词不稳定
+- **工具调用次数提示去重** - 移除 `ModelPromptController.buildToolPrompt` 中重复拼接的工具调用次数限制说明，改由工具提示构建逻辑统一处理；次数耗尽时仅提示“当前没有可用工具”，减少重复和冲突文案
+- **系统提示模板顺序调整** - `{{TOOLS_CONTEXT}}` 从 Agent 协作规则前移到工作目录上下文之后，让工具清单更贴近当前工作区信息，降低提示词前段噪音
+
+### Bug 修复
+
+- **Agent 进度回调栈溢出** - 修复 Agent / Agent Pipeline 工具进度回调在主线程同步派发时递归调用自身的问题；Release 混淆栈中的 `hi.j()` / `t.run()` 死循环已定位为 `GenerationFlowController` 匿名 Host 回调未限定外部类方法，现改为明确调用外层控制器，避免 `StackOverflowError`
+- **保活通知权限** - 补齐 Android 13+ `POST_NOTIFICATIONS` 权限声明与运行时申请；用户开启前台服务通知或假音乐播放时会主动申请通知权限，权限返回后自动重新应用保活设置
+- **前台保活通知实现** - 完善 `KeepAliveService` 前台通知，补齐默认状态文案、通知点击回到 LineCode、service 分类、ticker 与可见性设置；无保活开关时会停止服务，避免空启动
+- **假音乐播放保活** - 补上静音 `AudioTrack` 循环播放实现，用户开启“假音乐播放”后后台任务期间会实际启动静音音频；任务结束或关闭开关时会停止并释放音频资源
+
+### 测试
+
+- 新增 `ToolSettingsRepositoryTest` 覆盖扩展工具按名称稳定排序输出
+- 新增 `GenerationFlowControllerTest` 覆盖 Agent 工具结果回调只派发一次，防止回归到递归栈溢出
+- 已验证 `testDebugUnitTest` 定向测试、`compileDebugJavaWithJavac` 与 `assembleDebug`
+
+---
+
 ## v1.1.4
 
 ### 架构与维护

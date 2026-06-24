@@ -684,6 +684,7 @@
     <string name="screen_keep_alive_foreground_desc">开启后常驻显示正在编码通知</string>
     <string name="screen_keep_alive_fake_music_label">假音乐播放</string>
     <string name="screen_keep_alive_fake_music_desc">后台任务期间启动静音 AudioTrack</string>
+    <string name="screen_keep_alive_notification_permission_hint">请允许通知，保活服务需要显示常驻通知。</string>
     <string name="screen_keep_alive_ignore_battery_label">忽略电池优化</string>
     <string name="screen_keep_alive_ignore_battery_desc">打开 Android 白名单申请页面</string>
 

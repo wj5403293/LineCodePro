@@ -28,7 +28,10 @@ import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.workspace.WorkspacePaths;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 final class ModelPromptController {
@@ -40,6 +43,10 @@ final class ModelPromptController {
         String projectSource();
 
         boolean isTerminalProviderExecutionMode();
+
+        default String interruptedGenerationMessage() {
+            return "上次生成已中断。";
+        }
     }
 
     private final ArrayList<ChatMessage> messages;
@@ -122,10 +129,76 @@ final class ModelPromptController {
         int reservedTokens = contextManager.estimateTokens(systemPrompt) + 2048;
         boolean includeReasoning = aiSettings.isPreserveReasoningEnabled();
         List<ChatMessage> contextWindow = contextManager.selectWindow(messages, contextTokens, reservedTokens, includeReasoning);
-        for (ChatMessage message : contextWindow) {
+        for (ChatMessage message : completeToolCallPairsForRequest(contextWindow, host.interruptedGenerationMessage())) {
             modelMessages.add(toModelMessage(message, includeReasoning));
         }
         return modelMessages;
+    }
+
+    static ArrayList<ChatMessage> completeToolCallPairsForRequest(List<ChatMessage> source, String terminatedMessage) {
+        ArrayList<ChatMessage> repaired = new ArrayList<>();
+        if (source == null || source.isEmpty()) {
+            return repaired;
+        }
+        String fallbackContent = terminatedMessage == null || terminatedMessage.trim().length() == 0
+                ? "上次生成已中断。"
+                : terminatedMessage;
+        HashSet<String> toolCallIds = new HashSet<>();
+        Map<String, ChatMessage> toolResultById = new HashMap<>();
+        for (ChatMessage message : source) {
+            if (message == null) {
+                continue;
+            }
+            if (message.getRole() == ChatMessage.Role.ASSISTANT) {
+                for (cn.lineai.tool.ToolCall call : message.getToolCalls()) {
+                    if (call != null && call.getId().length() > 0) {
+                        toolCallIds.add(call.getId());
+                    }
+                }
+            } else if (message.getRole() == ChatMessage.Role.TOOL && message.getToolCallId().length() > 0) {
+                toolResultById.put(message.getToolCallId(), message);
+            }
+        }
+        HashSet<String> emittedToolResults = new HashSet<>();
+        int fallbackIndex = 0;
+        for (ChatMessage message : source) {
+            if (message == null) {
+                continue;
+            }
+            if (message.getRole() == ChatMessage.Role.TOOL) {
+                continue;
+            }
+            repaired.add(message);
+            if (message.getRole() != ChatMessage.Role.ASSISTANT || !message.hasToolCalls()) {
+                continue;
+            }
+            for (cn.lineai.tool.ToolCall call : message.getToolCalls()) {
+                if (call == null || call.getId().length() == 0 || emittedToolResults.contains(call.getId())) {
+                    continue;
+                }
+                ChatMessage result = toolResultById.get(call.getId());
+                if (result == null) {
+                    result = ChatMessage.toolResult(
+                            fallbackToolResultId(call.getId(), fallbackIndex++),
+                            fallbackContent,
+                            call.getId(),
+                            call.getName(),
+                            true
+                    );
+                }
+                repaired.add(result);
+                emittedToolResults.add(call.getId());
+            }
+        }
+        return repaired;
+    }
+
+    private static String fallbackToolResultId(String toolCallId, int index) {
+        String safe = toolCallId == null ? "" : toolCallId.replaceAll("[^A-Za-z0-9_\\-]", "_");
+        if (safe.length() == 0) {
+            safe = "unknown_" + index;
+        }
+        return "fallback_tool_result_" + safe;
     }
 
     ModelRequestOptions requestOptions(AiBehaviorSettings aiSettings, ModelConfig selectedModel, int usedToolCallCount) {

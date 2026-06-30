@@ -789,6 +789,11 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
                     public boolean isTerminalProviderExecutionMode() {
                         return MainCoordinator.this.isTerminalProviderExecutionMode();
                     }
+
+                    @Override
+                    public String interruptedGenerationMessage() {
+                        return context.getString(R.string.message_generation_interrupted);
+                    }
                 }
         );
         directoryPickerController = new DirectoryPickerController(

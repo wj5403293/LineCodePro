@@ -4,13 +4,24 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import cn.lineai.data.repository.ToolSettingsStore;
+import cn.lineai.model.McpSettingsState;
+import cn.lineai.model.McpToolConfig;
+import cn.lineai.model.WebSearchConfig;
+import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolCall;
+import cn.lineai.tool.ToolExecutor;
+import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.tool.builtin.AgentTool;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import org.json.JSONObject;
 import org.junit.Test;
 
@@ -168,6 +179,36 @@ public final class AgentExecutionControllerTest {
         assertTrue(prompt.contains("只读取代码"));
     }
 
+    @Test
+    public void shellExecuteWaitsForConfirmationBeforeRunningInsideAgent() throws Exception {
+        ToolRegistry registry = new ToolRegistry();
+        ConfirmTool shell = new ConfirmTool("shell_execute");
+        registry.register(shell);
+        ConfirmingSettings settings = new ConfirmingSettings();
+        ToolExecutor executor = new ToolExecutor(registry, settings);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
+        controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> {
+            assertEquals("agent_call_agent_0", displayToolCallId);
+            return "accepted";
+        });
+
+        ToolResult result = controller.executeAgentToolCall(
+                new ToolCall("shell_1", "shell_execute", "{\"command\":\"pwd\"}"),
+                Collections.singleton("shell_execute"),
+                AgentTool.TYPE_SUB_CODING,
+                Collections.emptyList(),
+                "",
+                progress,
+                new FakeHost(),
+                null);
+
+        assertFalse(result.isError());
+        assertEquals("accepted", result.getReviewState());
+        assertEquals("ran shell_execute", result.getContent());
+        assertEquals(1, shell.runCount);
+    }
+
     private static final class FakeTool extends BaseTool {
         private final String name;
         private final ToolCategory category;
@@ -200,6 +241,174 @@ public final class AgentExecutionControllerTest {
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
             return new ToolResult("", name, "", false);
+        }
+    }
+
+    private static final class ConfirmTool extends BaseTool {
+        private final String name;
+        private int runCount;
+
+        ConfirmTool(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String getDescription() {
+            return "confirm " + name;
+        }
+
+        @Override
+        public ToolCategory getCategory() {
+            return ToolCategory.SYSTEM;
+        }
+
+        @Override
+        public JSONObject getParameters() {
+            return new JSONObject();
+        }
+
+        @Override
+        public boolean requiresConfirmation() {
+            return true;
+        }
+
+        @Override
+        public ToolResult execute(JSONObject input, ToolContext context) {
+            runCount++;
+            return new ToolResult("", getName(), "ran " + getName(), false);
+        }
+    }
+
+    private static final class FakeHost implements AgentExecutionController.Host {
+        @Override
+        public String projectPath() {
+            return "";
+        }
+
+        @Override
+        public String projectSource() {
+            return "";
+        }
+
+        @Override
+        public void syncModePermission() {
+        }
+
+        @Override
+        public void addOrReplaceToolResult(ToolResult result) {
+        }
+
+        @Override
+        public void render() {
+        }
+
+        @Override
+        public void scheduleAgentProgressRender(AgentProgressSession session) {
+        }
+
+        @Override
+        public void postToolProgress(int generationId, cn.lineai.ai.ModelCancellationToken cancellationToken, String toolCallId, String toolName, String content, boolean error) {
+        }
+    }
+
+    private static final class ConfirmingSettings implements ToolSettingsStore {
+        @Override
+        public String getPermissionMode() {
+            return PERMISSION_CONFIRM;
+        }
+
+        @Override
+        public void setPermissionMode(String mode) {
+        }
+
+        @Override
+        public String getExecutionMode() {
+            return EXECUTION_SSH;
+        }
+
+        @Override
+        public void setExecutionMode(String mode) {
+        }
+
+        @Override
+        public List<McpToolConfig> getConfigs() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public McpSettingsState getMcpSettingsState() {
+            return null;
+        }
+
+        @Override
+        public WebSearchConfig getWebSearchConfig() {
+            return null;
+        }
+
+        @Override
+        public void setWebSearchConfig(WebSearchConfig config) {
+        }
+
+        @Override
+        public String getImageUnderstandingModelId() {
+            return "";
+        }
+
+        @Override
+        public void setImageUnderstandingModelId(String modelId) {
+        }
+
+        @Override
+        public String getImageGenerationModelId() {
+            return "";
+        }
+
+        @Override
+        public void setImageGenerationModelId(String modelId) {
+        }
+
+        @Override
+        public void setMcpEnabled(String id, boolean enabled) {
+        }
+
+        @Override
+        public Set<String> getEnabledToolNames() {
+            return new HashSet<>(Collections.singletonList("shell_execute"));
+        }
+
+        @Override
+        public Set<String> getEnabledToolNames(Collection<BaseTool> implementedTools) {
+            return getEnabledToolNames();
+        }
+
+        @Override
+        public PermissionResult canExecuteTool(String toolName, ToolCategory category) {
+            return PermissionResult.allowed();
+        }
+
+        @Override
+        public boolean needsConfirmation(String toolName) {
+            return true;
+        }
+
+        @Override
+        public String buildToolPrompt(Set<String> implementedToolNames) {
+            return "";
+        }
+
+        @Override
+        public String buildToolPrompt(Set<String> implementedToolNames, boolean nativeToolProtocol) {
+            return "";
+        }
+
+        @Override
+        public String buildToolPrompt(Collection<BaseTool> implementedTools, boolean nativeToolProtocol) {
+            return "";
         }
     }
 }

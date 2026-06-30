@@ -6,6 +6,8 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -16,6 +18,9 @@ import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
 
 public final class DirectoryPickerSheetView extends FrameLayout {
+    private static final long OPEN_MS = 180L;
+    private static final long CLOSE_MS = 150L;
+
     public interface Listener {
         void onDirectoryPickerClosed();
 
@@ -108,6 +113,10 @@ public final class DirectoryPickerSheetView extends FrameLayout {
     }
 
     public void show(String title, String subtitle, FileTreeNode tree, String selectedPath, boolean loading, String message) {
+        boolean wasVisible = getVisibility() == VISIBLE;
+        panel.animate().cancel();
+        confirmButton.animate().cancel();
+        backdrop.animate().cancel();
         this.selectedPath = selectedPath == null ? "" : selectedPath;
         titleView.setText(title == null ? "" : title);
         subtitleView.setText(subtitle == null ? "" : subtitle);
@@ -131,18 +140,84 @@ public final class DirectoryPickerSheetView extends FrameLayout {
         }
 
         confirmButton.setVisibility(this.selectedPath.length() == 0 ? GONE : VISIBLE);
-        setVisibility(VISIBLE);
-        bringToFront();
+        if (wasVisible) {
+            bringToFront();
+            panel.setTranslationX(0f);
+            confirmButton.setTranslationX(0f);
+            backdrop.setAlpha(1f);
+        } else {
+            openAnimated();
+        }
     }
 
     public void close() {
         if (getVisibility() != VISIBLE) {
             return;
         }
-        setVisibility(GONE);
-        if (listener != null) {
-            listener.onDirectoryPickerClosed();
-        }
+        closeAnimated();
+    }
+
+    private void openAnimated() {
+        panel.animate().cancel();
+        confirmButton.animate().cancel();
+        backdrop.animate().cancel();
+        setVisibility(VISIBLE);
+        bringToFront();
+        float offset = pageOffset();
+        panel.setTranslationX(offset);
+        confirmButton.setTranslationX(offset);
+        backdrop.setAlpha(0f);
+        panel.animate()
+                .translationX(0f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        confirmButton.animate()
+                .translationX(0f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(1f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void closeAnimated() {
+        panel.animate().cancel();
+        confirmButton.animate().cancel();
+        backdrop.animate().cancel();
+        float offset = pageOffset();
+        panel.animate()
+                .translationX(offset)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .start();
+        confirmButton.animate()
+                .translationX(offset)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(0f)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    setVisibility(GONE);
+                    panel.setTranslationX(0f);
+                    confirmButton.setTranslationX(0f);
+                    backdrop.setAlpha(1f);
+                    if (listener != null) {
+                        listener.onDirectoryPickerClosed();
+                    }
+                })
+                .start();
+    }
+
+    private int pageOffset() {
+        int width = getWidth();
+        return width > 0 ? width : getResources().getDisplayMetrics().widthPixels;
     }
 
     private void addStatus(String text) {

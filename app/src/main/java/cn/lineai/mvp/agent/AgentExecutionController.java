@@ -14,6 +14,7 @@ import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpRequestHeader;
@@ -47,10 +48,11 @@ public final class AgentExecutionController {
 
     private final ModelClient modelClient;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
-    private final ToolSettingsRepository toolSettingsRepository;
+    private final ToolSettingsStore toolSettingsRepository;
     private final ToolExecutor toolExecutor;
     private final ToolRegistry toolRegistry;
     private final ExtensionRepository extensionRepository;
+    private ToolReviewAwaiter toolReviewAwaiter;
 
     public interface Host {
         String projectPath();
@@ -68,10 +70,18 @@ public final class AgentExecutionController {
         void postToolProgress(int generationId, ModelCancellationToken cancellationToken, String toolCallId, String toolName, String content, boolean error);
     }
 
+    public interface ToolReviewAwaiter {
+        String awaitReview(String displayToolCallId, ToolCall call, ModelCancellationToken cancellationToken) throws InterruptedException;
+
+        default boolean isAutoConfirmed(ToolCall call) {
+            return false;
+        }
+    }
+
     public AgentExecutionController(
             ModelClient modelClient,
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
-            ToolSettingsRepository toolSettingsRepository,
+            ToolSettingsStore toolSettingsRepository,
             ToolExecutor toolExecutor,
             ToolRegistry toolRegistry,
             ExtensionRepository extensionRepository
@@ -82,6 +92,10 @@ public final class AgentExecutionController {
         this.toolExecutor = toolExecutor;
         this.toolRegistry = toolRegistry;
         this.extensionRepository = extensionRepository;
+    }
+
+    public void setToolReviewAwaiter(ToolReviewAwaiter toolReviewAwaiter) {
+        this.toolReviewAwaiter = toolReviewAwaiter;
     }
 
     public ToolResult runAgentTool(
@@ -306,7 +320,7 @@ public final class AgentExecutionController {
                         }
                         return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
                     }
-                    ToolResult toolResult = executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath, host);
+                    ToolResult toolResult = executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath, progress, host, cancellationToken);
                     toolCallCount++;
                     if (progress != null) {
                         progress.putToolResult(call, toolResult);
@@ -416,6 +430,19 @@ public final class AgentExecutionController {
             String homePath,
             Host host
     ) {
+        return executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath, null, host, null);
+    }
+
+    public ToolResult executeAgentToolCall(
+            ToolCall call,
+            Set<String> allowedToolNames,
+            String type,
+            List<String> writeScope,
+            String homePath,
+            AgentProgressSession progress,
+            Host host,
+            ModelCancellationToken cancellationToken
+    ) {
         host.syncModePermission();
         if (call == null) {
             return new ToolResult("", "", "Agent 工具调用为空", true);
@@ -423,12 +450,63 @@ public final class AgentExecutionController {
         if (!allowedToolNames.contains(call.getName())) {
             return new ToolResult(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
         }
-        ToolContext context = new ToolContext(homePath, extensionRepository.skillWriteRoots(homePath), null, "", null);
+        ToolContext context = new ToolContext(homePath, skillWriteRoots(homePath), null, "", null);
         ToolResult scopeError = validateAgentWriteScope(call, type, writeScope, context);
         if (scopeError != null) {
             return scopeError;
         }
+        if (requiresToolConfirmation(call)) {
+            return executeAgentToolCallWithReview(call, context, progress, host, cancellationToken);
+        }
         return toolExecutor.execute(call, context);
+    }
+
+    private List<String> skillWriteRoots(String homePath) {
+        return extensionRepository == null ? Collections.emptyList() : extensionRepository.skillWriteRoots(homePath);
+    }
+
+    private ToolResult executeAgentToolCallWithReview(
+            ToolCall call,
+            ToolContext context,
+            AgentProgressSession progress,
+            Host host,
+            ModelCancellationToken cancellationToken
+    ) {
+        if (progress == null || toolReviewAwaiter == null) {
+            return toolExecutor.execute(call, context);
+        }
+        String displayToolCallId = progress.displayToolCallId(call);
+        ToolResult pending = new ToolResult(call.getId(), call.getName(), "", false, "", "pending", "");
+        progress.putToolResult(call, pending);
+        progress.setFinished("pending", false, "");
+        host.addOrReplaceToolResult(progress.snapshotResult());
+        host.render();
+        try {
+            String state = toolReviewAwaiter.awaitReview(displayToolCallId, call, cancellationToken);
+            progress.setStatus("running", false);
+            if ("rejected".equals(state)) {
+                return new ToolResult(call.getId(), call.getName(), "用户拒绝执行此工具。", true, "", "rejected", "");
+            }
+            progress.putToolResult(call, new ToolResult(call.getId(), call.getName(), "", false, "", "accepted", ""));
+            host.addOrReplaceToolResult(progress.snapshotResult());
+            host.render();
+            return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ToolResult(call.getId(), call.getName(), "等待工具确认时被中断。", true);
+        }
+    }
+
+    private boolean requiresToolConfirmation(ToolCall call) {
+        if (call == null || toolReviewAwaiter == null || toolRegistry == null || toolSettingsRepository == null) {
+            return false;
+        }
+        BaseTool tool = toolRegistry.get(call.getName());
+        return tool != null
+                && tool.requiresConfirmation()
+                && !toolReviewAwaiter.isAutoConfirmed(call)
+                && toolSettingsRepository.canExecuteTool(tool.getName(), tool.getCategory()).isAllowed()
+                && ("file_delete".equals(tool.getName()) || toolSettingsRepository.needsConfirmation(tool.getName()));
     }
 
     public String agentSystemPrompt(

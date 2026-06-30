@@ -23,6 +23,8 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
     private boolean expanded = true;
     private ToolCall lastToolCall;
     private ToolResult lastResult;
+    private String projectPath = "";
+    private ToolReviewListener toolReviewListener;
 
     public ToolCallAgentPipelineView(Context context) {
         super(context);
@@ -43,6 +45,7 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         boolean error = result != null && (result.isError() || (progress != null && "error".equals(progress.optString("status"))));
         HashMap<String, AgentSummary> summaryById = progress != null ? parseProgress(progress) : parseResult(result);
         int failed = error ? Math.max(progress == null ? 1 : 0, failedCount(summaryById)) : failedCount(summaryById);
+        int pendingReview = pendingReviewCount(summaryById);
         int completed = summaryById.isEmpty() && complete && total > 0 && !error ? total : doneCount(summaryById);
         int running = complete ? 0 : runningCount(summaryById);
         if (!complete && running == 0 && progress == null && total > 0) {
@@ -83,7 +86,10 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         if (running > 0) {
             summary.addView(summaryItem(IconButtonView.LOADER, getContext().getString(R.string.tool_call_pipeline_summary_running, running), LineTheme.ACCENT));
         }
-        int waiting = Math.max(0, total - completed - running - failed);
+        if (pendingReview > 0) {
+            summary.addView(summaryItem(IconButtonView.CLOCK_3, getContext().getString(R.string.tool_call_pipeline_summary_pending_review, pendingReview), LineTheme.WARNING));
+        }
+        int waiting = Math.max(0, total - completed - running - pendingReview - failed);
         if (waiting > 0) {
             summary.addView(summaryItem(IconButtonView.CLOCK_3, getContext().getString(R.string.tool_call_pipeline_summary_waiting, waiting), LineTheme.TEXT_TERTIARY));
         }
@@ -144,6 +150,14 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
+    public void setProjectPath(String projectPath) {
+        this.projectPath = projectPath == null ? "" : projectPath;
+    }
+
+    public void setToolReviewListener(ToolReviewListener listener) {
+        toolReviewListener = listener;
+    }
+
     private View summaryItem(int iconType, String text, int color) {
         LinearLayout item = new LinearLayout(getContext());
         item.setOrientation(HORIZONTAL);
@@ -166,11 +180,12 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         String type = normalizeType(agent.optString("type"));
         String rowStatus = summary == null ? "" : summary.status;
         boolean running = "running".equals(rowStatus);
+        boolean pendingReview = "pending".equals(rowStatus);
         boolean done = "done".equals(rowStatus) || (complete && summary != null && !summary.error) || (complete && summary == null && !pipelineError);
         boolean error = (summary != null && summary.error) || "error".equals(rowStatus) || (complete && pipelineError && summary == null);
-        String status = error ? getContext().getString(R.string.tool_call_status_failed) : running ? getContext().getString(R.string.tool_call_status_running) : done ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_pipeline_status_waiting);
+        String status = error ? getContext().getString(R.string.tool_call_status_failed) : pendingReview ? getContext().getString(R.string.tool_call_status_pending_review) : running ? getContext().getString(R.string.tool_call_status_running) : done ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_pipeline_status_waiting);
         int typeColor = "explore".equals(type) ? LineTheme.ACCENT : LineTheme.DANGER;
-        int statusColor = error ? LineTheme.DANGER : running ? LineTheme.ACCENT : done ? LineTheme.SUCCESS : LineTheme.TEXT_TERTIARY;
+        int statusColor = error ? LineTheme.DANGER : pendingReview ? LineTheme.WARNING : running ? LineTheme.ACCENT : done ? LineTheme.SUCCESS : LineTheme.TEXT_TERTIARY;
 
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(VERTICAL);
@@ -219,7 +234,7 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         textBlock.addView(meta, metaParams);
 
         IconButtonView statusIcon = new IconButtonView(getContext(),
-                error ? IconButtonView.CIRCLE_X : running ? IconButtonView.LOADER : done ? IconButtonView.CIRCLE_CHECK : IconButtonView.CLOCK_3);
+                error ? IconButtonView.CIRCLE_X : running ? IconButtonView.LOADER : pendingReview ? IconButtonView.CLOCK_3 : done ? IconButtonView.CIRCLE_CHECK : IconButtonView.CLOCK_3);
         statusIcon.setIconColor(statusColor);
         statusIcon.setIconSizeDp(16, 12);
         statusIcon.setClickable(false);
@@ -240,6 +255,7 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
             outputParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
             row.addView(output, outputParams);
         }
+        addNestedToolCalls(row, summary == null ? null : summary.toolCalls);
 
         LayoutParams rowParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         rowParams.bottomMargin = LineTheme.dp(getContext(), LineTheme.XS);
@@ -290,7 +306,8 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
                     object.optString("output"),
                     object.optString("thinking"),
                     status,
-                    error
+                    error,
+                    object.optJSONArray("tool_calls")
             ));
         }
         return values;
@@ -323,7 +340,7 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
             if (outputStart >= 0 && outputStart < text.length()) {
                 output = text.substring(outputStart).trim();
             }
-            values.put(id, new AgentSummary(output, "", error ? "error" : "done", error));
+            values.put(id, new AgentSummary(output, "", error ? "error" : "done", error, null));
         }
         return values;
     }
@@ -370,6 +387,54 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         return count;
     }
 
+    private int pendingReviewCount(HashMap<String, AgentSummary> summaryById) {
+        int count = 0;
+        for (AgentSummary summary : summaryById.values()) {
+            if ("pending".equals(summary.status)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void addNestedToolCalls(LinearLayout row, JSONArray nestedToolCalls) {
+        if (nestedToolCalls == null || nestedToolCalls.length() == 0) {
+            return;
+        }
+        LinearLayout tools = new LinearLayout(getContext());
+        tools.setOrientation(VERTICAL);
+        LayoutParams toolsParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        toolsParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
+        row.addView(tools, toolsParams);
+        for (int i = 0; i < nestedToolCalls.length(); i++) {
+            JSONObject item = nestedToolCalls.optJSONObject(i);
+            if (item == null) {
+                continue;
+            }
+            ToolCall call = new ToolCall(item.optString("id"), item.optString("name"), item.optString("arguments", "{}"));
+            ToolResult result = null;
+            JSONObject resultObject = item.optJSONObject("result");
+            if (resultObject != null) {
+                result = new ToolResult(
+                        call.getId(),
+                        call.getName(),
+                        resultObject.optString("content"),
+                        resultObject.optBoolean("is_error"),
+                        resultObject.optString("diff_id"),
+                        resultObject.optString("review_state"),
+                        resultObject.optString("review_message")
+                );
+            }
+            ToolCallBlockView block = new ToolCallBlockView(getContext());
+            block.setProjectPath(projectPath);
+            block.setToolReviewListener(toolReviewListener);
+            block.bind(call, result);
+            LayoutParams blockParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            blockParams.topMargin = LineTheme.dp(getContext(), LineTheme.XS);
+            tools.addView(block, blockParams);
+        }
+    }
+
     private String normalizeType(String type) {
         String value = type == null ? "" : type.trim().toLowerCase(Locale.US);
         if ("sub_coding".equals(value) || "subcoding".equals(value) || "coding".equals(value)) {
@@ -387,12 +452,14 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         private final String thinking;
         private final String status;
         private final boolean error;
+        private final JSONArray toolCalls;
 
-        AgentSummary(String output, String thinking, String status, boolean error) {
+        AgentSummary(String output, String thinking, String status, boolean error, JSONArray toolCalls) {
             this.output = output == null ? "" : output;
             this.thinking = thinking == null ? "" : thinking;
             this.status = status == null || status.length() == 0 ? "waiting" : status;
             this.error = error;
+            this.toolCalls = toolCalls;
         }
     }
 }

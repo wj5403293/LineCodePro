@@ -59,6 +59,8 @@ public final class ToolCallBlockView extends LinearLayout {
         }
         if (ToolCallUtils.isAgentPipelineTool(name)) {
             ToolCallAgentPipelineView view = new ToolCallAgentPipelineView(getContext());
+            view.setToolReviewListener(toolReviewListener);
+            view.setProjectPath(projectPath);
             view.bind(toolCall, result);
             addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
@@ -127,6 +129,8 @@ public final class ToolCallBlockView extends LinearLayout {
             ((ToolCallDeleteView) getChildAt(0)).setToolReviewListener(listener);
         } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentView) {
             ((ToolCallAgentView) getChildAt(0)).setToolReviewListener(listener);
+        } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentPipelineView) {
+            ((ToolCallAgentPipelineView) getChildAt(0)).setToolReviewListener(listener);
         } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallShellView) {
             ((ToolCallShellView) getChildAt(0)).setToolReviewListener(listener);
         }
@@ -142,6 +146,8 @@ public final class ToolCallBlockView extends LinearLayout {
             ((ToolCallDeleteView) getChildAt(0)).setProjectPath(this.projectPath);
         } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentView) {
             ((ToolCallAgentView) getChildAt(0)).setProjectPath(this.projectPath);
+        } else if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentPipelineView) {
+            ((ToolCallAgentPipelineView) getChildAt(0)).setProjectPath(this.projectPath);
         }
     }
 

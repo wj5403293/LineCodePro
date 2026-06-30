@@ -48,15 +48,16 @@ public final class ToolCallAgentView extends BaseToolCallView {
                 : progress.optString("type", isCustomAgent ? "sub-coding" : input.optString("type")));
         String progressStatus = progress == null ? "" : progress.optString("status");
         boolean running = progress != null && ("running".equals(progressStatus) || "waiting_unlock".equals(progressStatus));
-        boolean complete = result != null && !running;
+        boolean pendingReview = "pending".equals(progressStatus);
+        boolean complete = result != null && !running && !pendingReview;
         boolean error = result != null && (result.isError() || "error".equals(progressStatus));
         String output = progress == null ? outputText(result) : progress.optString("output");
         String thinking = progress == null ? "" : progress.optString("thinking");
         JSONArray nestedToolCalls = progress == null ? null : progress.optJSONArray("tool_calls");
         int toolCount = progress == null ? toolCount(result) : progress.optInt("tool_call_count", nestedToolCalls == null ? 0 : nestedToolCalls.length());
-        String status = error ? getContext().getString(R.string.tool_call_status_failed) : complete ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_status_running);
+        String status = error ? getContext().getString(R.string.tool_call_status_failed) : pendingReview ? getContext().getString(R.string.tool_call_status_pending_review) : complete ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_status_running);
         int typeColor = "explore".equals(type) ? LineTheme.ACCENT : LineTheme.DANGER;
-        int statusColor = error ? LineTheme.DANGER : complete ? LineTheme.SUCCESS : LineTheme.ACCENT;
+        int statusColor = error ? LineTheme.DANGER : pendingReview ? LineTheme.WARNING : complete ? LineTheme.SUCCESS : LineTheme.ACCENT;
 
         LinearLayout header = new LinearLayout(getContext());
         header.setOrientation(HORIZONTAL);
@@ -96,18 +97,18 @@ public final class ToolCallAgentView extends BaseToolCallView {
         metaParams.topMargin = LineTheme.dp(getContext(), 3);
         titleBlock.addView(meta, metaParams);
 
-        if (!complete) {
+        if (!complete && !pendingReview) {
             ProgressBar bar = new ProgressBar(getContext());
             bar.setIndeterminate(true);
             header.addView(bar, new LayoutParams(LineTheme.dp(getContext(), 18), LineTheme.dp(getContext(), 18)));
         } else {
-            IconButtonView statusIcon = new IconButtonView(getContext(), error ? IconButtonView.CIRCLE_X : IconButtonView.CIRCLE_CHECK);
+            IconButtonView statusIcon = new IconButtonView(getContext(), error ? IconButtonView.CIRCLE_X : pendingReview ? IconButtonView.CLOCK_3 : IconButtonView.CIRCLE_CHECK);
             statusIcon.setIconColor(statusColor);
             statusIcon.setIconSizeDp(18, 13);
             statusIcon.setClickable(false);
             header.addView(statusIcon, new LayoutParams(LineTheme.dp(getContext(), 18), LineTheme.dp(getContext(), 18)));
         }
-        TextView statusText = LineTheme.text(getContext(), status, LineTheme.FONT_XS, error ? LineTheme.DANGER : LineTheme.TEXT_TERTIARY, Typeface.BOLD);
+        TextView statusText = LineTheme.text(getContext(), status, LineTheme.FONT_XS, statusColor, Typeface.BOLD);
         LayoutParams statusParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         statusParams.leftMargin = LineTheme.dp(getContext(), LineTheme.XS);
         header.addView(statusText, statusParams);

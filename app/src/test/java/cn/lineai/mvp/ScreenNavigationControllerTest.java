@@ -15,7 +15,19 @@ public final class ScreenNavigationControllerTest {
         controller.backFrom("settings", host);
 
         Assert.assertEquals("settings", host.lastScreenId);
+        Assert.assertFalse(host.lastForward);
         Assert.assertTrue(host.chatShown);
+    }
+
+    @Test
+    public void forwardNavigationMarksForwardDirection() {
+        ScreenNavigationController controller = new ScreenNavigationController();
+        RecordingHost host = new RecordingHost();
+
+        controller.showScreen("settings", host);
+
+        Assert.assertEquals("settings", host.lastScreenId);
+        Assert.assertTrue(host.lastForward);
     }
 
     @Test
@@ -64,6 +76,7 @@ public final class ScreenNavigationControllerTest {
 
     private static final class RecordingHost implements ScreenNavigationController.Host {
         private String lastScreenId = "";
+        private boolean lastForward;
         private boolean chatShown;
 
         @Override
@@ -73,6 +86,12 @@ public final class ScreenNavigationControllerTest {
         @Override
         public void showScreen(String screenId) {
             lastScreenId = screenId;
+        }
+
+        @Override
+        public void showScreen(String screenId, boolean forward) {
+            lastScreenId = screenId;
+            lastForward = forward;
         }
 
         @Override

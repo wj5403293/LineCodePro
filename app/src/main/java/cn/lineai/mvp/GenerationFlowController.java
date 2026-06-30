@@ -32,9 +32,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
 final class GenerationFlowController {
@@ -80,6 +82,7 @@ final class GenerationFlowController {
     private final BackgroundTaskRunner backgroundTasks;
     private final Host host;
     private final Set<String> sessionAutoConfirmedTools = new HashSet<>();
+    private final HashMap<String, PendingAgentToolReview> pendingAgentToolReviews = new HashMap<>();
     private final StringBuilder pendingStreamTextDelta = new StringBuilder();
     private final StringBuilder pendingStreamReasoningDelta = new StringBuilder();
     private final HashMap<String, StringBuilder> streamingRawTextByMessageId = new HashMap<>();
@@ -218,6 +221,19 @@ final class GenerationFlowController {
         this.mainThread = mainThread;
         this.backgroundTasks = backgroundTasks;
         this.host = host;
+        if (this.agentExecutionController != null) {
+            this.agentExecutionController.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
+                @Override
+                public String awaitReview(String displayToolCallId, ToolCall call, ModelCancellationToken cancellationToken) throws InterruptedException {
+                    return awaitAgentToolReview(displayToolCallId, call, cancellationToken);
+                }
+
+                @Override
+                public boolean isAutoConfirmed(ToolCall call) {
+                    return isSessionAutoConfirmed(call);
+                }
+            });
+        }
     }
 
     void startInitialModelRequest(
@@ -260,6 +276,31 @@ final class GenerationFlowController {
 
     void handleToolReview(String state) {
         PendingToolExecution pending = pendingToolExecution;
+        if (pending == null) {
+            return;
+        }
+        handlePendingToolReview(pending, state);
+    }
+
+    boolean handleAgentToolReview(String toolCallId, String state) {
+        if (toolCallId == null || toolCallId.length() == 0) {
+            return false;
+        }
+        PendingAgentToolReview pending;
+        synchronized (pendingAgentToolReviews) {
+            pending = pendingAgentToolReviews.get(toolCallId);
+        }
+        if (pending == null) {
+            return false;
+        }
+        pending.resolve(state);
+        if (isSessionAutoReview(state, pending.toolCall())) {
+            rememberSessionAutoConfirmation(pending.toolCall());
+        }
+        return true;
+    }
+
+    private void handlePendingToolReview(PendingToolExecution pending, String state) {
         if (pending == null || pending.getToolCall() == null) {
             return;
         }
@@ -396,6 +437,7 @@ final class GenerationFlowController {
 
     void cancelActiveGeneration() {
         pendingToolExecution = null;
+        rejectPendingAgentToolReviews();
         clearStreamingRawText();
     }
 
@@ -732,6 +774,34 @@ final class GenerationFlowController {
                 todoStateStore);
     }
 
+    private String awaitAgentToolReview(
+            String displayToolCallId,
+            ToolCall call,
+            ModelCancellationToken cancellationToken
+    ) throws InterruptedException {
+        if (displayToolCallId == null || displayToolCallId.length() == 0) {
+            return "accepted";
+        }
+        PendingAgentToolReview pending = new PendingAgentToolReview(call);
+        synchronized (pendingAgentToolReviews) {
+            pendingAgentToolReviews.put(displayToolCallId, pending);
+        }
+        try {
+            while (true) {
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    return "rejected";
+                }
+                if (pending.await(250L)) {
+                    return pending.state();
+                }
+            }
+        } finally {
+            synchronized (pendingAgentToolReviews) {
+                pendingAgentToolReviews.remove(displayToolCallId);
+            }
+        }
+    }
+
     private void executeAcceptedPendingTool(PendingToolExecution pending) {
         backgroundTasks.execute("linecode-tool-confirmed", () -> {
             ToolResult result;
@@ -985,6 +1055,17 @@ final class GenerationFlowController {
         toolMessageController.addTerminatedResultsForUnfinishedToolCalls(terminatedMessage);
     }
 
+    private void rejectPendingAgentToolReviews() {
+        synchronized (pendingAgentToolReviews) {
+            for (PendingAgentToolReview pending : pendingAgentToolReviews.values()) {
+                if (pending != null) {
+                    pending.resolve("rejected");
+                }
+            }
+            pendingAgentToolReviews.clear();
+        }
+    }
+
     private void addOrReplaceToolResult(ToolResult result) {
         toolMessageController.addOrReplaceToolResult(result);
     }
@@ -1025,6 +1106,33 @@ final class GenerationFlowController {
         }
         String name = error.getClass().getSimpleName();
         return name.length() == 0 ? "未知错误" : name;
+    }
+
+    private static final class PendingAgentToolReview {
+        private final CountDownLatch latch = new CountDownLatch(1);
+        private final ToolCall toolCall;
+        private String state = "accepted";
+
+        PendingAgentToolReview(ToolCall toolCall) {
+            this.toolCall = toolCall;
+        }
+
+        boolean await(long timeoutMs) throws InterruptedException {
+            return latch.await(Math.max(1L, timeoutMs), TimeUnit.MILLISECONDS);
+        }
+
+        void resolve(String nextState) {
+            state = "rejected".equals(nextState) ? "rejected" : "accepted";
+            latch.countDown();
+        }
+
+        String state() {
+            return state;
+        }
+
+        ToolCall toolCall() {
+            return toolCall;
+        }
     }
 
     private int findMessageIndex(String id) {

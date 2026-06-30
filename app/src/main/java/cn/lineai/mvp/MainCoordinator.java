@@ -130,6 +130,15 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
         }
 
         @Override
+        public void showScreen(String screenId, boolean forward) {
+            if (view instanceof cn.lineai.ui.MainChatView) {
+                ((cn.lineai.ui.MainChatView) view).showScreen(screenId, forward);
+            } else if (view != null) {
+                view.showScreen(screenId);
+            }
+        }
+
+        @Override
         public void showChatScreen() {
             if (view != null) {
                 view.showChatScreen();

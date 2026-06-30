@@ -110,6 +110,15 @@ public final class AgentProgressSession {
         }
     }
 
+    public synchronized String displayToolCallId(ToolCall call) {
+        if (call == null || call.getId().length() == 0 || call.getName().length() == 0) {
+            return "";
+        }
+        addToolCalls(Collections.singletonList(call));
+        String displayId = displayIdByOriginalId.get(call.getId());
+        return displayId == null ? "" : displayId;
+    }
+
     public synchronized void putToolResult(ToolCall originalCall, ToolResult result) {
         if (originalCall == null || result == null) {
             return;
@@ -131,6 +140,11 @@ public final class AgentProgressSession {
         modelContent = nextModelContent == null ? "" : nextModelContent;
     }
 
+    public synchronized void setStatus(String nextStatus, boolean nextError) {
+        status = nextStatus == null || nextStatus.length() == 0 ? status : nextStatus;
+        error = nextError;
+    }
+
     public synchronized boolean shouldScheduleRender() {
         if ((!canRender() && !canMirror()) || renderScheduled) {
             return false;
@@ -140,21 +154,29 @@ public final class AgentProgressSession {
     }
 
     public synchronized long renderDelayMs() {
-        long now = SystemClock.uptimeMillis();
+        long now = uptimeMillis();
         return Math.max(0L, AGENT_PROGRESS_RENDER_INTERVAL_MS - (now - lastRenderAt));
     }
 
     public synchronized ToolResult snapshotResult() {
         renderScheduled = false;
-        lastRenderAt = SystemClock.uptimeMillis();
+        lastRenderAt = uptimeMillis();
         return new ToolResult(toolCallId, toolName, payload(), error);
     }
 
     public synchronized void notifyMirror() {
         if (mirror != null) {
             renderScheduled = false;
-            lastRenderAt = SystemClock.uptimeMillis();
+            lastRenderAt = uptimeMillis();
             mirror.onAgentProgress(payload(), error);
+        }
+    }
+
+    private long uptimeMillis() {
+        try {
+            return SystemClock.uptimeMillis();
+        } catch (RuntimeException ignored) {
+            return System.currentTimeMillis();
         }
     }
 

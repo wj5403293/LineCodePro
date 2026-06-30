@@ -6,6 +6,8 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -18,6 +20,9 @@ import java.util.List;
 import java.util.Set;
 
 public final class AttachmentPickerSheetView extends FrameLayout {
+    private static final long OPEN_MS = 180L;
+    private static final long CLOSE_MS = 150L;
+
     public interface Listener {
         void onAttachmentPickerClosed();
 
@@ -102,6 +107,9 @@ public final class AttachmentPickerSheetView extends FrameLayout {
             String message,
             String source
     ) {
+        boolean wasVisible = getVisibility() == VISIBLE;
+        panel.animate().cancel();
+        backdrop.animate().cancel();
         this.selectedPaths = new HashSet<>(selectedPaths == null ? java.util.Collections.emptyList() : selectedPaths);
         this.source = source == null || source.length() == 0 ? "local" : source;
         titleView.setText(title == null ? "" : title);
@@ -123,18 +131,67 @@ public final class AttachmentPickerSheetView extends FrameLayout {
             addNodeRow(treeList, tree, 0, true);
         }
 
-        setVisibility(VISIBLE);
-        bringToFront();
+        if (wasVisible) {
+            bringToFront();
+            panel.setTranslationX(0f);
+            backdrop.setAlpha(1f);
+        } else {
+            openAnimated();
+        }
     }
 
     public void close() {
         if (getVisibility() != VISIBLE) {
             return;
         }
-        setVisibility(GONE);
-        if (listener != null) {
-            listener.onAttachmentPickerClosed();
-        }
+        closeAnimated();
+    }
+
+    private void openAnimated() {
+        panel.animate().cancel();
+        backdrop.animate().cancel();
+        setVisibility(VISIBLE);
+        bringToFront();
+        panel.setTranslationX(pageOffset());
+        backdrop.setAlpha(0f);
+        panel.animate()
+                .translationX(0f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(1f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void closeAnimated() {
+        panel.animate().cancel();
+        backdrop.animate().cancel();
+        panel.animate()
+                .translationX(pageOffset())
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(0f)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    setVisibility(GONE);
+                    panel.setTranslationX(0f);
+                    backdrop.setAlpha(1f);
+                    if (listener != null) {
+                        listener.onAttachmentPickerClosed();
+                    }
+                })
+                .start();
+    }
+
+    private int pageOffset() {
+        int width = getWidth();
+        return width > 0 ? width : getResources().getDisplayMetrics().widthPixels;
     }
 
     private void resizePanel() {

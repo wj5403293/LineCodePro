@@ -12,6 +12,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -26,6 +28,9 @@ import java.util.List;
 import java.util.Locale;
 
 public final class DrawerView extends FrameLayout {
+    private static final long OPEN_MS = 180L;
+    private static final long CLOSE_MS = 150L;
+
     public interface Listener {
         void onCloseDrawer();
 
@@ -84,8 +89,8 @@ public final class DrawerView extends FrameLayout {
         sidebar = new LinearLayout(context);
         sidebar.setOrientation(LinearLayout.VERTICAL);
         sidebar.setBackgroundColor(LineTheme.SURFACE_ELEVATED);
-        FrameLayout.LayoutParams sidebarParams = new FrameLayout.LayoutParams(LineTheme.dp(context, 300), LayoutParams.MATCH_PARENT);
-        sidebarParams.gravity = Gravity.START;
+        FrameLayout.LayoutParams sidebarParams = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, drawerHeight(context));
+        sidebarParams.gravity = Gravity.TOP;
         addView(sidebar, sidebarParams);
 
         LinearLayout header = new LinearLayout(context);
@@ -155,28 +160,50 @@ public final class DrawerView extends FrameLayout {
     }
 
     public void open() {
-        if (getVisibility() == VISIBLE) {
-            return;
+        sidebar.animate().cancel();
+        backdrop.animate().cancel();
+        if (getVisibility() != VISIBLE) {
+            setVisibility(VISIBLE);
+            sidebar.setTranslationY(-sidebarHeight());
+            backdrop.setAlpha(0f);
         }
-        setVisibility(VISIBLE);
         bringToFront();
-        sidebar.setTranslationX(-LineTheme.dp(getContext(), 300));
-        backdrop.setAlpha(0f);
-        sidebar.animate().translationX(0).setDuration(180).start();
-        backdrop.animate().alpha(1f).setDuration(200).start();
+        sidebar.animate()
+                .translationY(0f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(1f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
     }
 
     public void close() {
         if (getVisibility() != VISIBLE) {
             return;
         }
-        sidebar.animate().translationX(-LineTheme.dp(getContext(), 300)).setDuration(180).start();
-        backdrop.animate().alpha(0f).setDuration(150).withEndAction(() -> {
-            setVisibility(GONE);
-            if (listener != null) {
-                listener.onCloseDrawer();
-            }
-        }).start();
+        sidebar.animate().cancel();
+        backdrop.animate().cancel();
+        sidebar.animate()
+                .translationY(-sidebarHeight())
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(0f)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    setVisibility(GONE);
+                    sidebar.setTranslationY(0f);
+                    backdrop.setAlpha(1f);
+                    if (listener != null) {
+                        listener.onCloseDrawer();
+                    }
+                })
+                .start();
     }
 
     public boolean isFilesTabActive() {
@@ -262,6 +289,16 @@ public final class DrawerView extends FrameLayout {
         String safeLeft = left == null ? "" : left;
         String safeRight = right == null ? "" : right;
         return safeLeft.equals(safeRight);
+    }
+
+    private int sidebarHeight() {
+        int height = sidebar.getHeight();
+        return height > 0 ? height : drawerHeight(getContext());
+    }
+
+    private int drawerHeight(Context context) {
+        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        return Math.min(screenHeight - LineTheme.dp(context, 48), LineTheme.dp(context, 620));
     }
 
     private void renderConversations() {

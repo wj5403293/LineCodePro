@@ -80,8 +80,12 @@ public final class SshConnectionPool {
         Entry entry = entries.get(key);
         if (entry != null && !entry.closed && entry.lock.tryLock()) {
             if (!entry.session.isConnected() || entry.closed) {
-                closeQuietly(entry);
-                entries.remove(key, entry);
+                try {
+                    closeQuietly(entry);
+                    entries.remove(key, entry);
+                } finally {
+                    entry.lock.unlock();
+                }
             } else {
                 entry.inUse = true;
                 entry.lastUsedAtMs = System.currentTimeMillis();
@@ -90,6 +94,7 @@ public final class SshConnectionPool {
         }
         Session session = factory.createSession(config, timeoutMs);
         Entry created = new Entry(session);
+        created.lock.lock();
         created.inUse = true;
         entries.put(key, created);
         return session;
@@ -108,13 +113,16 @@ public final class SshConnectionPool {
             closeQuietlySession(session);
             return;
         }
-        entry.inUse = false;
-        entry.lastUsedAtMs = System.currentTimeMillis();
-        if (!session.isConnected() || entry.closed) {
-            closeQuietly(entry);
-            entries.remove(keyOf(config), entry);
+        try {
+            entry.inUse = false;
+            entry.lastUsedAtMs = System.currentTimeMillis();
+            if (!session.isConnected() || entry.closed) {
+                closeQuietly(entry);
+                entries.remove(keyOf(config), entry);
+            }
+        } finally {
+            entry.lock.unlock();
         }
-        entry.lock.unlock();
     }
 
     /**
@@ -127,8 +135,15 @@ public final class SshConnectionPool {
         String key = keyOf(config);
         Entry entry = entries.get(key);
         if (entry != null && entry.session == session) {
-            closeQuietly(entry);
-            entries.remove(key, entry);
+            try {
+                closeQuietly(entry);
+                entries.remove(key, entry);
+                entry.inUse = false;
+            } finally {
+                if (entry.lock.isHeldByCurrentThread()) {
+                    entry.lock.unlock();
+                }
+            }
         } else {
             closeQuietlySession(session);
         }

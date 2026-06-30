@@ -8,6 +8,10 @@ public final class ScreenNavigationController {
 
         void showScreen(String screenId);
 
+        default void showScreen(String screenId, boolean forward) {
+            showScreen(screenId);
+        }
+
         void showChatScreen();
     }
 
@@ -91,7 +95,7 @@ public final class ScreenNavigationController {
             if (screenStack.isEmpty()) {
                 screenStack.add(previousScreenId);
             }
-            showVisibleScreen(previousScreenId, host);
+            showVisibleScreen(previousScreenId, host, false);
         }
     }
 
@@ -156,10 +160,14 @@ public final class ScreenNavigationController {
     }
 
     private void showVisibleScreen(String screenId, Host host) {
+        showVisibleScreen(screenId, host, true);
+    }
+
+    private void showVisibleScreen(String screenId, Host host, boolean forward) {
         if (host == null) {
             return;
         }
         host.hideOverlays();
-        host.showScreen(screenId);
+        host.showScreen(screenId, forward);
     }
 }

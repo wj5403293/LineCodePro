@@ -11,6 +11,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -20,6 +22,9 @@ import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
 
 public final class BottomSheetView extends FrameLayout {
+    private static final long OPEN_MS = 180L;
+    private static final long CLOSE_MS = 150L;
+
     public interface Listener {
         void onSheetDismissed();
 
@@ -27,6 +32,7 @@ public final class BottomSheetView extends FrameLayout {
     }
 
     private final LinearLayout panel;
+    private final View backdrop;
     private Listener listener;
 
     public BottomSheetView(Context context) {
@@ -34,7 +40,7 @@ public final class BottomSheetView extends FrameLayout {
         setVisibility(GONE);
         setClickable(true);
 
-        View backdrop = new View(context);
+        backdrop = new View(context);
         backdrop.setBackgroundColor(LineTheme.OVERLAY);
         backdrop.setOnClickListener(v -> close());
         addView(backdrop, new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -82,18 +88,14 @@ public final class BottomSheetView extends FrameLayout {
         View bottomInset = new View(context);
         panel.addView(bottomInset, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(context, 34)));
 
-        setVisibility(VISIBLE);
-        bringToFront();
+        openAnimated();
     }
 
     public void close() {
         if (getVisibility() != VISIBLE) {
             return;
         }
-        setVisibility(GONE);
-        if (listener != null) {
-            listener.onSheetDismissed();
-        }
+        closeAnimated();
     }
 
     private View createOptionRow(SheetOption option) {
@@ -102,6 +104,53 @@ public final class BottomSheetView extends FrameLayout {
             attachDeleteLongPress(row, () -> showDeleteConfirmation(option));
         }
         return row;
+    }
+
+    private void openAnimated() {
+        panel.animate().cancel();
+        backdrop.animate().cancel();
+        setVisibility(VISIBLE);
+        bringToFront();
+        panel.setTranslationY(panelOffset());
+        backdrop.setAlpha(0f);
+        panel.animate()
+                .translationY(0f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(1f)
+                .setDuration(OPEN_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void closeAnimated() {
+        panel.animate().cancel();
+        backdrop.animate().cancel();
+        panel.animate()
+                .translationY(panelOffset())
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .start();
+        backdrop.animate()
+                .alpha(0f)
+                .setDuration(CLOSE_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    setVisibility(GONE);
+                    panel.setTranslationY(0f);
+                    backdrop.setAlpha(1f);
+                    if (listener != null) {
+                        listener.onSheetDismissed();
+                    }
+                })
+                .start();
+    }
+
+    private int panelOffset() {
+        int height = panel.getHeight();
+        return height > 0 ? height : getResources().getDisplayMetrics().heightPixels;
     }
 
     private View createOptionContentRow(SheetOption option) {

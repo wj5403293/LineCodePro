@@ -12,6 +12,8 @@ import android.net.Uri;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -75,6 +77,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 
 public final class MainChatView extends FrameLayout implements MainContract.View, BackNavigation.BackTarget {
+    private static final long SCREEN_ENTER_MS = 280L;
+    private static final long SCREEN_EXIT_MS = 220L;
+
     public interface WorkspaceHost {
         void openExternalProjectPicker();
 
@@ -117,6 +122,8 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private String currentScreenId = "";
     private final ScreenRegistry screenRegistry = new ScreenRegistry();
     private final LinkedHashMap<String, View> screenCache = new LinkedHashMap<>();
+    private int screenAnimationGeneration;
+    private boolean screenClosing;
     private String attachmentPickerTitle = "";
     private String attachmentPickerMessage = "";
     private String attachmentPickerSource = InputAttachment.SOURCE_LOCAL;
@@ -546,6 +553,13 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
     @Override
     public void showScreen(String screenId) {
+        showScreen(screenId, true);
+    }
+
+    public void showScreen(String screenId, boolean forward) {
+        int animationGeneration = ++screenAnimationGeneration;
+        screenClosing = false;
+        String previousScreenId = currentScreenId;
         currentScreenId = screenId == null ? "" : screenId;
         KeyboardController.clearFocusAndHide(screenHost);
         KeyboardController.clearFocusAndHide(this);
@@ -553,7 +567,16 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         bottomSheetView.close();
         directoryPickerSheetView.close();
         attachmentPickerSheetView.close();
-        View existing = screenHost.getChildCount() > 0 ? screenHost.getChildAt(0) : null;
+        screenHost.animate().cancel();
+        View existing = previousScreenId.length() > 0 ? screenCache.get(previousScreenId) : null;
+        if (existing == null || existing.getParent() != screenHost) {
+            existing = screenHost.getChildCount() > 0 ? screenHost.getChildAt(screenHost.getChildCount() - 1) : null;
+        }
+        if (existing != null) {
+            existing.animate().cancel();
+            existing.setTranslationX(0f);
+            existing.setAlpha(1f);
+        }
         View cached = currentScreenId.length() > 0 ? screenCache.get(currentScreenId) : null;
         View nextView;
         if (cached != null && cached.getParent() == null) {
@@ -564,15 +587,58 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                 screenCache.put(currentScreenId, nextView);
             }
         }
-        if (existing != null && existing != nextView) {
-            screenHost.removeView(existing);
-        }
         if (nextView != null && nextView.getParent() == null) {
             screenHost.addView(nextView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         }
         screenHost.setVisibility(VISIBLE);
+        screenHost.setAlpha(1f);
+        screenHost.setTranslationX(0f);
         screenHost.requestFocus();
         screenHost.bringToFront();
+        if (nextView == null) {
+            resetScreenHostAnimationState();
+            return;
+        }
+        float distance = screenTransitionDistance();
+        float enterFrom = forward ? distance : -distance;
+        float exitTo = forward ? -distance : distance;
+        if (existing == null || existing == nextView) {
+            nextView.setTranslationX(enterFrom);
+            nextView.setAlpha(1f);
+            nextView.animate()
+                    .translationX(0f)
+                    .setDuration(SCREEN_ENTER_MS)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .withEndAction(() -> {
+                        if (animationGeneration == screenAnimationGeneration) {
+                            resetScreenHostAnimationState();
+                        }
+                    })
+                    .start();
+            return;
+        }
+        nextView.setTranslationX(enterFrom);
+        nextView.setAlpha(1f);
+        existing.setTranslationX(0f);
+        existing.setAlpha(1f);
+        final View exitingView = existing;
+        existing.animate()
+                .translationX(exitTo)
+                .setDuration(SCREEN_ENTER_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+        nextView.animate()
+                .translationX(0f)
+                .setDuration(SCREEN_ENTER_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .withEndAction(() -> {
+                    if (animationGeneration == screenAnimationGeneration) {
+                        screenHost.removeView(exitingView);
+                        exitingView.setTranslationX(0f);
+                        resetScreenHostAnimationState();
+                    }
+                })
+                .start();
     }
 
     public void invalidateScreen(String screenId) {
@@ -591,14 +657,42 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
     @Override
     public void showChatScreen() {
+        int animationGeneration = ++screenAnimationGeneration;
         currentScreenId = "";
         KeyboardController.clearFocusAndHide(screenHost);
         KeyboardController.clearFocusAndHide(this);
-        View existing = screenHost.getChildCount() > 0 ? screenHost.getChildAt(0) : null;
-        if (existing != null) {
-            screenHost.removeView(existing);
+        screenHost.animate().cancel();
+        if (screenHost.getVisibility() != VISIBLE) {
+            screenClosing = false;
+            screenHost.removeAllViews();
+            screenHost.setVisibility(GONE);
+            resetScreenHostAnimationState();
+            return;
         }
-        screenHost.setVisibility(GONE);
+        screenClosing = true;
+        View existing = screenHost.getChildCount() > 0 ? screenHost.getChildAt(0) : null;
+        if (existing == null) {
+            screenHost.setVisibility(GONE);
+            screenClosing = false;
+            resetScreenHostAnimationState();
+            return;
+        }
+        existing.animate().cancel();
+        existing.animate()
+                .translationX(screenTransitionDistance())
+                .setDuration(SCREEN_EXIT_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    if (animationGeneration != screenAnimationGeneration) {
+                        return;
+                    }
+                    screenHost.removeAllViews();
+                    screenHost.setVisibility(GONE);
+                    screenClosing = false;
+                    existing.setTranslationX(0f);
+                    resetScreenHostAnimationState();
+                })
+                .start();
     }
 
     @Override
@@ -733,7 +827,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
     @Override
     public boolean isScreenVisible() {
-        return screenHost.getVisibility() == VISIBLE;
+        return screenHost.getVisibility() == VISIBLE && !screenClosing;
     }
 
     @Override
@@ -818,5 +912,15 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         String subtitle = SimpleScreenContent.subtitle(context, screenId);
         String[] rows = SimpleScreenContent.rows(context, screenId);
         return new SimpleSettingsScreenView(context, title, subtitle, rows, this::handleScreenBack);
+    }
+
+    private float screenTransitionDistance() {
+        int width = screenHost.getWidth();
+        return width > 0 ? width : getResources().getDisplayMetrics().widthPixels;
+    }
+
+    private void resetScreenHostAnimationState() {
+        screenHost.setAlpha(1f);
+        screenHost.setTranslationX(0f);
     }
 }

@@ -2,7 +2,7 @@ package cn.lineai.data.db;
 
 public final class LineCodeSchema {
     public static final String DATABASE_NAME = "linecode.db";
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
 
     public static final String TABLE_METADATA = "metadata";
     public static final String TABLE_SETTINGS = "settings";
@@ -10,6 +10,7 @@ public final class LineCodeSchema {
     public static final String TABLE_MODELS = "model_configs";
     public static final String TABLE_CONVERSATIONS = "conversations";
     public static final String TABLE_MESSAGES = "messages";
+    public static final String TABLE_MESSAGE_TEXT_CHUNKS = "message_text_chunks";
     public static final String TABLE_MESSAGE_BLOCKS = "message_blocks";
     public static final String TABLE_TOOL_CALLS = "tool_calls";
     public static final String TABLE_TOOL_RESULTS = "tool_results";
@@ -32,6 +33,7 @@ public final class LineCodeSchema {
             TABLE_MODELS,
             TABLE_CONVERSATIONS,
             TABLE_MESSAGES,
+            TABLE_MESSAGE_TEXT_CHUNKS,
             TABLE_MESSAGE_BLOCKS,
             TABLE_TOOL_CALLS,
             TABLE_TOOL_RESULTS,
@@ -147,6 +149,14 @@ public final class LineCodeSchema {
                     + "is_error INTEGER NOT NULL DEFAULT 0,"
                     + "raw_json TEXT,"
                     + "UNIQUE(conversation_id, local_order)"
+                    + ")",
+            "CREATE TABLE IF NOT EXISTS message_text_chunks ("
+                    + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    + "message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,"
+                    + "field_name TEXT NOT NULL,"
+                    + "chunk_order INTEGER NOT NULL,"
+                    + "content TEXT NOT NULL DEFAULT '',"
+                    + "UNIQUE(message_id, field_name, chunk_order)"
                     + ")",
             "CREATE TABLE IF NOT EXISTS message_blocks ("
                     + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -287,6 +297,7 @@ public final class LineCodeSchema {
             "CREATE INDEX IF NOT EXISTS idx_projects_selected ON projects(selected)",
             "CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)",
             "CREATE INDEX IF NOT EXISTS idx_messages_conversation_order ON messages(conversation_id, local_order)",
+            "CREATE INDEX IF NOT EXISTS idx_message_text_chunks_message_field ON message_text_chunks(message_id, field_name, chunk_order)",
             "CREATE INDEX IF NOT EXISTS idx_message_blocks_message_order ON message_blocks(message_id, block_order)",
             "CREATE INDEX IF NOT EXISTS idx_conversation_index_project ON conversation_index(project_id, updated_at DESC)",
             "CREATE INDEX IF NOT EXISTS idx_memories_scope_project ON memories(scope, project_id)",
@@ -339,6 +350,7 @@ public final class LineCodeSchema {
             "DROP TABLE IF EXISTS tool_results",
             "DROP TABLE IF EXISTS tool_calls",
             "DROP TABLE IF EXISTS message_blocks",
+            "DROP TABLE IF EXISTS message_text_chunks",
             "DROP TABLE IF EXISTS messages",
             "DROP TABLE IF EXISTS conversations",
             "DROP TABLE IF EXISTS model_configs",

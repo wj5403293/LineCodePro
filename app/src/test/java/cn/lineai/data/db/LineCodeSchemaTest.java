@@ -13,6 +13,7 @@ public final class LineCodeSchemaTest {
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS model_configs"));
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS conversations"));
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS messages"));
+        assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS message_text_chunks"));
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS settings"));
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS projects"));
         assertTrue(schema.contains("CREATE TABLE IF NOT EXISTS memories"));
@@ -36,6 +37,17 @@ public final class LineCodeSchemaTest {
     public void versionIsAtLeastTwo() {
         assertTrue("schema version should have advanced to at least 2 for migrations",
                 LineCodeSchema.VERSION >= 2);
+    }
+
+    @Test
+    public void messageTextChunksSchemaIsDeclared() {
+        String schema = String.join("\n", LineCodeSchema.CREATE_SQL);
+
+        assertTrue(schema.contains("message_text_chunks"));
+        assertTrue(schema.contains("field_name TEXT NOT NULL"));
+        assertTrue(schema.contains("chunk_order INTEGER NOT NULL"));
+        assertTrue(schema.contains("UNIQUE(message_id, field_name, chunk_order)"));
+        assertTrue(schema.contains("idx_message_text_chunks_message_field"));
     }
 
     @Test
@@ -76,6 +88,7 @@ public final class LineCodeSchemaTest {
         String drop = String.join("\n", LineCodeSchema.DROP_SQL);
 
         assertTrue(drop.contains("DROP TABLE IF EXISTS schema_migrations"));
+        assertTrue(drop.contains("DROP TABLE IF EXISTS message_text_chunks"));
     }
 
     @Test

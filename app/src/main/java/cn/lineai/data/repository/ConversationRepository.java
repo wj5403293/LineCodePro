@@ -10,16 +10,39 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class ConversationRepository extends BaseRepository implements ConversationStore {
+    private static final String[] CONVERSATION_COLUMNS = new String[] {
+            "id",
+            "title",
+            "project_id",
+            "created_at",
+            "updated_at",
+            "current",
+            "raw_json"
+    };
+    private static final String[] MESSAGE_META_COLUMNS = new String[] {
+            "id",
+            "role",
+            "timestamp",
+            "streaming",
+            "hidden",
+            "exclude_from_context",
+            "tool_call_id",
+            "tool_name",
+            "is_error"
+    };
+
+    private final MessageTextChunkStore textChunks;
 
     public ConversationRepository(Context context) {
         super(LineCodeDatabase.getInstance(context));
+        textChunks = new MessageTextChunkStore(database);
     }
 
     public synchronized List<ConversationRecord> getConversationMetas() {
         ArrayList<ConversationRecord> records = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().query(
                 "conversations",
-                null,
+                CONVERSATION_COLUMNS,
                 null,
                 null,
                 null,
@@ -43,7 +66,7 @@ public final class ConversationRepository extends BaseRepository implements Conv
         ArrayList<ConversationRecord> records = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().query(
                 "conversations",
-                null,
+                CONVERSATION_COLUMNS,
                 null,
                 null,
                 null,
@@ -64,7 +87,7 @@ public final class ConversationRepository extends BaseRepository implements Conv
     public synchronized ConversationRecord getConversation(String id) {
         Cursor cursor = database.getReadableDatabase().query(
                 "conversations",
-                null,
+                CONVERSATION_COLUMNS,
                 "id = ?",
                 new String[] {id},
                 null,
@@ -181,13 +204,14 @@ public final class ConversationRepository extends BaseRepository implements Conv
 
     private void saveMessage(SQLiteDatabase db, String conversationId, MessageRecord message, int order) {
         long timestamp = message.getTimestamp() > 0 ? message.getTimestamp() : System.currentTimeMillis();
+        String messageId = message.getId().length() == 0 ? conversationId + ":" + order : message.getId();
         ContentValues values = new ContentValues();
-        values.put("id", message.getId().length() == 0 ? conversationId + ":" + order : message.getId());
+        values.put("id", messageId);
         values.put("conversation_id", conversationId);
         values.put("local_order", order);
         values.put("role", message.getRole().getProtocolName());
-        values.put("content", message.getContent());
-        values.put("reasoning_content", message.getReasoningContent());
+        values.put("content", "");
+        values.put("reasoning_content", "");
         values.put("timestamp", timestamp);
         values.put("streaming", message.isStreaming() ? 1 : 0);
         values.put("hidden", message.isHidden() ? 1 : 0);
@@ -195,8 +219,11 @@ public final class ConversationRepository extends BaseRepository implements Conv
         values.put("tool_call_id", message.getToolCallId());
         values.put("tool_name", message.getToolName());
         values.put("is_error", message.isError() ? 1 : 0);
-        values.put("raw_json", message.getRawJson());
+        values.put("raw_json", "");
         db.insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        textChunks.save(db, messageId, "content", message.getContent());
+        textChunks.save(db, messageId, "reasoning_content", message.getReasoningContent());
+        textChunks.save(db, messageId, "raw_json", message.getRawJson());
     }
 
     private void setCurrentInsideTransaction(SQLiteDatabase db, String id) {
@@ -214,7 +241,7 @@ public final class ConversationRepository extends BaseRepository implements Conv
         ArrayList<MessageRecord> messages = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().query(
                 "messages",
-                null,
+                MESSAGE_META_COLUMNS,
                 "conversation_id = ?",
                 new String[] {conversationId},
                 null,
@@ -223,7 +250,7 @@ public final class ConversationRepository extends BaseRepository implements Conv
         );
         try {
             while (cursor.moveToNext()) {
-                messages.add(readMessage(cursor));
+                messages.add(readMessage(database.getReadableDatabase(), cursor));
             }
         } finally {
             cursor.close();
@@ -262,12 +289,13 @@ public final class ConversationRepository extends BaseRepository implements Conv
         );
     }
 
-    private MessageRecord readMessage(Cursor cursor) {
+    private MessageRecord readMessage(SQLiteDatabase db, Cursor cursor) {
+        String messageId = cursor.getString(cursor.getColumnIndexOrThrow("id"));
         return new MessageRecord(
-                cursor.getString(cursor.getColumnIndexOrThrow("id")),
+                messageId,
                 roleFromStorage(cursor.getString(cursor.getColumnIndexOrThrow("role"))),
-                cursor.getString(cursor.getColumnIndexOrThrow("content")),
-                cursor.getString(cursor.getColumnIndexOrThrow("reasoning_content")),
+                textChunks.read(db, messageId, "content"),
+                textChunks.read(db, messageId, "reasoning_content"),
                 cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")),
                 cursor.getInt(cursor.getColumnIndexOrThrow("streaming")) == 1,
                 cursor.getInt(cursor.getColumnIndexOrThrow("hidden")) == 1,
@@ -275,7 +303,7 @@ public final class ConversationRepository extends BaseRepository implements Conv
                 cursor.getString(cursor.getColumnIndexOrThrow("tool_call_id")),
                 cursor.getString(cursor.getColumnIndexOrThrow("tool_name")),
                 cursor.getInt(cursor.getColumnIndexOrThrow("is_error")) == 1,
-                cursor.getString(cursor.getColumnIndexOrThrow("raw_json"))
+                textChunks.read(db, messageId, "raw_json")
         );
     }
 

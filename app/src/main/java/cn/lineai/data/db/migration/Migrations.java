@@ -10,6 +10,7 @@ public final class Migrations {
     static {
         register(new AddToolCallObservabilityColumns());
         register(new AddIpcProvidersTable());
+        register(new AddMessageTextChunksTable());
     }
 
     private Migrations() {

@@ -9,6 +9,8 @@ import cn.lineai.model.ChatMessage;
  * 对话索引构建与存储。负责将对话内容分词后写入 conversation_index 表。
  */
 public final class ConversationIndexer extends BaseRepository {
+    private static final int INDEX_TEXT_LIMIT = 4000;
+
     public ConversationIndexer(LineCodeDatabase database) {
         super(database);
     }
@@ -31,11 +33,11 @@ public final class ConversationIndexer extends BaseRepository {
                 values.put("conversation_id", conversation.getId());
                 values.put("message_id", message.getId());
                 values.put("role", message.getRole().getProtocolName());
-                values.put("text", message.getContent());
+                values.put("text", compact(message.getContent(), INDEX_TEXT_LIMIT));
                 values.put("title", conversation.getTitle());
                 values.put("created_at", message.getTimestamp() > 0 ? message.getTimestamp() : conversation.getCreatedAt());
                 values.put("updated_at", conversation.getUpdatedAt());
-                values.put("raw_json", message.getRawJson());
+                values.put("raw_json", "");
                 db.insertWithOnConflict("conversation_index", null, values, SQLiteDatabase.CONFLICT_REPLACE);
             }
             db.setTransactionSuccessful();
@@ -51,5 +53,10 @@ public final class ConversationIndexer extends BaseRepository {
         ChatMessage.Role role = message.getRole();
         return (role == ChatMessage.Role.USER || role == ChatMessage.Role.ASSISTANT)
                 && message.getContent().trim().length() > 0;
+    }
+
+    private String compact(String text, int maxChars) {
+        String value = safe(text);
+        return value.length() <= maxChars ? value : value.substring(0, maxChars);
     }
 }

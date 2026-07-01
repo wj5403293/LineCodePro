@@ -10,10 +10,12 @@ import java.io.File;
 public final class StorageStatsRepository {
     private final Context context;
     private final LineCodeDatabase database;
+    private final MessageTextChunkStore textChunks;
 
     public StorageStatsRepository(Context context) {
         this.context = context;
         this.database = LineCodeDatabase.getInstance(context);
+        this.textChunks = new MessageTextChunkStore(database);
     }
 
     public StorageStats getStats() {
@@ -39,64 +41,16 @@ public final class StorageStatsRepository {
     }
 
     private long calculateDiffCache(SQLiteDatabase db) {
-        long size = 0;
-        Cursor cursor = db.query("diff_records", new String[]{"old_content", "new_content"}, null, null, null, null, null);
-        try {
-            while (cursor.moveToNext()) {
-                String oldContent = cursor.getString(0);
-                String newContent = cursor.getString(1);
-                if (oldContent != null) {
-                    size += oldContent.length();
-                }
-                if (newContent != null) {
-                    size += newContent.length();
-                }
-            }
-        } finally {
-            cursor.close();
-        }
-        return size;
+        return textChunks.totalLength(db, "diff_records", "old_content")
+                + textChunks.totalLength(db, "diff_records", "new_content");
     }
 
     private long calculateChatSize(SQLiteDatabase db) {
-        long size = 0;
-        Cursor cursor = db.query("messages", new String[]{"content", "reasoning_content"}, null, null, null, null, null);
-        try {
-            while (cursor.moveToNext()) {
-                String content = cursor.getString(0);
-                String reasoning = cursor.getString(1);
-                if (content != null) {
-                    size += content.length();
-                }
-                if (reasoning != null) {
-                    size += reasoning.length();
-                }
-            }
-        } finally {
-            cursor.close();
-        }
-        Cursor toolCursor = db.query("tool_calls", new String[]{"arguments"}, null, null, null, null, null);
-        try {
-            while (toolCursor.moveToNext()) {
-                String args = toolCursor.getString(0);
-                if (args != null) {
-                    size += args.length();
-                }
-            }
-        } finally {
-            toolCursor.close();
-        }
-        Cursor resultCursor = db.query("tool_results", new String[]{"content"}, null, null, null, null, null);
-        try {
-            while (resultCursor.moveToNext()) {
-                String content = resultCursor.getString(0);
-                if (content != null) {
-                    size += content.length();
-                }
-            }
-        } finally {
-            resultCursor.close();
-        }
+        long size = textChunks.totalLength(db, "messages", "content")
+                + textChunks.totalLength(db, "messages", "reasoning_content")
+                + textChunks.totalLength(db, "message_text_chunks", "content")
+                + textChunks.totalLength(db, "tool_calls", "arguments")
+                + textChunks.totalLength(db, "tool_results", "content");
         size += getDatabaseFileSize();
         return size;
     }

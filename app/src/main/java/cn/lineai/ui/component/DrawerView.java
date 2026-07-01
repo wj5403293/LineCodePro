@@ -89,8 +89,8 @@ public final class DrawerView extends FrameLayout {
         sidebar = new LinearLayout(context);
         sidebar.setOrientation(LinearLayout.VERTICAL);
         sidebar.setBackgroundColor(LineTheme.SURFACE_ELEVATED);
-        FrameLayout.LayoutParams sidebarParams = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, drawerHeight(context));
-        sidebarParams.gravity = Gravity.TOP;
+        FrameLayout.LayoutParams sidebarParams = new FrameLayout.LayoutParams(drawerWidth(context), LayoutParams.MATCH_PARENT);
+        sidebarParams.gravity = Gravity.START;
         addView(sidebar, sidebarParams);
 
         LinearLayout header = new LinearLayout(context);
@@ -164,12 +164,12 @@ public final class DrawerView extends FrameLayout {
         backdrop.animate().cancel();
         if (getVisibility() != VISIBLE) {
             setVisibility(VISIBLE);
-            sidebar.setTranslationY(-sidebarHeight());
+            sidebar.setTranslationX(-sidebarWidth());
             backdrop.setAlpha(0f);
         }
         bringToFront();
         sidebar.animate()
-                .translationY(0f)
+                .translationX(0f)
                 .setDuration(OPEN_MS)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
@@ -187,7 +187,7 @@ public final class DrawerView extends FrameLayout {
         sidebar.animate().cancel();
         backdrop.animate().cancel();
         sidebar.animate()
-                .translationY(-sidebarHeight())
+                .translationX(-sidebarWidth())
                 .setDuration(CLOSE_MS)
                 .setInterpolator(new AccelerateInterpolator())
                 .start();
@@ -197,7 +197,7 @@ public final class DrawerView extends FrameLayout {
                 .setInterpolator(new AccelerateInterpolator())
                 .withEndAction(() -> {
                     setVisibility(GONE);
-                    sidebar.setTranslationY(0f);
+                    sidebar.setTranslationX(0f);
                     backdrop.setAlpha(1f);
                     if (listener != null) {
                         listener.onCloseDrawer();
@@ -291,14 +291,14 @@ public final class DrawerView extends FrameLayout {
         return safeLeft.equals(safeRight);
     }
 
-    private int sidebarHeight() {
-        int height = sidebar.getHeight();
-        return height > 0 ? height : drawerHeight(getContext());
+    private int sidebarWidth() {
+        int width = sidebar.getWidth();
+        return width > 0 ? width : drawerWidth(getContext());
     }
 
-    private int drawerHeight(Context context) {
-        int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
-        return Math.min(screenHeight - LineTheme.dp(context, 48), LineTheme.dp(context, 620));
+    private int drawerWidth(Context context) {
+        int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+        return Math.min(screenWidth - LineTheme.dp(context, 48), LineTheme.dp(context, 360));
     }
 
     private void renderConversations() {

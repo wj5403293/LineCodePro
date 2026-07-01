@@ -15,12 +15,50 @@ import org.json.JSONObject;
 
 public final class LineCodeDatabaseArchive {
     private static final String TAG = "LineCodeDatabaseArchive";
+    private static final int MESSAGE_TEXT_CHUNK_SIZE = 64 * 1024;
+    private static final String[] MESSAGE_EXPORT_COLUMNS = new String[] {
+            "id",
+            "conversation_id",
+            "local_order",
+            "role",
+            "content",
+            "reasoning_content",
+            "timestamp",
+            "streaming",
+            "hidden",
+            "exclude_from_context",
+            "tool_call_id",
+            "tool_name",
+            "is_error",
+            "raw_json"
+    };
+    private static final String[] MESSAGE_META_EXPORT_COLUMNS = new String[] {
+            "id",
+            "conversation_id",
+            "local_order",
+            "role",
+            "timestamp",
+            "streaming",
+            "hidden",
+            "exclude_from_context",
+            "tool_call_id",
+            "tool_name",
+            "is_error"
+    };
+    private static final String[] MESSAGE_CHUNK_EXPORT_COLUMNS = new String[] {
+            "id",
+            "message_id",
+            "field_name",
+            "chunk_order",
+            "content"
+    };
     private static final String[] TABLES = new String[] {
             LineCodeSchema.TABLE_SETTINGS,
             LineCodeSchema.TABLE_PROJECTS,
             LineCodeSchema.TABLE_MODELS,
             LineCodeSchema.TABLE_CONVERSATIONS,
             LineCodeSchema.TABLE_MESSAGES,
+            LineCodeSchema.TABLE_MESSAGE_TEXT_CHUNKS,
             LineCodeSchema.TABLE_MESSAGE_BLOCKS,
             LineCodeSchema.TABLE_TOOL_CALLS,
             LineCodeSchema.TABLE_TOOL_RESULTS,
@@ -44,7 +82,13 @@ public final class LineCodeDatabaseArchive {
         JSONObject tables = new JSONObject();
         SQLiteDatabase db = database.getReadableDatabase();
         for (String table : TABLES) {
-            tables.put(table, exportTable(db, table));
+            if (LineCodeSchema.TABLE_MESSAGES.equals(table)) {
+                tables.put(table, exportMessagesTable(db));
+            } else if (LineCodeSchema.TABLE_MESSAGE_TEXT_CHUNKS.equals(table)) {
+                tables.put(table, exportMessageTextChunksTable(db));
+            } else {
+                tables.put(table, exportTable(db, table));
+            }
         }
         root.put("tables", tables);
         return root;
@@ -116,6 +160,162 @@ public final class LineCodeDatabaseArchive {
         return object;
     }
 
+    private JSONObject exportMessagesTable(SQLiteDatabase db) throws Exception {
+        JSONObject object = new JSONObject();
+        JSONArray columns = columnsJson(MESSAGE_EXPORT_COLUMNS);
+        JSONArray rows = new JSONArray();
+        Cursor cursor = db.query(
+                LineCodeSchema.TABLE_MESSAGES,
+                MESSAGE_META_EXPORT_COLUMNS,
+                null,
+                null,
+                null,
+                null,
+                "conversation_id ASC, local_order ASC"
+        );
+        try {
+            while (cursor.moveToNext()) {
+                JSONObject row = new JSONObject();
+                for (int i = 0; i < MESSAGE_EXPORT_COLUMNS.length; i++) {
+                    String column = MESSAGE_EXPORT_COLUMNS[i];
+                    if ("content".equals(column) || "reasoning_content".equals(column) || "raw_json".equals(column)) {
+                        row.put(column, stringCell(""));
+                    } else {
+                        row.put(column, encodeValue(cursor, cursor.getColumnIndexOrThrow(column)));
+                    }
+                }
+                rows.put(row);
+            }
+        } finally {
+            cursor.close();
+        }
+        object.put("columns", columns);
+        object.put("rows", rows);
+        return object;
+    }
+
+    private JSONObject exportMessageTextChunksTable(SQLiteDatabase db) throws Exception {
+        JSONObject object = new JSONObject();
+        JSONArray columns = columnsJson(MESSAGE_CHUNK_EXPORT_COLUMNS);
+        JSONArray rows = new JSONArray();
+        HashSet<String> chunkedFields = new HashSet<>();
+        Cursor cursor = db.query(
+                LineCodeSchema.TABLE_MESSAGE_TEXT_CHUNKS,
+                MESSAGE_CHUNK_EXPORT_COLUMNS,
+                null,
+                null,
+                null,
+                null,
+                "message_id ASC, field_name ASC, chunk_order ASC"
+        );
+        try {
+            while (cursor.moveToNext()) {
+                String messageId = cursor.getString(cursor.getColumnIndexOrThrow("message_id"));
+                String fieldName = cursor.getString(cursor.getColumnIndexOrThrow("field_name"));
+                chunkedFields.add(chunkKey(messageId, fieldName));
+                JSONObject row = new JSONObject();
+                for (int i = 0; i < MESSAGE_CHUNK_EXPORT_COLUMNS.length; i++) {
+                    row.put(MESSAGE_CHUNK_EXPORT_COLUMNS[i], encodeValue(cursor, i));
+                }
+                rows.put(row);
+            }
+        } finally {
+            cursor.close();
+        }
+        appendLegacyMessageTextChunks(db, rows, chunkedFields);
+        object.put("columns", columns);
+        object.put("rows", rows);
+        return object;
+    }
+
+    private void appendLegacyMessageTextChunks(SQLiteDatabase db, JSONArray rows, HashSet<String> chunkedFields) throws Exception {
+        Cursor cursor = db.query(
+                LineCodeSchema.TABLE_MESSAGES,
+                new String[] {"id"},
+                null,
+                null,
+                null,
+                null,
+                "conversation_id ASC, local_order ASC"
+        );
+        try {
+            while (cursor.moveToNext()) {
+                String messageId = cursor.getString(0);
+                appendLegacyMessageTextField(db, rows, chunkedFields, messageId, "content");
+                appendLegacyMessageTextField(db, rows, chunkedFields, messageId, "reasoning_content");
+                appendLegacyMessageTextField(db, rows, chunkedFields, messageId, "raw_json");
+            }
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private void appendLegacyMessageTextField(
+            SQLiteDatabase db,
+            JSONArray rows,
+            HashSet<String> chunkedFields,
+            String messageId,
+            String fieldName
+    ) throws Exception {
+        if (chunkedFields.contains(chunkKey(messageId, fieldName))) {
+            return;
+        }
+        int length = legacyMessageTextLength(db, messageId, fieldName);
+        if (length <= 0) {
+            return;
+        }
+        for (int start = 0, order = 0; start < length; start += MESSAGE_TEXT_CHUNK_SIZE, order++) {
+            JSONObject row = new JSONObject();
+            row.put("id", nullCell());
+            row.put("message_id", stringCell(messageId));
+            row.put("field_name", stringCell(fieldName));
+            row.put("chunk_order", integerCell(order));
+            row.put("content", stringCell(readLegacyMessageTextRange(db, messageId, fieldName, start, MESSAGE_TEXT_CHUNK_SIZE)));
+            rows.put(row);
+        }
+    }
+
+    private int legacyMessageTextLength(SQLiteDatabase db, String messageId, String fieldName) {
+        Cursor cursor = db.rawQuery(
+                "SELECT COALESCE(length(" + safeMessageTextField(fieldName) + "), 0) FROM messages WHERE id = ? LIMIT 1",
+                new String[] {messageId == null ? "" : messageId});
+        try {
+            return cursor.moveToFirst() && !cursor.isNull(0) ? cursor.getInt(0) : 0;
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private String readLegacyMessageTextRange(SQLiteDatabase db, String messageId, String fieldName, int start, int maxChars) {
+        Cursor cursor = db.rawQuery(
+                "SELECT substr(" + safeMessageTextField(fieldName) + ", ?, ?) FROM messages WHERE id = ? LIMIT 1",
+                new String[] {String.valueOf(start + 1), String.valueOf(maxChars), messageId == null ? "" : messageId});
+        try {
+            return cursor.moveToFirst() && !cursor.isNull(0) ? cursor.getString(0) : "";
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private String safeMessageTextField(String fieldName) {
+        if ("content".equals(fieldName) || "reasoning_content".equals(fieldName) || "raw_json".equals(fieldName)) {
+            return fieldName;
+        }
+        throw new IllegalArgumentException("非法消息文本字段: " + fieldName);
+    }
+
+    private String chunkKey(String messageId, String fieldName) {
+        return (messageId == null ? "" : messageId) + "\n" + (fieldName == null ? "" : fieldName);
+    }
+
+    private JSONArray columnsJson(String[] names) {
+        JSONArray columns = new JSONArray();
+        for (String name : names) {
+            columns.put(name);
+        }
+        return columns;
+    }
+
     private JSONObject encodeValue(Cursor cursor, int index) throws Exception {
         JSONObject object = new JSONObject();
         int type = cursor.getType(index);
@@ -134,6 +334,26 @@ public final class LineCodeDatabaseArchive {
             object.put("type", "string");
             object.put("value", cursor.getString(index));
         }
+        return object;
+    }
+
+    private JSONObject nullCell() throws Exception {
+        JSONObject object = new JSONObject();
+        object.put("type", "null");
+        return object;
+    }
+
+    private JSONObject integerCell(long value) throws Exception {
+        JSONObject object = new JSONObject();
+        object.put("type", "integer");
+        object.put("value", value);
+        return object;
+    }
+
+    private JSONObject stringCell(String value) throws Exception {
+        JSONObject object = new JSONObject();
+        object.put("type", "string");
+        object.put("value", value == null ? "" : value);
         return object;
     }
 

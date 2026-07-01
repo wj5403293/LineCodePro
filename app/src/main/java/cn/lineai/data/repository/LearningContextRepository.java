@@ -24,6 +24,7 @@ public final class LearningContextRepository extends BaseRepository implements L
     private final WorkspacePaths workspacePaths;
     private final PromptTemplateRepository promptTemplateRepository;
     private final ConversationIndexer conversationIndexer;
+    private final MessageTextChunkStore textChunks;
 
     public LearningContextRepository(Context context) {
         super(LineCodeDatabase.getInstance(context.getApplicationContext()));
@@ -31,6 +32,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         this.workspacePaths = new WorkspacePaths(this.context);
         this.promptTemplateRepository = new PromptTemplateRepository(this.context);
         this.conversationIndexer = new ConversationIndexer(database);
+        this.textChunks = new MessageTextChunkStore(database);
     }
 
     @Override
@@ -196,7 +198,7 @@ public final class LearningContextRepository extends BaseRepository implements L
     private List<MemoryRanker.Candidate> readConversationIndex(String projectId, String excludeConversationId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
-                "SELECT conversation_id, role, text, title, updated_at FROM conversation_index "
+                "SELECT conversation_id, role, substr(text, 1, 320) AS text, title, updated_at FROM conversation_index "
                         + "WHERE (? = '' OR project_id = ? OR project_id IS NULL OR project_id = '') "
                         + "AND (? = '' OR conversation_id != ?) ORDER BY updated_at DESC LIMIT ?",
                 new String[] {safe(projectId), safe(projectId), safe(excludeConversationId), safe(excludeConversationId), String.valueOf(SCAN_LIMIT)});
@@ -218,9 +220,11 @@ public final class LearningContextRepository extends BaseRepository implements L
     private List<MemoryRanker.Candidate> readConversationMessages(String projectId, String excludeConversationId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
-                "SELECT c.id AS conversation_id, c.title AS title, m.role AS role, m.content AS text, m.timestamp AS updated_at "
+                "SELECT c.id AS conversation_id, c.title AS title, m.id AS message_id, m.role AS role, "
+                        + "substr(m.content, 1, 320) AS text, m.timestamp AS updated_at "
                         + "FROM messages m JOIN conversations c ON c.id = m.conversation_id "
-                        + "WHERE m.hidden = 0 AND m.exclude_from_context = 0 AND m.content != '' "
+                        + "WHERE m.hidden = 0 AND m.exclude_from_context = 0 "
+                        + "AND (m.content != '' OR EXISTS (SELECT 1 FROM message_text_chunks mtc WHERE mtc.message_id = m.id AND mtc.field_name = 'content' LIMIT 1)) "
                         + "AND (? = '' OR c.project_id = ? OR c.project_id IS NULL OR c.project_id = '') "
                         + "AND (? = '' OR c.id != ?) ORDER BY m.timestamp DESC LIMIT ?",
                 new String[] {safe(projectId), safe(projectId), safe(excludeConversationId), safe(excludeConversationId), String.valueOf(SCAN_LIMIT)});
@@ -228,7 +232,7 @@ public final class LearningContextRepository extends BaseRepository implements L
             while (cursor.moveToNext()) {
                 String title = value(cursor, "title");
                 String role = value(cursor, "role");
-                String text = compact(value(cursor, "text"), 320);
+                String text = compact(readMessageContentPrefix(value(cursor, "message_id"), value(cursor, "text")), 320);
                 items.add(new MemoryRanker.Candidate("", title + " " + text,
                         cursor.getLong(cursor.getColumnIndexOrThrow("updated_at")),
                         "- " + titleLabel(title, value(cursor, "conversation_id")) + " " + role + ": " + text));
@@ -237,6 +241,11 @@ public final class LearningContextRepository extends BaseRepository implements L
             cursor.close();
         }
         return items;
+    }
+
+    private String readMessageContentPrefix(String messageId, String legacyPrefix) {
+        String text = textChunks.readFirstChars(database.getReadableDatabase(), messageId, "content", 320);
+        return text.length() == 0 ? legacyPrefix : text;
     }
 
     private List<MemoryRanker.Candidate> readSkills() {
@@ -320,7 +329,7 @@ public final class LearningContextRepository extends BaseRepository implements L
     private List<MemoryOverviewState.HistoryEntry> readOverviewHistory(String projectId) {
         ArrayList<MemoryOverviewState.HistoryEntry> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
-                "SELECT id, project_id, conversation_id, message_id, role, text, title, created_at, updated_at "
+                "SELECT id, project_id, conversation_id, message_id, role, substr(text, 1, 1000) AS text, title, created_at, updated_at "
                         + "FROM conversation_index WHERE (? = '' OR project_id = ? OR project_id IS NULL OR project_id = '') ORDER BY updated_at DESC LIMIT ?",
                 new String[] {safe(projectId), safe(projectId), String.valueOf(OVERVIEW_LIMIT)});
         try {

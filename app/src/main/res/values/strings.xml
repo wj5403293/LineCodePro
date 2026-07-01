@@ -51,6 +51,20 @@
     <string name="composer_attachment_remove_desc">Remove attachment</string>
     <string name="chat_mode_control_label">Control</string>
 
+    <string name="slash_command_main_title">Quick switch</string>
+    <string name="slash_command_model_title">Pick a model</string>
+    <string name="slash_command_reasoning_title">Reasoning level for %1$s</string>
+    <string name="slash_command_chat_desc">Switch to chat mode (read-only Q&amp;A)</string>
+    <string name="slash_command_plan_desc">Switch to plan mode (read-only planning)</string>
+    <string name="slash_command_agent_desc">Switch to agent mode (default execution)</string>
+    <string name="slash_command_control_desc">Switch to control mode (phone automation)</string>
+    <string name="slash_command_model_desc">Switch model, optional reasoning level</string>
+    <string name="slash_command_reasoning_off_desc">Disable thinking, fastest response</string>
+    <string name="slash_command_reasoning_low_desc">Light thinking, suits simple tasks</string>
+    <string name="slash_command_reasoning_medium_desc">Standard thinking, balanced speed and quality</string>
+    <string name="slash_command_reasoning_high_desc">Deep thinking, suits complex tasks</string>
+    <string name="slash_command_reasoning_max_desc">Maximum thinking, for the hardest problems</string>
+
     <string name="message_user_attached_files">Attached files</string>
     <string name="message_assistant_generating">Generating…</string>
     <string name="message_empty_model_required">Please configure a model in settings first</string>

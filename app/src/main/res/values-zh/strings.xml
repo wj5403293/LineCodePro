@@ -51,6 +51,20 @@
     <string name="composer_attachment_remove_desc">移除附件</string>
     <string name="chat_mode_control_label">控制</string>
 
+    <string name="slash_command_main_title">快速切换</string>
+    <string name="slash_command_model_title">选择模型</string>
+    <string name="slash_command_reasoning_title">为 %1$s 选择思考等级</string>
+    <string name="slash_command_chat_desc">切换到 Chat 模式（只读问答）</string>
+    <string name="slash_command_plan_desc">切换到 Plan 模式（只读规划）</string>
+    <string name="slash_command_agent_desc">切换到 Agent 模式（默认执行）</string>
+    <string name="slash_command_control_desc">切换到 Control 模式（手机控制）</string>
+    <string name="slash_command_model_desc">切换模型，可选思考等级</string>
+    <string name="slash_command_reasoning_off_desc">关闭思考，响应最快</string>
+    <string name="slash_command_reasoning_low_desc">轻度思考，适合简单任务</string>
+    <string name="slash_command_reasoning_medium_desc">标准思考，平衡速度和质量</string>
+    <string name="slash_command_reasoning_high_desc">深度思考，适合复杂任务</string>
+    <string name="slash_command_reasoning_max_desc">最深度思考，适合极难问题</string>
+
     <string name="message_user_attached_files">已附加文件</string>
     <string name="message_assistant_generating">正在生成…</string>
     <string name="message_empty_model_required">请先在设置中配置模型</string>

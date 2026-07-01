@@ -19,12 +19,14 @@ import android.widget.LinearLayout;
 import android.widget.PopupWindow;
 import android.widget.TextView;
 import cn.lineai.R;
+import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMode;
 import cn.lineai.model.ChatUiState;
 import cn.lineai.model.InputAttachment;
 import cn.lineai.model.InputSettings;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.ui.theme.LineTheme;
+import cn.lineai.ui.util.SlashCommandCatalog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,6 +44,8 @@ public final class ComposerView extends LinearLayout {
         void onModelQuickSwitch(String modelId);
 
         void onModelManageClick();
+
+        void onAiReasoningEffortChanged(String effort);
     }
 
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -60,6 +64,8 @@ public final class ComposerView extends LinearLayout {
     private final ArrayList<InputAttachment> attachments = new ArrayList<>();
     private PopupWindow modePopup;
     private PopupWindow modelPopup;
+    private SlashCommandPopup slashPopup;
+    private String lastSlashSignature = null;
     private boolean streaming;
     private String chatMode = ChatMode.DEFAULT;
     private String enterKeyBehavior = InputSettings.ENTER_SEND;
@@ -194,6 +200,8 @@ public final class ComposerView extends LinearLayout {
                 if (modelPopup != null && modelPopup.isShowing()) {
                     modelPopup.dismiss();
                 }
+            } else {
+                dismissSlashPopup();
             }
         });
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
@@ -256,12 +264,14 @@ public final class ComposerView extends LinearLayout {
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 updateSendButton();
+                updateSlashPopup();
             }
 
             @Override
             public void afterTextChanged(Editable s) {
             }
         });
+        slashPopup = new SlashCommandPopup(context);
         updateSendButton();
     }
 
@@ -336,6 +346,11 @@ public final class ComposerView extends LinearLayout {
         if (streaming && modelPopup != null) {
             modelPopup.dismiss();
         }
+        if (streaming) {
+            dismissSlashPopup();
+        } else {
+            updateSlashPopup();
+        }
         input.setEnabled(!streaming);
         attachButton.setEnabled(!streaming);
         attachButton.setAlpha(streaming ? 0.62f : 1f);
@@ -380,8 +395,30 @@ public final class ComposerView extends LinearLayout {
         if (streaming || !canSend()) {
             return true;
         }
+        String text = input.getText().toString();
+        SlashCommandCatalog.Parsed parsed = SlashCommandCatalog.parse(text);
+        if (parsed != null) {
+            if (listener == null) {
+                input.setText("");
+                clearAttachments();
+                dismissSlashPopup();
+                return true;
+            }
+            if (parsed.kind == SlashCommandCatalog.Kind.MODE) {
+                listener.onModeChanged(parsed.mode);
+            } else if (parsed.kind == SlashCommandCatalog.Kind.MODEL) {
+                listener.onModelQuickSwitch(parsed.modelId);
+                if (parsed.reasoningEffort != null) {
+                    listener.onAiReasoningEffortChanged(parsed.reasoningEffort);
+                }
+            }
+            input.setText("");
+            clearAttachments();
+            dismissSlashPopup();
+            return true;
+        }
         if (listener != null) {
-            listener.onSend(input.getText().toString(), getAttachments());
+            listener.onSend(text, getAttachments());
         }
         input.setText("");
         clearAttachments();
@@ -453,6 +490,257 @@ public final class ComposerView extends LinearLayout {
         return chip;
     }
 
+    private void updateSlashPopup() {
+        if (slashPopup == null) {
+            return;
+        }
+        if (streaming) {
+            dismissSlashPopup();
+            return;
+        }
+        String text = input.getText() == null ? "" : input.getText().toString();
+        SlashState state = resolveSlashState(text);
+        if (state == null) {
+            dismissSlashPopup();
+            return;
+        }
+        String signature = state.signature + "|" + chatMode;
+        if (signature.equals(lastSlashSignature) && slashPopup.isShowing()) {
+            return;
+        }
+        lastSlashSignature = signature;
+        List<SlashCommandPopup.Row> rows = buildSlashRows(state);
+        if (rows.isEmpty()) {
+            dismissSlashPopup();
+            return;
+        }
+        slashPopup.setSelectedIndex(state.selectedIndex);
+        slashPopup.show(state.title, rows);
+        slashPopup.showAtAnchor(this);
+    }
+
+    private void dismissSlashPopup() {
+        if (slashPopup != null) {
+            slashPopup.dismiss();
+        }
+        lastSlashSignature = null;
+    }
+
+    /**
+     * 把当前输入文本解析为 slash popup 状态。返回 null 表示不应展示 popup。
+     * 三种状态：主命令（MAIN）、模型 id（MODEL_ID）、思考等级（REASONING）。
+     */
+    private SlashState resolveSlashState(String text) {
+        if (text == null || text.length() == 0) {
+            return null;
+        }
+        if (text.charAt(0) != '/') {
+            return null;
+        }
+        String[] tokens = text.split("\\s+", -1);
+        String head = tokens[0].toLowerCase();
+        if ("/model".equals(head)) {
+            if (tokens.length < 2 || tokens[1].length() == 0) {
+                return modelIdState("");
+            }
+            String modelId = tokens[1];
+            if (!containsModelId(modelId)) {
+                return mainState("");
+            }
+            String reasonQuery = tokens.length >= 3 ? tokens[2] : "";
+            return reasoningState(modelId, reasonQuery);
+        }
+        return mainState(head.substring(1));
+    }
+
+    private boolean containsModelId(String id) {
+        for (ModelConfig model : availableModels) {
+            if (model != null && model.getId().equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private SlashState mainState(String query) {
+        List<SlashCommandCatalog.Definition> defs = SlashCommandCatalog.filterMain(query);
+        int selected = -1;
+        for (int i = 0; i < defs.size(); i++) {
+            SlashCommandCatalog.Definition def = defs.get(i);
+            if (def.kind == SlashCommandCatalog.Kind.MODE && def.token.substring(1).equalsIgnoreCase(chatMode)) {
+                selected = i;
+                break;
+            }
+        }
+        return new SlashState(SlashState.Kind.MAIN,
+                getContext().getString(R.string.slash_command_main_title),
+                defs, query, selected, null,
+                Collections.<String>emptyList(), Collections.<String>emptyList());
+    }
+
+    private SlashState modelIdState(String query) {
+        List<String> ids = new ArrayList<>();
+        for (ModelConfig model : availableModels) {
+            if (model != null) {
+                ids.add(model.getId());
+            }
+        }
+        List<String> filtered = SlashCommandCatalog.filterModelIds(ids, query);
+        int selected = -1;
+        for (int i = 0; i < filtered.size(); i++) {
+            if (filtered.get(i).equals(selectedModelId)) {
+                selected = i;
+                break;
+            }
+        }
+        return new SlashState(SlashState.Kind.MODEL_ID,
+                getContext().getString(R.string.slash_command_model_title),
+                Collections.<SlashCommandCatalog.Definition>emptyList(), query, selected, null,
+                filtered, Collections.<String>emptyList());
+    }
+
+    private SlashState reasoningState(String modelId, String query) {
+        List<String> levels = SlashCommandCatalog.filterReasoningLevels(query);
+        return new SlashState(SlashState.Kind.REASONING,
+                getContext().getString(R.string.slash_command_reasoning_title, modelId),
+                Collections.<SlashCommandCatalog.Definition>emptyList(), query, -1, modelId,
+                Collections.<String>emptyList(), levels);
+    }
+
+    private List<SlashCommandPopup.Row> buildSlashRows(SlashState state) {
+        List<SlashCommandPopup.Row> rows = new ArrayList<>();
+        if (state.kind == SlashState.Kind.MAIN) {
+            for (SlashCommandCatalog.Definition def : state.definitions) {
+                String label = def.token;
+                String description = mainDescription(def.token);
+                Runnable action = () -> applyMainSelection(def);
+                rows.add(new SlashCommandPopup.Row(label, description, action));
+            }
+        } else if (state.kind == SlashState.Kind.MODEL_ID) {
+            for (String id : state.modelIds) {
+                String label = id;
+                String description = modelDescription(id);
+                Runnable action = () -> applyModelIdSelection(id);
+                rows.add(new SlashCommandPopup.Row(label, description, action));
+            }
+        } else {
+            for (String level : state.levels) {
+                String description = reasoningDescription(level);
+                Runnable action = () -> applyReasoningSelection(state.modelId, level);
+                rows.add(new SlashCommandPopup.Row(level, description, action));
+            }
+        }
+        return rows;
+    }
+
+    private String modelDescription(String id) {
+        for (ModelConfig model : availableModels) {
+            if (model != null && model.getId().equals(id)) {
+                String name = model.getName();
+                if (name.length() > 0 && !name.equals(id)) {
+                    return name;
+                }
+                return model.getProviderLabel();
+            }
+        }
+        return "";
+    }
+
+    private String mainDescription(String token) {
+        Context ctx = getContext();
+        if ("/chat".equals(token)) {
+            return ctx.getString(R.string.slash_command_chat_desc);
+        }
+        if ("/plan".equals(token)) {
+            return ctx.getString(R.string.slash_command_plan_desc);
+        }
+        if ("/agent".equals(token)) {
+            return ctx.getString(R.string.slash_command_agent_desc);
+        }
+        if ("/control".equals(token)) {
+            return ctx.getString(R.string.slash_command_control_desc);
+        }
+        if ("/model".equals(token)) {
+            return ctx.getString(R.string.slash_command_model_desc);
+        }
+        return "";
+    }
+
+    private String reasoningDescription(String level) {
+        Context ctx = getContext();
+        if (AiBehaviorSettings.REASONING_OFF.equals(level)) {
+            return ctx.getString(R.string.slash_command_reasoning_off_desc);
+        }
+        if (AiBehaviorSettings.REASONING_LOW.equals(level)) {
+            return ctx.getString(R.string.slash_command_reasoning_low_desc);
+        }
+        if (AiBehaviorSettings.REASONING_MEDIUM.equals(level)) {
+            return ctx.getString(R.string.slash_command_reasoning_medium_desc);
+        }
+        if (AiBehaviorSettings.REASONING_HIGH.equals(level)) {
+            return ctx.getString(R.string.slash_command_reasoning_high_desc);
+        }
+        if (AiBehaviorSettings.REASONING_MAX.equals(level)) {
+            return ctx.getString(R.string.slash_command_reasoning_max_desc);
+        }
+        return level;
+    }
+
+    private void applyMainSelection(SlashCommandCatalog.Definition def) {
+        String replacement;
+        if (def.kind == SlashCommandCatalog.Kind.MODEL) {
+            replacement = "/model ";
+        } else {
+            replacement = def.token + " ";
+        }
+        input.setText(replacement);
+        input.setSelection(replacement.length());
+        lastSlashSignature = null;
+    }
+
+    private void applyModelIdSelection(String modelId) {
+        String replacement = "/model " + modelId + " ";
+        input.setText(replacement);
+        input.setSelection(replacement.length());
+        lastSlashSignature = null;
+    }
+
+    private void applyReasoningSelection(String modelId, String level) {
+        String replacement = "/model " + modelId + " " + level;
+        input.setText(replacement);
+        input.setSelection(replacement.length());
+        lastSlashSignature = null;
+    }
+
+    private static final class SlashState {
+        enum Kind { MAIN, MODEL_ID, REASONING }
+        final Kind kind;
+        final String title;
+        final List<SlashCommandCatalog.Definition> definitions;
+        final List<String> modelIds;
+        final List<String> levels;
+        final String query;
+        final int selectedIndex;
+        final String modelId;
+        final String signature;
+
+        SlashState(Kind kind, String title,
+                   List<SlashCommandCatalog.Definition> definitions,
+                   String query, int selectedIndex, String modelId,
+                   List<String> modelIds, List<String> levels) {
+            this.kind = kind;
+            this.title = title;
+            this.definitions = definitions == null ? Collections.<SlashCommandCatalog.Definition>emptyList() : definitions;
+            this.modelIds = modelIds == null ? Collections.<String>emptyList() : modelIds;
+            this.levels = levels == null ? Collections.<String>emptyList() : levels;
+            this.query = query == null ? "" : query;
+            this.selectedIndex = selectedIndex;
+            this.modelId = modelId == null ? "" : modelId;
+            this.signature = kind.name() + ":" + this.query + ":" + this.modelId + ":"
+                    + this.definitions.size() + ":" + this.modelIds.size() + ":" + this.levels.size();
+        }
+    }
+
     private void updateModeButtons() {
         modeSelectorText.setText(modeLabel(chatMode));
         modeSelectorText.setTextColor(streaming ? LineTheme.TEXT_TERTIARY : LineTheme.TEXT);
@@ -470,6 +758,7 @@ public final class ComposerView extends LinearLayout {
 
     private void showModelPopup(View anchor) {
         if (streaming) return;
+        dismissSlashPopup();
         input.clearFocus();
         if (modelPopup != null && modelPopup.isShowing()) { modelPopup.dismiss(); return; }
         Context ctx = getContext();
@@ -565,6 +854,7 @@ public final class ComposerView extends LinearLayout {
         if (streaming) {
             return;
         }
+        dismissSlashPopup();
         if (modePopup != null && modePopup.isShowing()) {
             modePopup.dismiss();
             return;

@@ -237,6 +237,11 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             public void onModelManageClick() {
                 MainChatView.this.presenter.showModelManagement();
             }
+
+            @Override
+            public void onAiReasoningEffortChanged(String effort) {
+                MainChatView.this.presenter.onAiReasoningEffortChanged(effort);
+            }
         });
         contentView.addView(composerView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,

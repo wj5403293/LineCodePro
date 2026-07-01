@@ -9,7 +9,7 @@
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 [![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84.svg)](app/build.gradle.kts)
-[![Latest: 1.1.4](https://img.shields.io/badge/version-1.1.4-success.svg)](app/build.gradle.kts)
+[![Latest: 1.1.7](https://img.shields.io/badge/version-1.1.7-success.svg)](app/build.gradle.kts)
 [![Java only](https://img.shields.io/badge/code-Java%2011-orange.svg)](#project-layout)
 
 ---
@@ -19,18 +19,17 @@
 1. [What is LineCode Pro?](#what-is-linecode-pro)
 2. [What it can do](#what-it-can-do)
 3. [Highlights](#highlights)
-4. [Recent changes](#recent-changes)
-5. [Project layout](#project-layout)
-6. [Install](#install)
-7. [Getting started](#getting-started)
-8. [Execution modes](#execution-modes)
-9. [Model providers](#model-providers)
-10. [Tool system](#tool-system)
-11. [Extending LineCode](#extending-linecode)
-12. [Building from source](#building-from-source)
-13. [Privacy & security](#privacy--security)
-14. [Contributing](#contributing)
-15. [License](#license)
+4. [Project layout](#project-layout)
+5. [Install](#install)
+6. [Getting started](#getting-started)
+7. [Execution modes](#execution-modes)
+8. [Model providers](#model-providers)
+9. [Tool system](#tool-system)
+10. [Extending LineCode](#extending-linecode)
+11. [Building from source](#building-from-source)
+12. [Privacy & security](#privacy--security)
+13. [Contributing](#contributing)
+14. [License](#license)
 
 ---
 
@@ -102,20 +101,6 @@ Every file-touching tool routes paths through `FileToolPathPolicy` so the model 
 - **Memory and context.** Long conversations are summarised; durable knowledge is re-injected next session.
 - **Private by default.** URL allow-list, strict `network_security_config.xml`, secrets redacted from exports, in-app browser keeps JavaScript off.
 - **Java-only, on purpose.** No Kotlin runtime, no XML layouts — the app is built entirely in Java 11 for transparency and reviewability.
-
----
-
-## Recent changes
-
-### v1.1.4
-
-- **More focused MVP controllers.** Chat flow, generation, model prompts, project workspace, directory picking, IPC provider binding, extension editing, tool review, tool messages, storage maintenance, and overlay actions now live in dedicated controllers; `MainCoordinator` stays closer to an orchestration layer.
-- **Tool-call interruption safety.** When generation is stopped or interrupted, every unfinished `tool_call` receives a matching error `tool` message. Running, pending, and empty accepted tool results are replaced with a termination result, keeping model protocol ordering valid.
-- **Context window protocol safety.** Context selection now keeps assistant `tool_calls` and their matching tool-result messages together, avoiding invalid requests where one side of the tool-call pair was trimmed away.
-- **SSH and shell error handling.** Successful SSH commands no longer show `error:null` when the drain phase is interrupted after the remote command already closed. Tool execution errors now distinguish argument parsing from runtime failure and avoid rendering `null`; non-zero IPC shell results keep both output and exit code.
-- **Screen reuse and diagnostics.** Settings/model/extension screens are cached and can be invalidated explicitly. Model-list fetch failures are recorded in the error-log center with sensitive values redacted.
-
-For the full release history, see [`update.md`](update.md).
 
 ---
 

@@ -459,10 +459,17 @@ public final class AgentExecutionController {
         if (scopeError != null) {
             return scopeError;
         }
+        if (isSessionAutoConfirmed(call)) {
+            return toolExecutor.executeConfirmed(call, context);
+        }
         if (requiresToolConfirmation(call)) {
             return executeAgentToolCallWithReview(call, context, progress, host, cancellationToken);
         }
         return toolExecutor.execute(call, context);
+    }
+
+    private boolean isSessionAutoConfirmed(ToolCall call) {
+        return toolReviewAwaiter != null && toolReviewAwaiter.isAutoConfirmed(call);
     }
 
     private List<String> skillWriteRoots(String homePath) {

@@ -210,6 +210,44 @@ public final class AgentExecutionControllerTest {
     }
 
     @Test
+    public void shellExecuteAutoConfirmedSkipsReviewAndExecutesConfirmed() throws Exception {
+        ToolRegistry registry = new ToolRegistry();
+        ConfirmTool shell = new ConfirmTool("shell_execute");
+        registry.register(shell);
+        ConfirmingSettings settings = new ConfirmingSettings();
+        ToolExecutor executor = new ToolExecutor(registry, settings);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
+        controller.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
+            @Override
+            public String awaitReview(String displayToolCallId, ToolCall call, cn.lineai.ai.ModelCancellationToken cancellationToken) {
+                throw new AssertionError("awaitReview should not be called when session auto confirmed");
+            }
+
+            @Override
+            public boolean isAutoConfirmed(ToolCall call) {
+                return "shell_execute".equals(call.getName());
+            }
+        });
+        RecordingHost host = new RecordingHost();
+
+        ToolResult result = controller.executeAgentToolCall(
+                new ToolCall("shell_1", "shell_execute", "{\"command\":\"pwd\"}"),
+                Collections.singleton("shell_execute"),
+                AgentTool.TYPE_SUB_CODING,
+                Collections.emptyList(),
+                "",
+                progress,
+                host,
+                null);
+
+        assertFalse(result.isError());
+        assertEquals(1, shell.runCount);
+        assertTrue(host.requestedReviews.isEmpty());
+        assertTrue(host.clearedReviews.isEmpty());
+    }
+
+    @Test
     public void subAgentToolReviewNotifiesMainFlowBeforeAwaiting() throws Exception {
         ToolRegistry registry = new ToolRegistry();
         registry.register(new ConfirmTool("shell_execute"));

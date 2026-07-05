@@ -50,27 +50,42 @@ public final class ToolCallBlockView extends LinearLayout {
         }
         removeAllViews();
         if (ToolCallUtils.isAgentTool(name)) {
-            ToolCallAgentView view = new ToolCallAgentView(getContext());
-            view.setToolReviewListener(toolReviewListener);
-            view.setProjectPath(projectPath);
+            ToolCallAgentView view;
+            if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentView) {
+                view = (ToolCallAgentView) getChildAt(0);
+            } else {
+                view = new ToolCallAgentView(getContext());
+                view.setToolReviewListener(toolReviewListener);
+                view.setProjectPath(projectPath);
+                addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            }
             view.bind(toolCall, result);
-            addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
         if (ToolCallUtils.isAgentPipelineTool(name)) {
-            ToolCallAgentPipelineView view = new ToolCallAgentPipelineView(getContext());
-            view.setToolReviewListener(toolReviewListener);
-            view.setProjectPath(projectPath);
+            ToolCallAgentPipelineView view;
+            if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentPipelineView) {
+                view = (ToolCallAgentPipelineView) getChildAt(0);
+            } else {
+                view = new ToolCallAgentPipelineView(getContext());
+                view.setToolReviewListener(toolReviewListener);
+                view.setProjectPath(projectPath);
+                addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            }
             view.bind(toolCall, result);
-            addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
         if (ToolCallUtils.isCustomAgentTool(name)) {
-            ToolCallAgentView view = new ToolCallAgentView(getContext());
-            view.setToolReviewListener(toolReviewListener);
-            view.setProjectPath(projectPath);
+            ToolCallAgentView view;
+            if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallAgentView) {
+                view = (ToolCallAgentView) getChildAt(0);
+            } else {
+                view = new ToolCallAgentView(getContext());
+                view.setToolReviewListener(toolReviewListener);
+                view.setProjectPath(projectPath);
+                addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            }
             view.bind(toolCall, result);
-            addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
             return;
         }
         if (ToolCallUtils.isImageGenerationTool(name)) {

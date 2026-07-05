@@ -23,7 +23,7 @@ import org.json.JSONObject;
 public final class ToolCallTodoView extends BaseToolCallView {
     private final int circleSize;
     private final int circleStroke;
-    private final int rowHeight;
+    private final int minRowHeight;
     private List<TodoItem> lastItems;
     private String lastSignature = "";
 
@@ -31,7 +31,7 @@ public final class ToolCallTodoView extends BaseToolCallView {
         super(context);
         circleSize = LineTheme.dp(context, 14);
         circleStroke = LineTheme.dp(context, 2);
-        rowHeight = LineTheme.dp(context, 28);
+        minRowHeight = LineTheme.dp(context, 28);
     }
 
     public void bind(ToolCall toolCall, ToolResult result) {
@@ -55,7 +55,9 @@ public final class ToolCallTodoView extends BaseToolCallView {
         list.setOrientation(VERTICAL);
         LineTheme.padding(list, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
         for (TodoItem item : items) {
-            list.addView(buildRow(item), new LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
+            LinearLayout row = buildRow(item);
+            row.setMinimumHeight(minRowHeight);
+            list.addView(row, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
@@ -74,6 +76,7 @@ public final class ToolCallTodoView extends BaseToolCallView {
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
+        LineTheme.padding(row, 0, LineTheme.XS, 0, LineTheme.XS);
 
         View indicator = indicatorView(item);
         row.addView(indicator, new LayoutParams(circleSize, circleSize));

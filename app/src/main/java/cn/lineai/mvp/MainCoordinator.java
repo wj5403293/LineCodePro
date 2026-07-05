@@ -1051,6 +1051,16 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
                     public void setCurrentCancellationToken(ModelCancellationToken cancellationToken) {
                         generationLifecycleController.setCurrentCancellationToken(cancellationToken);
                     }
+
+                    @Override
+                    public boolean isSshExecutionMode() {
+                        return MainCoordinator.this.isSshExecutionMode();
+                    }
+
+                    @Override
+                    public boolean isTerminalProviderExecutionMode() {
+                        return MainCoordinator.this.isTerminalProviderExecutionMode();
+                    }
                 }
         );
         generationLifecycleController.setGenerationFlowController(generationFlowController);

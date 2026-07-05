@@ -38,6 +38,11 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
 
         JSONObject input = ToolCallUtils.parseInput(toolCall);
         JSONArray agents = input.optJSONArray("agents");
+        String parseError = parseInputError(toolCall, input);
+        if (parseError.length() > 0 && (agents == null || agents.length() == 0)) {
+            bindParseError(toolCall, result, parseError);
+            return;
+        }
         int total = agents == null ? 0 : agents.length();
         JSONObject progress = progressPayload(result);
         boolean runningProgress = progress != null && "running".equals(progress.optString("status", "running"));
@@ -146,6 +151,18 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         } else {
             TextView empty = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_pipeline_running), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             list.addView(empty, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        }
+        String finalSummary = progress != null ? progress.optString("summary") : "";
+        if (finalSummary.length() > 0 && (agents == null || agents.length() == 0)) {
+            View summaryDivider = new View(getContext());
+            summaryDivider.setBackgroundColor(LineTheme.CODE_BORDER);
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1);
+            dividerParams.topMargin = LineTheme.dp(getContext(), LineTheme.SM);
+            dividerParams.bottomMargin = LineTheme.dp(getContext(), LineTheme.SM);
+            list.addView(summaryDivider, dividerParams);
+            MarkdownView summaryMarkdown = new MarkdownView(getContext());
+            summaryMarkdown.setMarkdown(finalSummary);
+            list.addView(summaryMarkdown, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         }
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
@@ -280,6 +297,75 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private String parseInputError(ToolCall toolCall, JSONObject input) {
+        if (toolCall == null) {
+            return "";
+        }
+        String arguments = toolCall.getArguments();
+        if (arguments == null || arguments.trim().length() == 0) {
+            return "";
+        }
+        if (input == null) {
+            return "参数解析失败: 模型返回的不是合法 JSON。";
+        }
+        if (input.length() == 0) {
+            String message = "参数解析失败";
+            try {
+                new JSONObject(arguments);
+            } catch (Exception e) {
+                message = "参数解析失败: " + e.getMessage();
+            }
+            return message;
+        }
+        return "";
+    }
+
+    private void bindParseError(ToolCall toolCall, ToolResult result, String parseError) {
+        LinearLayout header = new LinearLayout(getContext());
+        header.setOrientation(HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setClickable(false);
+        LineTheme.padding(header, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
+
+        IconButtonView icon = new IconButtonView(getContext(), IconButtonView.GIT_BRANCH);
+        icon.setIconColor(LineTheme.ACCENT);
+        icon.setIconSizeDp(30, 15);
+        icon.setClickable(false);
+        icon.setBackground(LineTheme.roundedStroke(getContext(), android.graphics.Color.TRANSPARENT, 15, LineTheme.CODE_BORDER));
+        header.addView(icon, new LayoutParams(LineTheme.dp(getContext(), 30), LineTheme.dp(getContext(), 30)));
+
+        LinearLayout titleBlock = new LinearLayout(getContext());
+        titleBlock.setOrientation(VERTICAL);
+        LayoutParams titleParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        titleParams.leftMargin = LineTheme.dp(getContext(), LineTheme.SM);
+        titleParams.rightMargin = LineTheme.dp(getContext(), LineTheme.SM);
+        header.addView(titleBlock, titleParams);
+
+        TextView title = LineTheme.text(getContext(), getContext().getString(R.string.tool_call_pipeline_title), LineTheme.FONT_SM, LineTheme.TEXT, Typeface.BOLD);
+        title.setSingleLine(true);
+        titleBlock.addView(title, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        FlowLayoutView meta = new FlowLayoutView(getContext());
+        meta.setSpacingDp(LineTheme.SM, 3);
+        meta.addView(summaryItem(IconButtonView.CIRCLE_X, getContext().getString(R.string.tool_call_status_failed), LineTheme.DANGER));
+        titleBlock.addView(meta, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        IconButtonView statusIcon = new IconButtonView(getContext(), IconButtonView.CIRCLE_X);
+        statusIcon.setIconColor(LineTheme.DANGER);
+        statusIcon.setIconSizeDp(16, 12);
+        statusIcon.setClickable(false);
+        header.addView(statusIcon, new LayoutParams(LineTheme.dp(getContext(), 16), LineTheme.dp(getContext(), 16)));
+
+        addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        LinearLayout list = new LinearLayout(getContext());
+        list.setOrientation(VERTICAL);
+        LineTheme.padding(list, LineTheme.SM, LineTheme.SM, LineTheme.SM, LineTheme.SM);
+        TextView errorView = LineTheme.text(getContext(), parseError, LineTheme.FONT_XS, LineTheme.DANGER, Typeface.NORMAL);
+        list.addView(errorView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     private HashMap<String, AgentSummary> parseProgress(JSONObject progress) {

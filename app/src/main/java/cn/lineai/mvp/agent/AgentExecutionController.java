@@ -43,8 +43,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class AgentExecutionController {
-    private static final int AGENT_MAX_TURNS = 8;
+    private static final long AGENT_TOTAL_BUDGET_MS = 30L * 60L * 1000L;
     private static final String AGENT_TERMINATED_MESSAGE = "Agent 已终止。";
+    private static final String AGENT_TOOL_LIMIT_MESSAGE = "Agent 已达到主流程总工具调用次数上限。";
 
     private final ModelClient modelClient;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
@@ -72,6 +73,14 @@ public final class AgentExecutionController {
         void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult);
 
         void clearAgentToolReview(String displayToolCallId);
+
+        default boolean isSshExecutionMode() {
+            return false;
+        }
+
+        default boolean isTerminalProviderExecutionMode() {
+            return false;
+        }
     }
 
     public interface ToolReviewAwaiter {
@@ -108,10 +117,14 @@ public final class AgentExecutionController {
             ModelConfig selectedModel,
             ModelCancellationToken cancellationToken,
             int generationId,
-            Host host
+            Host host,
+            int usedToolCallCount
     ) {
         if (selectedModel == null) {
             return new ToolResult("", "agent", "当前没有可用模型，无法运行 Agent。", true);
+        }
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return new ToolResult("", "agent", AGENT_TERMINATED_MESSAGE, true);
         }
         String type = AgentTool.normalizeType(input.optString("type"));
         String description = input.optString("description").trim();
@@ -128,6 +141,7 @@ public final class AgentExecutionController {
                 type,
                 description
         );
+        int[] toolCallBudget = new int[]{Math.max(0, usedToolCallCount)};
         AgentRunResult result = runAgentLoop(
                 type,
                 description,
@@ -140,7 +154,8 @@ public final class AgentExecutionController {
                 progress,
                 host,
                 customToolNames,
-                customMcpIds
+                customMcpIds,
+                toolCallBudget
         );
         StringBuilder builder = new StringBuilder();
         builder.append("Agent 完成: ").append(description).append('\n')
@@ -160,10 +175,14 @@ public final class AgentExecutionController {
             ModelConfig selectedModel,
             ModelCancellationToken cancellationToken,
             int generationId,
-            Host host
+            Host host,
+            int usedToolCallCount
     ) {
         if (selectedModel == null) {
             return new ToolResult("", "agent_pipeline", "当前没有可用模型，无法运行 Agent 流水线。", true);
+        }
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return new ToolResult("", "agent_pipeline", AGENT_TERMINATED_MESSAGE, true);
         }
         ArrayList<PipelineAgent> agents = parsePipelineAgents(input.optJSONArray("agents"));
         if (agents.isEmpty()) {
@@ -185,12 +204,49 @@ public final class AgentExecutionController {
         pipelineProgress.publish(false);
         boolean hasError = false;
         int totalToolCalls = 0;
+        long pipelineStartedAt = System.currentTimeMillis();
+        long pipelineBudgetMs = (long) agents.size() * AGENT_TOTAL_BUDGET_MS;
+        int[] toolCallBudget = new int[]{Math.max(0, usedToolCallCount)};
         for (ArrayList<PipelineAgent> level : levels) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 pipelineProgress.terminate();
-                return new ToolResult("", "agent_pipeline", "Agent 流水线已终止。", true);
+                pipelineProgress.setFinalSummary("Agent 流水线已终止。");
+                pipelineProgress.setStatus("error", true);
+                pipelineProgress.publish(true);
+                ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, "Agent 流水线已终止。", true);
+                host.addOrReplaceToolResult(finalProgress);
+                return finalProgress;
+            }
+            if (System.currentTimeMillis() - pipelineStartedAt > pipelineBudgetMs) {
+                String message = "Agent 流水线达到总时长预算 " + (pipelineBudgetMs / 60000L) + " 分钟，已强制结束。";
+                pipelineProgress.terminate();
+                pipelineProgress.setFinalSummary(message);
+                pipelineProgress.setStatus("error", true);
+                pipelineProgress.publish(true);
+                ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, message, true);
+                host.addOrReplaceToolResult(finalProgress);
+                return finalProgress;
             }
             for (PipelineAgent agent : level) {
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    pipelineProgress.terminate();
+                    pipelineProgress.setFinalSummary("Agent 流水线已终止。");
+                    pipelineProgress.setStatus("error", true);
+                    pipelineProgress.publish(true);
+                    ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, "Agent 流水线已终止。", true);
+                    host.addOrReplaceToolResult(finalProgress);
+                    return finalProgress;
+                }
+                if (System.currentTimeMillis() - pipelineStartedAt > pipelineBudgetMs) {
+                    String message = "Agent 流水线达到总时长预算 " + (pipelineBudgetMs / 60000L) + " 分钟，已强制结束。";
+                    pipelineProgress.terminate();
+                    pipelineProgress.setFinalSummary(message);
+                    pipelineProgress.setStatus("error", true);
+                    pipelineProgress.publish(true);
+                    ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, message, true);
+                    host.addOrReplaceToolResult(finalProgress);
+                    return finalProgress;
+                }
                 String agentPrompt = agent.getPrompt() + dependencyOutputContext(agent, results);
                 pipelineProgress.beginAgent(agent);
                 AgentProgressSession agentProgress = new AgentProgressSession(
@@ -213,7 +269,8 @@ public final class AgentExecutionController {
                         agentProgress,
                         host,
                         Collections.emptySet(),
-                        Collections.emptySet()
+                        Collections.emptySet(),
+                        toolCallBudget
                 );
                 pipelineProgress.finishAgent(agent, result);
                 results.put(agent.getId(), result);
@@ -224,10 +281,46 @@ public final class AgentExecutionController {
                         .append('\n').append("状态: ").append(result.isError() ? "error" : "done")
                         .append('\n').append("工具调用: ").append(result.getToolCallCount())
                         .append('\n').append(result.getOutput());
+                if (result.isError() && result.getOutput().contains(AGENT_TOOL_LIMIT_MESSAGE)) {
+                    String message = "Agent 流水线因工具调用次数达到主流程上限，已提前结束：\n" + result.getOutput();
+                    pipelineProgress.setFinalSummary(message);
+                    pipelineProgress.setStatus("error", true);
+                    pipelineProgress.publish(true);
+                    ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, message, true);
+                    host.addOrReplaceToolResult(finalProgress);
+                    return finalProgress;
+                }
             }
         }
         summary.append("\n\n总工具调用: ").append(totalToolCalls);
-        return new ToolResult("", "agent_pipeline", summary.toString().trim(), hasError);
+        String finalSummaryText = summary.toString().trim();
+        pipelineProgress.setFinalSummary(finalSummaryText);
+        pipelineProgress.setStatus(hasError ? "error" : "done", hasError);
+        pipelineProgress.publish(hasError);
+        ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, finalSummaryText, hasError);
+        host.addOrReplaceToolResult(finalProgress);
+        return finalProgress;
+    }
+
+    private ToolResult pipelineProgressFinalToolResult(
+            ToolContext parentContext,
+            PipelineProgressSession pipelineProgress,
+            String summary,
+            boolean error
+    ) {
+        String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
+        if (toolCallId.length() == 0) {
+            return new ToolResult("", "agent_pipeline", summary, error);
+        }
+        return new ToolResult(
+                toolCallId,
+                "agent_pipeline",
+                pipelineProgress.payload(),
+                error,
+                "",
+                error ? "error" : "done",
+                ""
+        );
     }
 
     public AgentRunResult runAgentLoop(
@@ -242,7 +335,8 @@ public final class AgentExecutionController {
             AgentProgressSession progress,
             Host host,
             Set<String> customToolNames,
-            Set<String> customMcpIds
+            Set<String> customMcpIds,
+            int[] toolCallBudget
     ) {
         host.syncModePermission();
         ArrayList<BaseTool> agentTools = agentTools(type, host, customToolNames, customMcpIds);
@@ -252,8 +346,10 @@ public final class AgentExecutionController {
         agentMessages.add(new UserModelMessage(prompt));
         int toolCallCount = 0;
         String lastOutput = "";
+        long startedAt = System.currentTimeMillis();
+        int toolCallLimit = selectedModel == null ? -1 : selectedModel.getToolCallLimit();
 
-        for (int turn = 0; turn < AGENT_MAX_TURNS; turn++) {
+        while (true) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 if (progress != null) {
                     progress.setFinished("error", true, AGENT_TERMINATED_MESSAGE);
@@ -261,6 +357,25 @@ public final class AgentExecutionController {
                     host.render();
                 }
                 return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
+            }
+            if (toolCallLimit > 0 && toolCallBudget[0] >= toolCallLimit) {
+                String message = AGENT_TOOL_LIMIT_MESSAGE + "\n" + lastOutput;
+                if (progress != null) {
+                    progress.setFinished("error", true, message);
+                    host.addOrReplaceToolResult(progress.snapshotResult());
+                    host.render();
+                }
+                return new AgentRunResult(message, toolCallCount, true);
+            }
+            if (System.currentTimeMillis() - startedAt > AGENT_TOTAL_BUDGET_MS) {
+                String timeoutMessage = "Agent 达到总时长预算 " + (AGENT_TOTAL_BUDGET_MS / 60000L)
+                        + " 分钟，最后输出：\n" + lastOutput;
+                if (progress != null) {
+                    progress.setFinished("error", true, timeoutMessage);
+                    host.addOrReplaceToolResult(progress.snapshotResult());
+                    host.render();
+                }
+                return new AgentRunResult(timeoutMessage, toolCallCount, true);
             }
             try {
                 if (progress != null) {
@@ -324,8 +439,18 @@ public final class AgentExecutionController {
                         }
                         return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
                     }
+                    if (toolCallLimit > 0 && toolCallBudget[0] >= toolCallLimit) {
+                        String message = AGENT_TOOL_LIMIT_MESSAGE + "\n" + lastOutput;
+                        if (progress != null) {
+                            progress.setFinished("error", true, message);
+                            host.addOrReplaceToolResult(progress.snapshotResult());
+                            host.render();
+                        }
+                        return new AgentRunResult(message, toolCallCount, true);
+                    }
                     ToolResult toolResult = executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath, progress, host, cancellationToken);
                     toolCallCount++;
+                    toolCallBudget[0]++;
                     if (progress != null) {
                         progress.putToolResult(call, toolResult);
                         host.addOrReplaceToolResult(progress.snapshotResult());
@@ -354,12 +479,6 @@ public final class AgentExecutionController {
                 return new AgentRunResult("Agent 执行失败：\n" + e.getMessage(), toolCallCount, true);
             }
         }
-        if (progress != null) {
-            progress.setFinished("error", true, "Agent 达到最大轮次 " + AGENT_MAX_TURNS + "，最后输出：\n" + lastOutput);
-            host.addOrReplaceToolResult(progress.snapshotResult());
-            host.render();
-        }
-        return new AgentRunResult("Agent 达到最大轮次 " + AGENT_MAX_TURNS + "，最后输出：\n" + lastOutput, toolCallCount, true);
     }
 
     public ArrayList<BaseTool> agentTools(String type, Host host, Set<String> customToolNames, Set<String> customMcpIds) {
@@ -536,15 +655,41 @@ public final class AgentExecutionController {
             Host host
     ) {
         host.syncModePermission();
-        return agentRolePrompt(type)
+        boolean remoteMode = host != null && (host.isSshExecutionMode() || host.isTerminalProviderExecutionMode());
+        return agentRolePrompt(type, remoteMode)
                 + "\n\n你的任务: " + description
-                + "\n\n" + agentWorkspacePrompt(homePath, host)
-                + "\n\n" + agentScopePrompt(type, readScope, writeScope)
+                + "\n\n" + agentWorkspacePrompt(homePath, host, remoteMode)
+                + "\n\n" + agentScopePrompt(type, readScope, writeScope, remoteMode)
                 + "\n\n" + extensionRepository.buildExtensionPrompt(homePath)
                 + "\n\n" + toolSettingsRepository.buildToolPrompt(agentTools, supportsNativeTools(selectedModel));
     }
 
     public String agentRolePrompt(String type) {
+        return agentRolePrompt(type, false);
+    }
+
+    public String agentRolePrompt(String type, boolean remoteMode) {
+        if (remoteMode) {
+            if (AgentTool.TYPE_EXPLORE.equals(type)) {
+                return "你是一个远程 Shell 环境下的代码探索 Agent（当前工作区位于 SSH 远端或终端提供者容器内，本地 file_read / file_write / file_edit / glob / list_dir 不一定可用）。\n"
+                        + "规则：\n"
+                        + "- 必须通过 shell_execute 调用 pwd、ls、find、grep、rg、cat、head、tail、git diff、git status 等命令完成只读探查，不要假设 file_read 等本地文件工具可用。\n"
+                        + "- shell_execute 禁止执行写入、删除、移动、安装、启动服务、修改权限、重定向写文件或其它有副作用的命令。\n"
+                        + "- 写操作类工具（file_write、file_edit、file_delete 等）即使注册了也不在当前 Agent 的允许范围，禁止调用。\n"
+                        + "- 给出简洁准确的中文回答，并标注文件路径和必要的行号。";
+            }
+            return "你是一个远程 Shell 环境下的编程 Agent（当前工作区位于 SSH 远端或终端提供者容器内，本地 file_read / file_write / file_edit / glob / list_dir 不一定可用）。\n"
+                    + "规则：\n"
+                    + "- 必须通过 shell_execute 完成绝大多数工作：先 cat/ls/grep 读取，写入用 sed/awk/python heredoc 或 tee，确认 cat 验证。\n"
+                    + "- 只负责用户明确分派给你的任务区域，不要修改无关文件。\n"
+                    + "- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件，只能汇报需要主模型重新分配。\n"
+                    + "- 使用 shell_execute 时，命令的写入、修改、副作用同样视为对 write_scope 内文件操作；禁止读取、修改、删除或影响 write_scope 外的文件、目录、环境变量、依赖、服务和进程。\n"
+                    + "- 写操作类工具（file_write、file_edit、file_delete 等）即使注册了也不在当前 Agent 的允许范围，禁止调用。\n"
+                    + "- 如果发现必须修改 write_scope 外的文件，停止写入并在输出中说明需要扩大或重新分配范围。\n"
+                    + "- 修改前先读取目标文件，完成后做最小可行验证。\n"
+                    + "- 如果工具失败，先重新读取和分析，不要盲目重复。\n"
+                    + "- 用中文总结完成内容、验证结果和剩余风险。";
+        }
         if (AgentTool.TYPE_EXPLORE.equals(type)) {
             return "你是一个代码探索 Agent。你的任务是快速定位和分析代码，回答用户的问题。\n"
                     + "规则：\n"
@@ -560,18 +705,28 @@ public final class AgentExecutionController {
                 + "- 使用 shell_execute 时，命令的写入、修改、副作用同样视为对 write_scope 内文件操作；禁止读取、修改、删除或影响 write_scope 外的文件、目录、环境变量、依赖、服务和进程。\n"
                 + "- 优先使用 file_read / file_write / file_edit / glob / list_dir 完成工作；只有 file 类工具确实无法满足时（如 SSH 环境、运行构建或验证脚本）才使用 shell_execute。\n"
                 + "- 如果发现必须修改 write_scope 外的文件，停止写入并在输出中说明需要扩大或重新分配范围。\n"
-                + "- 修改前先读取目标文件，完成后做最小可行验证。\n"
-                + "- 如果工具失败，先重新读取和分析，不要盲目重复。\n"
-                + "- 用中文总结完成内容、验证结果和剩余风险。";
+                    + "- 修改前先读取目标文件，完成后做最小可行验证。\n"
+                    + "- 如果工具失败，先重新读取和分析，不要盲目重复。\n"
+                    + "- 用中文总结完成内容、验证结果和剩余风险。";
     }
 
     public String agentWorkspacePrompt(String homePath, Host host) {
+        return agentWorkspacePrompt(homePath, host, host != null && (host.isSshExecutionMode() || host.isTerminalProviderExecutionMode()));
+    }
+
+    public String agentWorkspacePrompt(String homePath, Host host, boolean remoteMode) {
         String path = homePath == null || homePath.trim().length() == 0 ? promptHomePath(host) : homePath.trim();
-        return "当前工作区: " + path + "\n"
-                + "所有文件路径默认相对此工作区。不要访问未授权路径，不要读取 API key、token、密码等敏感数据。";
+        String modeHint = remoteMode
+                ? "\n当前是 SSH 远端或终端提供者模式：所有命令作用于远端主机上的工作区，文件路径按远端约定解析。"
+                : "\n所有文件路径默认相对此工作区。不要访问未授权路径，不要读取 API key、token、密码等敏感数据。";
+        return "当前工作区: " + path + modeHint;
     }
 
     public String agentScopePrompt(String type, List<String> readScope, List<String> writeScope) {
+        return agentScopePrompt(type, readScope, writeScope, false);
+    }
+
+    public String agentScopePrompt(String type, List<String> readScope, List<String> writeScope, boolean remoteMode) {
         StringBuilder builder = new StringBuilder();
         builder.append("## Agent 范围\n");
         builder.append("read_scope: ").append(scopeSummary(readScope)).append('\n');
@@ -582,6 +737,9 @@ public final class AgentExecutionController {
             builder.append("没有授权写入范围。禁止写入文件；如果任务需要修改文件，直接说明需要主模型重新分配 write_scope。");
         } else {
             builder.append("只能写入 write_scope 覆盖的路径。不要修改其它文件，不要把多个 Agent 的职责混到同一个文件里。");
+        }
+        if (remoteMode) {
+            builder.append("\n注意：所有路径都是远端主机上的路径；写入/读取都要通过 shell_execute 调用 sed/awk/python heredoc/cat 等命令，不要尝试调用本地 file 类工具。");
         }
         return builder.toString();
     }

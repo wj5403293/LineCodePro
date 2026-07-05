@@ -4,7 +4,13 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -143,18 +149,18 @@ public final class SlashCommandPopup {
     private LinearLayout.LayoutParams titleParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LineTheme.dp(context, 32)
+                LineTheme.dp(context, 22)
         );
         params.leftMargin = LineTheme.dp(context, LineTheme.MD);
         params.rightMargin = LineTheme.dp(context, LineTheme.MD);
-        params.bottomMargin = LineTheme.dp(context, LineTheme.XS);
+        params.topMargin = LineTheme.dp(context, 1);
         return params;
     }
 
     private View rowView(Row row, int index) {
         LinearLayout container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
-        LineTheme.padding(container, LineTheme.MD, 0, LineTheme.MD, 0);
+        LineTheme.padding(container, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
         container.setGravity(Gravity.CENTER_VERTICAL);
 
         LinearLayout row1 = new LinearLayout(context);
@@ -168,6 +174,10 @@ public final class SlashCommandPopup {
         TextView label = LineTheme.textMedium(context, row.label, LineTheme.FONT_SM, LineTheme.TEXT);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
+        Spannable formattedLabel = formatLabel(row.label);
+        if (formattedLabel != null) {
+            label.setText(formattedLabel);
+        }
         row1.addView(label, new LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -190,21 +200,37 @@ public final class SlashCommandPopup {
                     LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
             desc.setSingleLine(true);
             desc.setEllipsize(TextUtils.TruncateAt.END);
-            container.addView(desc, new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams descParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-            ));
+            );
+            descParams.topMargin = LineTheme.dp(context, 1);
+            container.addView(desc, descParams);
         }
 
         container.setClickable(true);
         container.setFocusable(true);
         container.setOnClickListener(v -> {
+            Runnable onClick = row.onClick;
             dismiss();
-            if (row.onClick != null) {
-                container.post(row.onClick);
+            if (onClick != null) {
+                new Handler(Looper.getMainLooper()).post(onClick);
             }
         });
         return container;
+    }
+
+    private Spannable formatLabel(String text) {
+        SpannableString span = new SpannableString(text == null ? "" : text);
+        if (span.length() > 0 && span.charAt(0) == '/') {
+            int end = 1;
+            while (end < span.length() && span.charAt(end) != ' ' && span.charAt(end) != '\t') {
+                end++;
+            }
+            span.setSpan(new ForegroundColorSpan(LineTheme.ACCENT), 0, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+            span.setSpan(new StyleSpan(Typeface.BOLD), 0, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+        }
+        return span;
     }
 
     private LinearLayout.LayoutParams rowParams() {

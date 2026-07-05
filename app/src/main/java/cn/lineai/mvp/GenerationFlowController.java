@@ -62,6 +62,14 @@ final class GenerationFlowController {
         void stopGenerationKeepAlive();
 
         void setCurrentCancellationToken(ModelCancellationToken cancellationToken);
+
+        default boolean isSshExecutionMode() {
+            return false;
+        }
+
+        default boolean isTerminalProviderExecutionMode() {
+            return false;
+        }
     }
 
     private final ArrayList<ChatMessage> messages;
@@ -96,6 +104,16 @@ final class GenerationFlowController {
         @Override
         public String projectSource() {
             return host.projectSource();
+        }
+
+        @Override
+        public boolean isSshExecutionMode() {
+            return host.isSshExecutionMode();
+        }
+
+        @Override
+        public boolean isTerminalProviderExecutionMode() {
+            return host.isTerminalProviderExecutionMode();
         }
 
         @Override
@@ -648,7 +666,7 @@ final class GenerationFlowController {
             ModelCancellationToken cancellationToken
     ) {
         backgroundTasks.execute("linecode-tool-execute", () -> {
-            ToolExecutionBatch batch = executeToolCallsUntilPending(toolCalls, homePath, selectedModel, cancellationToken, generationId);
+            ToolExecutionBatch batch = executeToolCallsUntilPending(toolCalls, homePath, selectedModel, cancellationToken, generationId, usedToolCallCount);
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 return;
             }
@@ -666,13 +684,14 @@ final class GenerationFlowController {
             String homePath,
             ModelConfig selectedModel,
             ModelCancellationToken cancellationToken,
-            int generationId
+            int generationId,
+            int usedToolCallCount
     ) {
         host.syncModePermission();
         toolRegistry.reloadExtensions();
         ToolExecutionCoordinator.ToolExecutionPlan plan = toolRunController.createPlan(toolCalls);
         HashMap<String, ToolResult> resultById = new HashMap<>();
-        ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId);
+        ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId, usedToolCallCount);
 
         if (!plan.getConcurrentTasks().isEmpty()) {
             ExecutorService executor = Executors.newFixedThreadPool(Math.min(4, plan.getConcurrentTasks().size()));
@@ -791,17 +810,19 @@ final class GenerationFlowController {
             String homePath,
             ModelConfig selectedModel,
             ModelCancellationToken cancellationToken,
-            int generationId
+            int generationId,
+            int usedToolCallCount
     ) {
+        final int[] counter = new int[]{Math.max(0, usedToolCallCount)};
         return new ToolContext(homePath, extensionRepository.skillWriteRoots(homePath), new ToolContext.AgentRunner() {
             @Override
             public ToolResult runAgent(JSONObject input, ToolContext context) {
-                return agentExecutionController.runAgentTool(input, context, selectedModel, cancellationToken, generationId, agentHost);
+                return agentExecutionController.runAgentTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
             }
 
             @Override
             public ToolResult runAgentPipeline(JSONObject input, ToolContext context) {
-                return agentExecutionController.runAgentPipelineTool(input, context, selectedModel, cancellationToken, generationId, agentHost);
+                return agentExecutionController.runAgentPipelineTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
             }
         }, "", (toolCallId, toolName, content, error) ->
                 postToolProgress(generationId, cancellationToken, toolCallId, toolName, content, error),
@@ -847,7 +868,8 @@ final class GenerationFlowController {
                                 pending.getHomePath(),
                                 pending.getSelectedModel(),
                                 pending.getCancellationToken(),
-                                pending.getGenerationId()
+                                pending.getGenerationId(),
+                                pending.getUsedToolCallCount()
                         ))
                         .withReview("accepted", "");
             } catch (Exception e) {

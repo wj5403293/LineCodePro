@@ -1,5 +1,78 @@
 # 更新日志
 
+## v1.1.8
+
+### 聊天输入框斜杠命令
+
+- **斜杠命令系统** - 聊天 composer 中输入 `/` 触发命令弹窗，按键入内容实时过滤候选项；支持主命令（`/chat`、`/plan`、`/agent`、`/control`、`/model`）、模型 id 补全与思考等级选择，点击候选项自动回填为完整命令文本
+- **`SlashCommandCatalog` 解析与过滤** - 新增 `cn.lineai.ui.util.SlashCommandCatalog` 纯逻辑工具类，提供 `MAIN_COMMANDS` / `REASONING_LEVELS` 常量、`filterMain` / `filterModelIds` / `filterReasoningLevels` 前缀过滤、`parse` 整段文本解析为 `Kind.MODE` 或 `Kind.MODEL`；不依赖 Android 视图，便于 JUnit 覆盖
+- **`SlashCommandPopup` 组件** - 独立实现 composer 上方展示的命令弹窗：圆角描边、行高紧凑化（标题 22dp）、`/` 前缀加 ACCENT 色 + BOLD 加粗、当前态圆点指示；`show` 在 `title+rows` 数量未变时跳过重建，`showAtAnchor` 自动对齐到 anchor 容器并向上 8dp 弹出
+- **`/` 标签着色** - `SlashCommandPopup.formatLabel` 把以 `/` 开头的 token 第一个空白前的部分加 `ForegroundColorSpan(ACCENT)` + `StyleSpan(BOLD)`，弹窗中 `/chat`、`/model` 等命令一眼可辨
+- **点击回调主线程投递** - 行 `OnClickListener` 改为 `new Handler(Looper.getMainLooper()).post(onClick)`，避免 popup `dismiss()` 与点击动作同帧触发的竞态
+- **发送时拦截斜杠命令** - `ComposerView.handleSendClick` 在 send 时调用 `SlashCommandCatalog.parse`；命中 `MODE` 时走 `Listener.onModeChanged`，命中 `MODEL` 时同时调用 `onModelQuickSwitch` 与可选的 `onAiReasoningEffortChanged`；未命中时按原逻辑走 `onSend`
+- **多语言文案** - `values/strings.xml` 与 `values-zh/strings.xml` 新增 `slash_command_main_title` / `slash_command_model_title` / `slash_command_reasoning_title` 以及 4 种模式、5 档思考等级的副标题，弹窗描述根据语言自动切换
+- **流式生成时禁用** - `setStreaming` 在生成期间关闭并清理 `slashPopup`，避免与现有 model / mode 弹窗互相干扰
+
+### Agent 工具审核
+
+- **子 Agent 工具审核流程** - `AgentExecutionController.executeAgentToolCallWithReview` 在 `awaitReview` 之前调用新增的 `host.requestAgentToolReview(displayToolCallId, call, pending)`，主流程感知到 `pending` 审核态后立即持久化并 `render`；`finally` 块保证在执行完成、被拒绝或被中断时调用 `host.clearAgentToolReview` 清理
+- **拒绝结果落库** - 拒绝分支不再直接返回新建的 `ToolResult`，而是同步调用 `progress.putToolResult` + `host.addOrReplaceToolResult(progress.snapshotResult())`，让 UI 在拒绝时立刻看到 `rejected` 状态卡片
+- **`AgentProgressSession.snapshotResult` 透传状态** - 由 `new ToolResult(..., error)` 调整为 `new ToolResult(..., error, "", status, "")`，把 `pending` / `running` / `done` / `error` 等内部状态写进外层 `ToolResult.reviewState`
+- **`GenerationFlowController` 跟踪待审核请求** - 新增 `pendingAgentToolRequests` 映射与 `requestAgentToolReview` / `clearAgentToolReview` / `isPendingAgentToolReview` / `acceptAgentToolReview` 入口；`cancelActiveGeneration` 同步清空；`MainCoordinatorDelegates.handleToolReview` 在收到审核回调时优先尝试 agent 路径
+- **UI 审核态判断扩展** - `ToolCallAgentView` 读取 `result.getReviewState()`，与 progress status 任一为 `pending` 时都视为待审核；`pending` 卡片稳定显示，避免审核期间闪烁
+
+### 工具调用与会话自动确认
+
+- **会话级自动确认** - `AgentExecutionController.executeAgentToolCall` 在工具需要确认时先调用 `toolReviewAwaiter.isAutoConfirmed(call)`；命中则直接走 `toolExecutor.executeConfirmed`，跳过 `awaitReview` 阻塞与 UI 审核面板
+- **`ToolReviewAwaiter` 接口扩展** - 新增 `boolean isAutoConfirmed(ToolCall call)` 默认返回 `false` 的方法，由主流程在初始化 `setToolReviewAwaiter` 时实现并与 `MainCoordinator.sessionAutoConfirmedTools` 联动
+- **工具调用 UI 视图复用** - `ToolCallBlockView` 对 `ToolCallAgentView` / `ToolCallAgentPipelineView` / `ToolCallAgentView`（自定义 Agent）三类子视图在 `bind` 前先 `getChildAt(0)` 复用已有实例，避免每次刷新都重新 `new` 并触发 `setToolReviewListener` / `setProjectPath` 副作用
+- **Todo 行高自适应** - `ToolCallTodoView` 将固定 `rowHeight` 改为 `minRowHeight`，通过 `setMinimumHeight` 实现最小 28dp + WRAP_CONTENT，长任务描述能自然撑高而短条目仍维持原视觉
+
+### Agent 循环预算与远端模式
+
+- **总时长预算替代最大轮次** - 移除 `AGENT_MAX_TURNS = 8` 硬轮次上限，新增 `AGENT_TOTAL_BUDGET_MS = 30 分钟`；`runAgentLoop` 把 `for (turn = 0; turn < 8)` 改为 `while (true)`，由取消 / 工具次数限制 / 时间预算三种条件共同决定退出，避免深度任务被 8 轮卡死
+- **工具调用次数共享预算** - `GenerationFlowController.toolContext` 透传 `usedToolCallCount` 到 `AgentRunner`，`runAgentTool` / `runAgentPipelineTool` 在调用入口构造 `int[] toolCallBudget`；Agent / Pipeline / Pipeline 内部子 Agent 每次工具调用都 `toolCallBudget[0]++`，跨调用共享模型配置的 `toolCallLimit`
+- **超过预算安全退出** - `runAgentLoop` 在每轮入口与执行工具前检查 `toolCallBudget[0] >= toolCallLimit`，命中返回 `AGENT_TOOL_LIMIT_MESSAGE`（"Agent 已达到主流程总工具调用次数上限。"）并把 progress 同步到 `error` 状态；Pipeline 收到含该消息的子结果立即中断后续层并写入错误摘要
+- **时间预算检查** - 同样在每轮入口检查 `System.currentTimeMillis() - startedAt > AGENT_TOTAL_BUDGET_MS`，命中返回带"最后输出"的超时消息；Pipeline 整体 `pipelineBudgetMs = agents.size() * AGENT_TOTAL_BUDGET_MS` 在每个 level / agent 进入前双重判断
+- **取消与初始检查** - `runAgentTool` / `runAgentPipelineTool` 入口增加 `cancellationToken.isCancelled()` 提前返回；Pipeline 在外层循环与每个 agent 进入前各检查一次取消与时间预算
+- **Pipeline 进度汇总落库** - `PipelineProgressSession` 新增 `setStatus` / `setFinalSummary` / `getFinalSummary` / `payload` 公共方法与 `ProgressPublisher` 接口；`runAgentPipelineTool` 在最终/异常分支统一调用 `pipelineProgress.setFinalSummary` + `setStatus` + `publish(true)` + `addOrReplaceToolResult`，让 UI 在流水线结束时能直接拿到 summary
+- **远端 Shell 模式提示词** - `agentRolePrompt` / `agentWorkspacePrompt` / `agentScopePrompt` 新增 `boolean remoteMode` 重载；SSH 或终端提供者模式下返回"远程 Shell"专用提示词：明确 `file_read / file_write / file_edit / glob / list_dir` 不一定可用、必须通过 `shell_execute` 完成探查与写入、禁止调用写操作类工具；探索 Agent 进一步禁止任何有副作用的命令
+
+### 模型 HTTP 连接
+
+- **读取超时延长到 10 分钟** - `AbstractHttpModelProtocol.openConnection` 把 `setReadTimeout(120000)` 调整为 `setReadTimeout(600000)`，匹配 Agent 30 分钟总预算下的长流式响应与 reasoning 内容；避免大输出 / 慢模型在 2 分钟后被强行断开
+- **Connection: close 头** - 显式设置 `Connection: close` 请求头，避免长 keep-alive 在 NAT / 代理环境下被中间设备单边切断导致首包延迟或半包
+
+### Agent 流水线视图
+
+- **参数解析失败专用卡片** - `ToolCallAgentPipelineView` 在 `bind` 时调用 `parseInputError` 检查模型原始参数；JSON 解析失败或输入为空时直接渲染 `bindParseError` 视图（标题、红色 `CIRCLE_X` 状态、错误描述），不再误显示空 agents 列表
+- **最终 summary 单独展示** - `progress.optString("summary")` 在 agents 为空时通过分割线 + `MarkdownView` 单独渲染，便于查看流水线终止原因
+
+### 斜杠命令视觉
+
+- **标题紧凑化** - `titleParams` 高度由 32dp 改为 22dp，margin 从底部 `XS` 调整为顶部 1dp，弹窗整体更紧凑
+- **行间距** - 容器 vertical padding 由 0 改为 `LineTheme.SM`，描述行顶部 margin 1dp，行间层次更清晰
+
+### 版本
+
+- 版本号升级到 `1.1.8`
+- `versionCode` 升级到 `21`
+
+### 测试
+
+- 新增 `SlashCommandCatalogTest`（134 行）覆盖 `filterMain` 空查询返回全部 / 大小写不敏感前缀匹配 / 未知前缀返回空、`parse` 模式命令解析、`/model` 必填 id 与可选思考等级、无效思考等级保留 id、未知命令与 `/model` 缺 id 返回 null
+- 扩展 `AgentExecutionControllerTest`：
+  - `subAgentToolReviewNotifiesMainFlowBeforeAwaiting` 验证子 Agent 工具审核在 await 之前就触发主流程的 `requestAgentToolReview` 并在结束时 `clearAgentToolReview`
+  - `subAgentToolReviewClearsMainFlowAfterReject` 验证拒绝路径返回 `rejected` 状态、错误内容包含"用户拒绝执行"并清理主流程审核
+  - `snapshotResultPropagatesStatusToOuterReviewState` 验证 progress 状态变化能正确透传到外层 `ToolResult.reviewState`
+  - `shellExecuteAutoConfirmedSkipsReviewAndExecutesConfirmed` 验证会话级自动确认时不再走 `awaitReview` 且不触发主流程审核
+  - `agentRolePromptSwitchesToShellInRemoteMode` 验证 `agentRolePrompt(type, false)` 提及 file 工具但不出现"远程 Shell"，`agentRolePrompt(type, true)` 出现"远程 Shell"、"shell_execute" 与"不一定可用"
+  - `agentRolePromptExploreInRemoteModeRecommendsShell` 验证探索型 Agent 在远端模式下提示词同时出现"远程 Shell"与 `shell_execute`
+- 已有 `shellExecuteWaitsForConfirmationBeforeRunningInsideAgent` 改名为 `shellExecuteWaitsForReviewAndResumesOnAccept` 并补充 `FakeHost` 默认实现 `requestAgentToolReview` / `clearAgentToolReview` / `isSshExecutionMode` / `isTerminalProviderExecutionMode` 桩方法
+- 已验证 `./gradlew :app:testDebugUnitTest`
+
+---
+
 ## v1.1.7
 
 ### 数据存储与导出

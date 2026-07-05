@@ -248,6 +248,26 @@ public final class AgentExecutionControllerTest {
     }
 
     @Test
+    public void agentRolePromptSwitchesToShellInRemoteMode() {
+        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null);
+        String localRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, false);
+        String remoteRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, true);
+        assertTrue("local role should mention file tools", localRole.contains("file_read"));
+        assertFalse("local role should not advertise remote-only mode", localRole.contains("远程 Shell"));
+        assertTrue("remote role should advertise remote mode", remoteRole.contains("远程 Shell"));
+        assertTrue("remote role should recommend shell_execute first", remoteRole.contains("shell_execute"));
+        assertTrue("remote role should mark file tools as unavailable", remoteRole.contains("不一定可用"));
+    }
+
+    @Test
+    public void agentRolePromptExploreInRemoteModeRecommendsShell() {
+        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null);
+        String remoteExplore = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE, true);
+        assertTrue(remoteExplore.contains("远程 Shell"));
+        assertTrue(remoteExplore.contains("shell_execute"));
+    }
+
+    @Test
     public void subAgentToolReviewNotifiesMainFlowBeforeAwaiting() throws Exception {
         ToolRegistry registry = new ToolRegistry();
         registry.register(new ConfirmTool("shell_execute"));
@@ -434,6 +454,16 @@ public final class AgentExecutionControllerTest {
 
         @Override
         public void clearAgentToolReview(String displayToolCallId) {
+        }
+
+        @Override
+        public boolean isSshExecutionMode() {
+            return false;
+        }
+
+        @Override
+        public boolean isTerminalProviderExecutionMode() {
+            return false;
         }
     }
 

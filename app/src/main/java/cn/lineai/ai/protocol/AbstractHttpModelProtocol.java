@@ -160,10 +160,11 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
         ).openConnection();
         connection.setRequestMethod("POST");
         connection.setConnectTimeout(20000);
-        connection.setReadTimeout(120000);
+        connection.setReadTimeout(600000);
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setRequestProperty("Accept", accept);
+        connection.setRequestProperty("Connection", "close");
         for (Map.Entry<String, String> header : headers.entrySet()) {
             if (header.getValue() != null && header.getValue().length() > 0) {
                 connection.setRequestProperty(header.getKey(), header.getValue());

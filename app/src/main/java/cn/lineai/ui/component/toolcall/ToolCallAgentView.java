@@ -46,9 +46,10 @@ public final class ToolCallAgentView extends BaseToolCallView {
         String type = normalizeType(progress == null
                 ? (isCustomAgent ? "sub-coding" : input.optString("type"))
                 : progress.optString("type", isCustomAgent ? "sub-coding" : input.optString("type")));
+        String outerReviewState = result == null ? "" : result.getReviewState();
         String progressStatus = progress == null ? "" : progress.optString("status");
         boolean running = progress != null && ("running".equals(progressStatus) || "waiting_unlock".equals(progressStatus));
-        boolean pendingReview = "pending".equals(progressStatus);
+        boolean pendingReview = "pending".equals(progressStatus) || "pending".equals(outerReviewState);
         boolean complete = result != null && !running && !pendingReview;
         boolean error = result != null && (result.isError() || "error".equals(progressStatus));
         String output = progress == null ? outputText(result) : progress.optString("output");

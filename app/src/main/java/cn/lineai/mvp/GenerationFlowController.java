@@ -83,6 +83,7 @@ final class GenerationFlowController {
     private final Host host;
     private final Set<String> sessionAutoConfirmedTools = new HashSet<>();
     private final HashMap<String, PendingAgentToolReview> pendingAgentToolReviews = new HashMap<>();
+    private final HashMap<String, PendingAgentToolRequest> pendingAgentToolRequests = new HashMap<>();
     private final StringBuilder pendingStreamTextDelta = new StringBuilder();
     private final StringBuilder pendingStreamReasoningDelta = new StringBuilder();
     private final HashMap<String, StringBuilder> streamingRawTextByMessageId = new HashMap<>();
@@ -134,6 +135,27 @@ final class GenerationFlowController {
                     content,
                     error
             );
+        }
+
+        @Override
+        public void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult) {
+            mainThread.post(() -> {
+                synchronized (pendingAgentToolRequests) {
+                    pendingAgentToolRequests.put(displayToolCallId, new PendingAgentToolRequest(call, pendingToolResult));
+                }
+                host.persistCurrentConversation();
+                host.render();
+            });
+        }
+
+        @Override
+        public void clearAgentToolReview(String displayToolCallId) {
+            mainThread.post(() -> {
+                synchronized (pendingAgentToolRequests) {
+                    pendingAgentToolRequests.remove(displayToolCallId);
+                }
+                host.render();
+            });
         }
     };
 
@@ -300,6 +322,29 @@ final class GenerationFlowController {
         return true;
     }
 
+    boolean isPendingAgentToolReview(String toolCallId) {
+        if (toolCallId == null || toolCallId.length() == 0) {
+            return false;
+        }
+        synchronized (pendingAgentToolRequests) {
+            return pendingAgentToolRequests.containsKey(toolCallId);
+        }
+    }
+
+    void acceptAgentToolReview(String toolCallId, String state) {
+        if (toolCallId == null || toolCallId.length() == 0) {
+            return;
+        }
+        PendingAgentToolRequest request;
+        synchronized (pendingAgentToolRequests) {
+            request = pendingAgentToolRequests.remove(toolCallId);
+        }
+        if (request == null) {
+            return;
+        }
+        handleAgentToolReview(toolCallId, state);
+    }
+
     private void handlePendingToolReview(PendingToolExecution pending, String state) {
         if (pending == null || pending.getToolCall() == null) {
             return;
@@ -438,6 +483,9 @@ final class GenerationFlowController {
     void cancelActiveGeneration() {
         pendingToolExecution = null;
         rejectPendingAgentToolReviews();
+        synchronized (pendingAgentToolRequests) {
+            pendingAgentToolRequests.clear();
+        }
         clearStreamingRawText();
     }
 
@@ -1118,6 +1166,16 @@ final class GenerationFlowController {
 
         ToolCall toolCall() {
             return toolCall;
+        }
+    }
+
+    private static final class PendingAgentToolRequest {
+        final ToolCall call;
+        final ToolResult pending;
+
+        PendingAgentToolRequest(ToolCall call, ToolResult pending) {
+            this.call = call;
+            this.pending = pending;
         }
     }
 

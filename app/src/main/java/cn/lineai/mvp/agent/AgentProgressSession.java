@@ -161,7 +161,7 @@ public final class AgentProgressSession {
     public synchronized ToolResult snapshotResult() {
         renderScheduled = false;
         lastRenderAt = uptimeMillis();
-        return new ToolResult(toolCallId, toolName, payload(), error);
+        return new ToolResult(toolCallId, toolName, payload(), error, "", status, "");
     }
 
     public synchronized void notifyMirror() {

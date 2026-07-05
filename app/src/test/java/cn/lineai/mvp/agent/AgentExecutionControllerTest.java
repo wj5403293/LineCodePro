@@ -180,7 +180,7 @@ public final class AgentExecutionControllerTest {
     }
 
     @Test
-    public void shellExecuteWaitsForConfirmationBeforeRunningInsideAgent() throws Exception {
+    public void shellExecuteWaitsForReviewAndResumesOnAccept() throws Exception {
         ToolRegistry registry = new ToolRegistry();
         ConfirmTool shell = new ConfirmTool("shell_execute");
         registry.register(shell);
@@ -207,6 +207,81 @@ public final class AgentExecutionControllerTest {
         assertEquals("accepted", result.getReviewState());
         assertEquals("ran shell_execute", result.getContent());
         assertEquals(1, shell.runCount);
+    }
+
+    @Test
+    public void subAgentToolReviewNotifiesMainFlowBeforeAwaiting() throws Exception {
+        ToolRegistry registry = new ToolRegistry();
+        registry.register(new ConfirmTool("shell_execute"));
+        ConfirmingSettings settings = new ConfirmingSettings();
+        ToolExecutor executor = new ToolExecutor(registry, settings);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
+        controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "accepted");
+        RecordingHost host = new RecordingHost();
+
+        controller.executeAgentToolCall(
+                new ToolCall("shell_1", "shell_execute", "{\"command\":\"pwd\"}"),
+                Collections.singleton("shell_execute"),
+                AgentTool.TYPE_SUB_CODING,
+                Collections.emptyList(),
+                "",
+                progress,
+                host,
+                null);
+
+        assertEquals(1, host.requestedReviews.size());
+        assertEquals("agent_call_agent_0", host.requestedReviews.get(0).displayToolCallId);
+        assertEquals("shell_execute", host.requestedReviews.get(0).call.getName());
+        assertEquals("pending", host.requestedReviews.get(0).pending.getReviewState());
+        assertTrue(host.clearedReviews.contains("agent_call_agent_0"));
+    }
+
+    @Test
+    public void subAgentToolReviewClearsMainFlowAfterReject() throws Exception {
+        ToolRegistry registry = new ToolRegistry();
+        registry.register(new ConfirmTool("shell_execute"));
+        ConfirmingSettings settings = new ConfirmingSettings();
+        ToolExecutor executor = new ToolExecutor(registry, settings);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
+        controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "rejected");
+        RecordingHost host = new RecordingHost();
+
+        ToolResult result = controller.executeAgentToolCall(
+                new ToolCall("shell_1", "shell_execute", "{\"command\":\"pwd\"}"),
+                Collections.singleton("shell_execute"),
+                AgentTool.TYPE_SUB_CODING,
+                Collections.emptyList(),
+                "",
+                progress,
+                host,
+                null);
+
+        assertTrue(result.isError());
+        assertEquals("rejected", result.getReviewState());
+        assertTrue(result.getContent().contains("用户拒绝执行"));
+        assertTrue(host.clearedReviews.contains("agent_call_agent_0"));
+    }
+
+    @Test
+    public void snapshotResultPropagatesStatusToOuterReviewState() {
+        AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
+        progress.setStatus("pending", false);
+        ToolResult pending = progress.snapshotResult();
+        assertEquals("pending", pending.getReviewState());
+
+        progress.setStatus("running", false);
+        ToolResult running = progress.snapshotResult();
+        assertEquals("running", running.getReviewState());
+
+        progress.setFinished("done", false, "");
+        ToolResult done = progress.snapshotResult();
+        assertEquals("done", done.getReviewState());
+
+        progress.setFinished("error", true, "");
+        ToolResult error = progress.snapshotResult();
+        assertEquals("error", error.getReviewState());
     }
 
     private static final class FakeTool extends BaseTool {
@@ -284,7 +359,7 @@ public final class AgentExecutionControllerTest {
         }
     }
 
-    private static final class FakeHost implements AgentExecutionController.Host {
+    private static class FakeHost implements AgentExecutionController.Host {
         @Override
         public String projectPath() {
             return "";
@@ -313,6 +388,41 @@ public final class AgentExecutionControllerTest {
 
         @Override
         public void postToolProgress(int generationId, cn.lineai.ai.ModelCancellationToken cancellationToken, String toolCallId, String toolName, String content, boolean error) {
+        }
+
+        @Override
+        public void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult) {
+        }
+
+        @Override
+        public void clearAgentToolReview(String displayToolCallId) {
+        }
+    }
+
+    private static final class RecordingHost extends FakeHost {
+        final java.util.ArrayList<RequestEntry> requestedReviews = new java.util.ArrayList<>();
+        final java.util.ArrayList<String> clearedReviews = new java.util.ArrayList<>();
+
+        @Override
+        public void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult) {
+            requestedReviews.add(new RequestEntry(displayToolCallId, call, pendingToolResult));
+        }
+
+        @Override
+        public void clearAgentToolReview(String displayToolCallId) {
+            clearedReviews.add(displayToolCallId);
+        }
+    }
+
+    private static final class RequestEntry {
+        final String displayToolCallId;
+        final ToolCall call;
+        final ToolResult pending;
+
+        RequestEntry(String displayToolCallId, ToolCall call, ToolResult pending) {
+            this.displayToolCallId = displayToolCallId;
+            this.call = call;
+            this.pending = pending;
         }
     }
 

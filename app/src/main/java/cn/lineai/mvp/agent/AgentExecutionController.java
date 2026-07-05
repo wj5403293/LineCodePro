@@ -68,6 +68,10 @@ public final class AgentExecutionController {
         void scheduleAgentProgressRender(AgentProgressSession session);
 
         void postToolProgress(int generationId, ModelCancellationToken cancellationToken, String toolCallId, String toolName, String content, boolean error);
+
+        void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult);
+
+        void clearAgentToolReview(String displayToolCallId);
     }
 
     public interface ToolReviewAwaiter {
@@ -480,20 +484,25 @@ public final class AgentExecutionController {
         progress.putToolResult(call, pending);
         progress.setFinished("pending", false, "");
         host.addOrReplaceToolResult(progress.snapshotResult());
+        host.requestAgentToolReview(displayToolCallId, call, pending);
         host.render();
         try {
             String state = toolReviewAwaiter.awaitReview(displayToolCallId, call, cancellationToken);
             progress.setStatus("running", false);
             if ("rejected".equals(state)) {
-                return new ToolResult(call.getId(), call.getName(), "用户拒绝执行此工具。", true, "", "rejected", "");
+                ToolResult rejected = new ToolResult(call.getId(), call.getName(), "用户拒绝执行此工具。", true, "", "rejected", "");
+                progress.putToolResult(call, rejected);
+                host.addOrReplaceToolResult(progress.snapshotResult());
+                return rejected;
             }
             progress.putToolResult(call, new ToolResult(call.getId(), call.getName(), "", false, "", "accepted", ""));
             host.addOrReplaceToolResult(progress.snapshotResult());
-            host.render();
             return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return new ToolResult(call.getId(), call.getName(), "等待工具确认时被中断。", true);
+        } finally {
+            host.clearAgentToolReview(displayToolCallId);
         }
     }
 

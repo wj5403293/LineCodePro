@@ -235,6 +235,10 @@ abstract class MainCoordinatorDelegates implements MainUiController {
             generationFlowDelegate().handleToolReview(state);
             return;
         }
+        if (generationFlowDelegate().isPendingAgentToolReview(toolCallId)) {
+            generationFlowDelegate().acceptAgentToolReview(toolCallId, state);
+            return;
+        }
         if (generationFlowDelegate().handleAgentToolReview(toolCallId, state)) {
             return;
         }

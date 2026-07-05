@@ -42,4 +42,20 @@ public interface ModelProtocol {
     ) throws ModelCompletionException {
         return stream(config, messages, callback, cancellationToken);
     }
+
+    default boolean supportsNativeTools(ModelConfig model) {
+        return false;
+    }
+
+    default boolean supportsDedicatedCompression() {
+        return false;
+    }
+
+    default boolean supportsImageGeneration() {
+        return false;
+    }
+
+    default boolean supportsImageUnderstanding() {
+        return true;
+    }
 }

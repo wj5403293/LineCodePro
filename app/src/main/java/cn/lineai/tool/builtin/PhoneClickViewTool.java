@@ -6,6 +6,7 @@ import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,6 +32,30 @@ public final class PhoneClickViewTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.SYSTEM;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
+        if (ctx == null) return getName();
+        String resourceId = input.optString("resource_id");
+        if (resourceId.length() > 0) {
+            return ctx.getString(R.string.tool_call_phone_summary_click_view, resourceId);
+        }
+        String text = input.optString("text");
+        if (text.length() > 0) {
+            return ctx.getString(R.string.tool_call_phone_summary_click_text, text);
+        }
+        return ctx.getString(R.string.tool_call_phone_summary_point, input.optInt("x"), input.optInt("y"));
+    }
+
+    @Override
+    public String getActionName(Context ctx) {
+        return ctx == null ? getName() : ctx.getString(R.string.tool_call_phone_action_click_view);
     }
 
     @Override

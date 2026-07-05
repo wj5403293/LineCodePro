@@ -5,6 +5,7 @@ import cn.lineai.state.TodoStateStore;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,11 @@ public final class TodoUpdateTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.SYSTEM;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.TODO;
     }
 
     @Override

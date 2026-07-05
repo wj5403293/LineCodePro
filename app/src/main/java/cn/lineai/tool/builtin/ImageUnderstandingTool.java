@@ -4,6 +4,7 @@ import android.content.Context;
 import cn.lineai.ai.ImageInputPayload;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionResponse;
+import cn.lineai.ai.protocol.ModelProtocolFactory;
 import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
@@ -15,12 +16,12 @@ import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.ipc.IpcProviderType;
 import cn.lineai.ipc.terminal.TerminalIpcProvider;
 import cn.lineai.model.ModelConfig;
-import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelRepository;
 import cn.lineai.ssh.SshService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -37,6 +38,7 @@ public final class ImageUnderstandingTool extends BaseTool {
     private final ModelClient modelClient;
     private final IpcProviderManager ipcProviderManager;
     private final Context context;
+    private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
 
     public ImageUnderstandingTool() {
         this(null);
@@ -72,6 +74,11 @@ public final class ImageUnderstandingTool extends BaseTool {
     }
 
     @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.READ;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
@@ -102,7 +109,7 @@ public final class ImageUnderstandingTool extends BaseTool {
         if (model == null) {
             return error("图片理解未选择模型。请在 设置 -> 工具设置 -> 图片操作 中选择视觉模型。");
         }
-        if (model.getProtocolType() == ModelProtocolType.LOCAL_GGUF) {
+        if (!modelProtocolFactory.create(model.getProtocolType()).supportsImageUnderstanding()) {
             return error("本地 GGUF 协议暂不支持图片理解工具。请选择 OpenAI、Codex 或 Anthropic 协议模型。");
         }
         try {

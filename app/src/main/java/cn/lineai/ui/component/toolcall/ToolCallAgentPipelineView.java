@@ -19,7 +19,7 @@ import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class ToolCallAgentPipelineView extends BaseToolCallView {
+public final class ToolCallAgentPipelineView extends BaseToolCallView implements ToolCallCardView {
     private boolean expanded = true;
     private ToolCall lastToolCall;
     private ToolResult lastResult;

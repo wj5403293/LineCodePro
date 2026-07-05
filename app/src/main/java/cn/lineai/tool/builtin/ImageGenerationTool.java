@@ -3,6 +3,7 @@ package cn.lineai.tool.builtin;
 import android.content.Context;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
+import cn.lineai.ai.protocol.ModelProtocolFactory;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
 import cn.lineai.model.ModelProtocolType;
@@ -10,6 +11,7 @@ import cn.lineai.model.ModelRepository;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -19,6 +21,7 @@ public final class ImageGenerationTool extends BaseTool {
     private final ModelRepository modelRepository;
     private final ImageApiClient apiClient;
     private final ImageResponseParser responseParser;
+    private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
 
     public ImageGenerationTool() {
         this(null);
@@ -45,6 +48,16 @@ public final class ImageGenerationTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.GENERATE;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.IMAGE_GENERATION;
+    }
+
+    @Override
+    public boolean shouldHideOnSuccess() {
+        return true;
     }
 
     @Override
@@ -80,8 +93,7 @@ public final class ImageGenerationTool extends BaseTool {
         if (model == null) {
             return error("图片生成未选择模型。请在 设置 -> 工具设置 -> 图片操作 中选择生图模型。");
         }
-        if (model.getProtocolType() != ModelProtocolType.OPENAI_COMPATIBLE
-                && model.getProtocolType() != ModelProtocolType.CODEX_RESPONSES) {
+        if (!modelProtocolFactory.create(model.getProtocolType()).supportsImageGeneration()) {
             return error("图片生成当前仅支持 OpenAI 兼容或 Codex 协议模型。请添加或选择一个 Images API 兼容模型。");
         }
         try {

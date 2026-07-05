@@ -20,6 +20,7 @@ public enum ToolCategory {
         return value;
     }
 
+    @Deprecated
     public static boolean isReadType(String name) {
         return "file_read".equals(name) || "glob".equals(name) || "list_dir".equals(name)
                 || "web_search".equals(name) || "web_fetch".equals(name)
@@ -27,46 +28,57 @@ public enum ToolCategory {
                 || "image_generation".equals(name);
     }
 
+    @Deprecated
     public static boolean isWriteType(String name) {
         return "file_write".equals(name) || "file_edit".equals(name);
     }
 
+    @Deprecated
     public static boolean isDeleteType(String name) {
         return "file_delete".equals(name);
     }
 
+    @Deprecated
     public static boolean isHttpType(String name) {
         return "http_server".equals(name);
     }
 
+    @Deprecated
     public static boolean isShellType(String name) {
         return "shell_execute".equals(name);
     }
 
+    @Deprecated
     public static boolean isAgentType(String name) {
         return "agent".equals(name);
     }
 
+    @Deprecated
     public static boolean isAgentPipelineType(String name) {
         return "agent_pipeline".equals(name);
     }
 
+    @Deprecated
     public static boolean isTodoType(String name) {
         return "todo_update".equals(name);
     }
 
+    @Deprecated
     public static boolean isImageGenerationType(String name) {
         return "image_generation".equals(name);
     }
 
+    @Deprecated
     public static boolean isPhoneControlType(String name) {
         return name != null && name.startsWith("phone_");
     }
 
+    @Deprecated
     public static boolean isCustomMcpType(String name) {
         return name != null && name.startsWith("mcpx_");
     }
 
+    @Deprecated
     public static boolean isCustomAgentType(String name) {
         return name != null && name.startsWith("agentx_");
     }

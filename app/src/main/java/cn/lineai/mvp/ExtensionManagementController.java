@@ -90,12 +90,9 @@ final class ExtensionManagementController {
     }
 
     void setExtensionEnabled(String kind, String id, boolean enabled) {
-        if ("agent".equals(kind)) {
-            extensionRepository.setAgentEnabled(id, enabled);
-        } else if ("mcp".equals(kind)) {
-            extensionRepository.setMcpEnabled(id, enabled);
-        } else if ("skills".equals(kind)) {
-            extensionRepository.setSkillEnabled(id, enabled);
+        ExtensionKindDescriptor descriptor = ExtensionKindRegistry.getInstance().get(kind);
+        if (descriptor != null) {
+            descriptor.setEnabled(extensionRepository, id, enabled);
         }
         reloadExtensions();
         host.refreshVisibleScreen("extension:" + kind);
@@ -103,12 +100,9 @@ final class ExtensionManagementController {
     }
 
     void deleteExtension(String kind, String id) {
-        if ("agent".equals(kind)) {
-            extensionRepository.deleteAgent(id);
-        } else if ("mcp".equals(kind)) {
-            extensionRepository.deleteMcp(id);
-        } else if ("skills".equals(kind)) {
-            extensionRepository.deleteSkill(id);
+        ExtensionKindDescriptor descriptor = ExtensionKindRegistry.getInstance().get(kind);
+        if (descriptor != null) {
+            descriptor.delete(extensionRepository, id);
         }
         reloadExtensions();
         host.refreshVisibleScreen("extension:" + kind);

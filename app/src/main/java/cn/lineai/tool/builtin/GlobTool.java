@@ -4,6 +4,7 @@ import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.io.File;
 import java.util.ArrayList;
@@ -27,6 +28,11 @@ public final class GlobTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.READ;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.READ;
     }
 
     @Override

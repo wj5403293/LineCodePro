@@ -3,6 +3,7 @@ package cn.lineai.tool.builtin;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.io.File;
 import java.util.ArrayList;
@@ -23,6 +24,11 @@ public final class FileDeleteTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.WRITE;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.DELETE;
     }
 
     @Override

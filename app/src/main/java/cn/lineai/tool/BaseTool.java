@@ -1,5 +1,6 @@
 package cn.lineai.tool;
 
+import android.content.Context;
 import org.json.JSONObject;
 
 public abstract class BaseTool {
@@ -17,11 +18,27 @@ public abstract class BaseTool {
 
     public abstract ToolResult execute(JSONObject input, ToolContext context);
 
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.GENERIC;
+    }
+
+    public String getDisplayLabel(Context context, JSONObject input, String workspacePath) {
+        return null;
+    }
+
+    public String getActionName(Context context) {
+        return null;
+    }
+
     public boolean isConcurrencySafe() {
         return false;
     }
 
     public boolean shouldRecordDiff() {
+        return false;
+    }
+
+    public boolean shouldHideOnSuccess() {
         return false;
     }
 

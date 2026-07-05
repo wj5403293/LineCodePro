@@ -6,6 +6,7 @@ import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,6 +32,21 @@ public final class PhoneViewHierarchyTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.READ;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
+        return ctx == null ? getName() : ctx.getString(R.string.tool_call_phone_summary_view_hierarchy);
+    }
+
+    @Override
+    public String getActionName(Context ctx) {
+        return ctx == null ? getName() : ctx.getString(R.string.tool_call_phone_action_view_hierarchy);
     }
 
     @Override

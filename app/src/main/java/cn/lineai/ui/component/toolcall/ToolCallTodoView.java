@@ -20,7 +20,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public final class ToolCallTodoView extends BaseToolCallView {
+public final class ToolCallTodoView extends BaseToolCallView implements ToolCallCardView {
     private final int circleSize;
     private final int circleStroke;
     private final int minRowHeight;
@@ -34,6 +34,7 @@ public final class ToolCallTodoView extends BaseToolCallView {
         minRowHeight = LineTheme.dp(context, 28);
     }
 
+    @Override
     public void bind(ToolCall toolCall, ToolResult result) {
         List<TodoItem> items = parseItems(toolCall);
         String signature = signature(items);
@@ -178,5 +179,15 @@ public final class ToolCallTodoView extends BaseToolCallView {
 
     public List<TodoItem> getCurrentItems() {
         return lastItems;
+    }
+
+    @Override
+    public void setToolReviewListener(ToolReviewListener listener) {
+        // Todo view does not use tool review
+    }
+
+    @Override
+    public void setProjectPath(String projectPath) {
+        // Todo view does not use project path
     }
 }

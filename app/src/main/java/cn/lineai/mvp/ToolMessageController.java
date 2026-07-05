@@ -2,7 +2,9 @@ package cn.lineai.mvp;
 
 import cn.lineai.model.ChatMessage;
 import cn.lineai.model.MessageContentSanitizer;
+import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCall;
+import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +18,16 @@ final class ToolMessageController {
 
     private final ArrayList<ChatMessage> messages;
     private final IdProvider idProvider;
+    private final ToolRegistry toolRegistry;
 
     ToolMessageController(ArrayList<ChatMessage> messages, IdProvider idProvider) {
+        this(messages, idProvider, null);
+    }
+
+    ToolMessageController(ArrayList<ChatMessage> messages, IdProvider idProvider, ToolRegistry toolRegistry) {
         this.messages = messages;
         this.idProvider = idProvider;
+        this.toolRegistry = toolRegistry;
     }
 
     void addOrReplaceToolResults(List<ToolResult> results) {
@@ -76,12 +84,19 @@ final class ToolMessageController {
         messages.set(assistantIndex, assistant.withContent(nextContent, assistant.getReasoningContent(), assistant.isStreaming()));
     }
 
+    private boolean shouldHideOnSuccess(ToolResult result) {
+        if (result == null || result.isError() || result.getContent().trim().length() == 0 || result.getReviewState().length() > 0) {
+            return false;
+        }
+        if (toolRegistry != null) {
+            BaseTool tool = toolRegistry.get(result.getToolName());
+            return tool != null && tool.shouldHideOnSuccess();
+        }
+        return false;
+    }
+
     private boolean isFinalSuccessfulImageGenerationResult(ToolResult result) {
-        return result != null
-                && "image_generation".equals(result.getToolName())
-                && !result.isError()
-                && result.getContent().trim().length() > 0
-                && result.getReviewState().length() == 0;
+        return shouldHideOnSuccess(result);
     }
 
     private String imageGenerationDisplayMarkdown(String content) {

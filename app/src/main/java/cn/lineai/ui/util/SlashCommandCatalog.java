@@ -21,19 +21,34 @@ public final class SlashCommandCatalog {
     }
 
     /**
+     * 命令解析函数式接口。接收命令头部之后的尾部文本，返回解析结果；
+     * 无法解析时返回 {@code null}。
+     */
+    @FunctionalInterface
+    public interface CommandParser {
+        Parsed parse(String tail);
+    }
+
+    /**
      * 主命令定义。{@link #token} 是用户输入的 {@code /xxx} 前缀（含斜杠），
      * {@link #description} 为 popup 中展示的副标题，{@link #kind} 决定该命令
-     * 在 send 时如何分发。
+     * 在 send 时如何分发，{@link #parser} 负责将命令尾部文本解析为 {@link Parsed}。
      */
     public static final class Definition {
         public final String token;
         public final String description;
         public final Kind kind;
+        private final CommandParser parser;
 
-        Definition(String token, String description, Kind kind) {
+        Definition(String token, String description, Kind kind, CommandParser parser) {
             this.token = token;
             this.description = description;
             this.kind = kind;
+            this.parser = parser;
+        }
+
+        public CommandParser getParser() {
+            return parser;
         }
     }
 
@@ -60,11 +75,16 @@ public final class SlashCommandCatalog {
 
     static {
         List<Definition> main = new ArrayList<>();
-        main.add(new Definition("/chat", "Switch to chat mode (read-only Q&A).", Kind.MODE));
-        main.add(new Definition("/plan", "Switch to plan mode (read-only planning).", Kind.MODE));
-        main.add(new Definition("/agent", "Switch to agent mode (default execution).", Kind.MODE));
-        main.add(new Definition("/control", "Switch to control mode (phone automation).", Kind.MODE));
-        main.add(new Definition("/model", "Switch model, optional reasoning level.", Kind.MODEL));
+        main.add(new Definition("/chat", "Switch to chat mode (read-only Q&A).", Kind.MODE,
+                tail -> new Parsed(Kind.MODE, ChatMode.CHAT, null, null)));
+        main.add(new Definition("/plan", "Switch to plan mode (read-only planning).", Kind.MODE,
+                tail -> new Parsed(Kind.MODE, ChatMode.PLAN, null, null)));
+        main.add(new Definition("/agent", "Switch to agent mode (default execution).", Kind.MODE,
+                tail -> new Parsed(Kind.MODE, ChatMode.AGENT, null, null)));
+        main.add(new Definition("/control", "Switch to control mode (phone automation).", Kind.MODE,
+                tail -> new Parsed(Kind.MODE, ChatMode.CONTROL, null, null)));
+        main.add(new Definition("/model", "Switch model, optional reasoning level.", Kind.MODEL,
+                SlashCommandCatalog::parseModelTail));
         MAIN_COMMANDS = Collections.unmodifiableList(main);
         REASONING_LEVELS = Collections.unmodifiableList(Arrays.asList(
                 AiBehaviorSettings.REASONING_OFF,
@@ -112,31 +132,37 @@ public final class SlashCommandCatalog {
         }
         String[] tokens = trimmed.split("\\s+");
         String head = tokens[0].toLowerCase();
-        switch (head) {
-            case "/chat":
-                return new Parsed(Kind.MODE, ChatMode.CHAT, null, null);
-            case "/plan":
-                return new Parsed(Kind.MODE, ChatMode.PLAN, null, null);
-            case "/agent":
-                return new Parsed(Kind.MODE, ChatMode.AGENT, null, null);
-            case "/control":
-                return new Parsed(Kind.MODE, ChatMode.CONTROL, null, null);
-            case "/model":
-                if (tokens.length < 2 || tokens[1].length() == 0) {
-                    return null;
-                }
-                String modelId = tokens[1];
-                String effort = null;
-                if (tokens.length >= 3) {
-                    String candidate = tokens[2].toLowerCase();
-                    if (REASONING_LEVELS.contains(candidate)) {
-                        effort = candidate;
-                    }
-                }
-                return new Parsed(Kind.MODEL, null, modelId, effort);
-            default:
-                return null;
+        String tail = trimmed.substring(head.length()).trim();
+
+        for (Definition cmd : MAIN_COMMANDS) {
+            if (head.equals(cmd.token)) {
+                return cmd.getParser().parse(tail);
+            }
         }
+        return null;
+    }
+
+    /**
+     * /model 命令的尾部解析逻辑。期望格式 {@code {id} [level]}，
+     * id 为空时返回 null；level 必须属于 {@link #REASONING_LEVELS}，否则忽略。
+     */
+    private static Parsed parseModelTail(String tail) {
+        if (tail.length() == 0) {
+            return null;
+        }
+        String[] parts = tail.split("\\s+");
+        String modelId = parts[0];
+        if (modelId.length() == 0) {
+            return null;
+        }
+        String effort = null;
+        if (parts.length >= 2) {
+            String candidate = parts[1].toLowerCase();
+            if (REASONING_LEVELS.contains(candidate)) {
+                effort = candidate;
+            }
+        }
+        return new Parsed(Kind.MODEL, null, modelId, effort);
     }
 
     /**

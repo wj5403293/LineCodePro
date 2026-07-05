@@ -1,6 +1,5 @@
 package cn.lineai.mvp;
 
-import android.os.SystemClock;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionException;
@@ -40,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
 final class GenerationFlowController {
-    private static final long STREAM_RENDER_INTERVAL_MS = 80L;
     private static final String SHELL_EXECUTE_TOOL = "shell_execute";
     private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
@@ -92,9 +90,7 @@ final class GenerationFlowController {
     private final Set<String> sessionAutoConfirmedTools = new HashSet<>();
     private final HashMap<String, PendingAgentToolReview> pendingAgentToolReviews = new HashMap<>();
     private final HashMap<String, PendingAgentToolRequest> pendingAgentToolRequests = new HashMap<>();
-    private final StringBuilder pendingStreamTextDelta = new StringBuilder();
-    private final StringBuilder pendingStreamReasoningDelta = new StringBuilder();
-    private final HashMap<String, StringBuilder> streamingRawTextByMessageId = new HashMap<>();
+    private final StreamingRenderController streamingRenderController;
     private final AgentExecutionController.Host agentHost = new AgentExecutionController.Host() {
         @Override
         public String projectPath() {
@@ -177,10 +173,6 @@ final class GenerationFlowController {
         }
     };
 
-    private String pendingStreamAssistantId = "";
-    private int pendingStreamGenerationId = -1;
-    private boolean streamRenderScheduled;
-    private long lastStreamRenderAt;
     private PendingToolExecution pendingToolExecution;
     private String sessionAutoConfirmedConversationId = "";
 
@@ -261,6 +253,31 @@ final class GenerationFlowController {
         this.mainThread = mainThread;
         this.backgroundTasks = backgroundTasks;
         this.host = host;
+        this.streamingRenderController = new StreamingRenderController(mainThread, result -> {
+            if (result == null) {
+                return;
+            }
+            if (!chatSessionStore.isActiveGeneration(result.generationId)) {
+                return;
+            }
+            int index = findMessageIndex(result.assistantId);
+            if (index < 0) {
+                return;
+            }
+            ChatMessage message = messages.get(index);
+            String visibleText = result.parsedToolCalls.hasToolMarkup()
+                    ? result.parsedToolCalls.getText()
+                    : message.getContent() + result.textDelta;
+            List<ToolCall> toolCalls = result.parsedToolCalls.hasToolMarkup()
+                    ? mergeToolCalls(message.getToolCalls(), result.parsedToolCalls.getToolCalls())
+                    : message.getToolCalls();
+            messages.set(index, message.withContent(
+                    visibleText,
+                    message.getReasoningContent() + result.reasoningDelta,
+                    true
+            ).withToolCalls(toolCalls, false));
+            host.render();
+        }, generationId -> chatSessionStore.isActiveGeneration(generationId));
         if (this.agentExecutionController != null) {
             this.agentExecutionController.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
                 @Override
@@ -287,7 +304,7 @@ final class GenerationFlowController {
         }
         ArrayList<ModelMessage> requestMessages = modelPromptController.buildModelMessages(userInput);
         String assistantId = host.nextId();
-        streamingRawTextByMessageId.put(assistantId, new StringBuilder());
+        streamingRenderController.initRawText(assistantId);
         messages.add(new ChatMessage(assistantId, ChatMessage.Role.ASSISTANT, "", true));
         host.persistCurrentConversation();
         host.render();
@@ -299,12 +316,12 @@ final class GenerationFlowController {
                 ModelCompletionResponse response = modelClient.stream(selectedModel, requestMessages, new ModelStreamCallback() {
                     @Override
                     public void onTextDelta(String delta) {
-                        appendAssistantDelta(generationId, assistantId, delta, "");
+                        streamingRenderController.appendDelta(generationId, assistantId, delta, "");
                     }
 
                     @Override
                     public void onReasoningDelta(String delta) {
-                        appendAssistantDelta(generationId, assistantId, "", delta);
+                        streamingRenderController.appendDelta(generationId, assistantId, "", delta);
                     }
                 }, cancellationToken, requestOptions);
                 finishGeneration(generationId, assistantId, selectedModel, response, cancellationToken, 0);
@@ -456,46 +473,7 @@ final class GenerationFlowController {
     }
 
     void flushPendingAssistantDelta() {
-        streamRenderScheduled = false;
-        if (pendingStreamTextDelta.length() == 0 && pendingStreamReasoningDelta.length() == 0) {
-            return;
-        }
-        int generationId = pendingStreamGenerationId;
-        String assistantId = pendingStreamAssistantId;
-        String textDelta = pendingStreamTextDelta.toString();
-        String reasoningDelta = pendingStreamReasoningDelta.toString();
-        pendingStreamTextDelta.setLength(0);
-        pendingStreamReasoningDelta.setLength(0);
-        pendingStreamGenerationId = -1;
-        pendingStreamAssistantId = "";
-        if (!chatSessionStore.isActiveGeneration(generationId)) {
-            return;
-        }
-        int index = findMessageIndex(assistantId);
-        if (index < 0) {
-            return;
-        }
-        ChatMessage message = messages.get(index);
-        StringBuilder rawText = streamingRawTextByMessageId.get(assistantId);
-        if (rawText == null) {
-            rawText = new StringBuilder(message.getContent());
-            streamingRawTextByMessageId.put(assistantId, rawText);
-        }
-        rawText.append(textDelta);
-        ToolCallTextParser.Result parsedToolCalls = ToolCallTextParser.parseStreamingPreview(rawText.toString());
-        String visibleText = parsedToolCalls.hasToolMarkup()
-                ? parsedToolCalls.getText()
-                : message.getContent() + textDelta;
-        List<ToolCall> toolCalls = parsedToolCalls.hasToolMarkup()
-                ? mergeToolCalls(message.getToolCalls(), parsedToolCalls.getToolCalls())
-                : message.getToolCalls();
-        messages.set(index, message.withContent(
-                visibleText,
-                message.getReasoningContent() + reasoningDelta,
-                true
-        ).withToolCalls(toolCalls, false));
-        lastStreamRenderAt = SystemClock.uptimeMillis();
-        host.render();
+        streamingRenderController.flush();
     }
 
     void cancelActiveGeneration() {
@@ -504,11 +482,11 @@ final class GenerationFlowController {
         synchronized (pendingAgentToolRequests) {
             pendingAgentToolRequests.clear();
         }
-        clearStreamingRawText();
+        streamingRenderController.clear();
     }
 
     void clearStreamingRawText() {
-        streamingRawTextByMessageId.clear();
+        streamingRenderController.clear();
     }
 
     void clearSessionAutoToolConfirmations() {
@@ -557,26 +535,6 @@ final class GenerationFlowController {
         addTerminatedResultsForUnfinishedToolCalls(terminatedMessage);
     }
 
-    private void appendAssistantDelta(int generationId, String assistantId, String textDelta, String reasoningDelta) {
-        mainThread.post(() -> {
-            if (!chatSessionStore.isActiveGeneration(generationId)) {
-                return;
-            }
-            if (pendingStreamGenerationId != generationId || !pendingStreamAssistantId.equals(assistantId)) {
-                flushPendingAssistantDelta();
-                pendingStreamGenerationId = generationId;
-                pendingStreamAssistantId = assistantId;
-            }
-            if (textDelta != null && textDelta.length() > 0) {
-                pendingStreamTextDelta.append(textDelta);
-            }
-            if (reasoningDelta != null && reasoningDelta.length() > 0) {
-                pendingStreamReasoningDelta.append(reasoningDelta);
-            }
-            scheduleAssistantDeltaFlush();
-        });
-    }
-
     private void finishGeneration(
             int generationId,
             String assistantId,
@@ -586,7 +544,7 @@ final class GenerationFlowController {
             int usedToolCallCount
     ) {
         mainThread.post(() -> {
-            flushPendingAssistantDelta();
+            streamingRenderController.flush();
             if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
@@ -596,7 +554,7 @@ final class GenerationFlowController {
             }
             ChatMessage message = messages.get(index);
             String rawResponseText = response.getText();
-            StringBuilder rawStream = streamingRawTextByMessageId.remove(assistantId);
+            StringBuilder rawStream = streamingRenderController.removeRawText(assistantId);
             if (rawResponseText.trim().length() == 0 && rawStream != null) {
                 rawResponseText = rawStream.toString();
             }
@@ -781,7 +739,7 @@ final class GenerationFlowController {
     ) {
         ArrayList<ModelMessage> nextRequestMessages = modelPromptController.buildModelMessages("", usedToolCallCount);
         String nextAssistantId = host.nextId();
-        streamingRawTextByMessageId.put(nextAssistantId, new StringBuilder());
+        streamingRenderController.initRawText(nextAssistantId);
         messages.add(new ChatMessage(nextAssistantId, ChatMessage.Role.ASSISTANT, "", true));
         host.render();
         backgroundTasks.execute("linecode-tool-continuation", () -> {
@@ -791,12 +749,12 @@ final class GenerationFlowController {
                 ModelCompletionResponse response = modelClient.stream(selectedModel, nextRequestMessages, new ModelStreamCallback() {
                     @Override
                     public void onTextDelta(String delta) {
-                        appendAssistantDelta(generationId, nextAssistantId, delta, "");
+                        streamingRenderController.appendDelta(generationId, nextAssistantId, delta, "");
                     }
 
                     @Override
                     public void onReasoningDelta(String delta) {
-                        appendAssistantDelta(generationId, nextAssistantId, "", delta);
+                        streamingRenderController.appendDelta(generationId, nextAssistantId, "", delta);
                     }
                 }, cancellationToken, nextRequestOptions);
                 finishGeneration(generationId, nextAssistantId, selectedModel, response, cancellationToken, usedToolCallCount);
@@ -958,7 +916,7 @@ final class GenerationFlowController {
 
     private void failGeneration(int generationId, String assistantId, String text) {
         mainThread.post(() -> {
-            flushPendingAssistantDelta();
+            streamingRenderController.flush();
             if (!chatSessionStore.isActiveGeneration(generationId)) {
                 return;
             }
@@ -969,7 +927,7 @@ final class GenerationFlowController {
             } else {
                 messages.add(new ChatMessage(host.nextId(), ChatMessage.Role.ASSISTANT, text, false));
             }
-            streamingRawTextByMessageId.remove(assistantId);
+            streamingRenderController.removeRawText(assistantId);
             finishActiveGeneration();
             host.persistCurrentConversation();
             host.render();
@@ -980,16 +938,6 @@ final class GenerationFlowController {
         chatSessionStore.setStreaming(false);
         host.setCurrentCancellationToken(null);
         host.stopGenerationKeepAlive();
-    }
-
-    private void scheduleAssistantDeltaFlush() {
-        if (streamRenderScheduled) {
-            return;
-        }
-        long now = SystemClock.uptimeMillis();
-        long delay = Math.max(0L, STREAM_RENDER_INTERVAL_MS - (now - lastStreamRenderAt));
-        streamRenderScheduled = true;
-        mainThread.postDelayed(this::flushPendingAssistantDelta, delay);
     }
 
     private void flushAgentProgress(AgentProgressSession session) {

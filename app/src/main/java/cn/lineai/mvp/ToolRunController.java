@@ -73,6 +73,6 @@ public final class ToolRunController {
         if (!permission.isAllowed()) {
             return false;
         }
-        return "file_delete".equals(tool.getName()) || toolSettingsRepository.needsConfirmation(tool.getName());
+        return toolSettingsRepository.needsConfirmation(tool.getName());
     }
 }

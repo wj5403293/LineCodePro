@@ -21,6 +21,11 @@ import org.json.JSONObject;
 
 public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
     @Override
+    public boolean supportsNativeTools(ModelConfig model) {
+        return true;
+    }
+
+    @Override
     public ModelCompletionResponse complete(ModelConfig config, List<ModelMessage> messages) throws ModelCompletionException {
         String raw = "";
         try {

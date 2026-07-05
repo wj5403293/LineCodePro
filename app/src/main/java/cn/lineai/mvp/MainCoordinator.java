@@ -675,7 +675,7 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
                     }
                 }
         );
-        toolMessageController = new ToolMessageController(messages, this::nextId);
+        toolMessageController = new ToolMessageController(messages, this::nextId, toolRegistry);
         toolReviewController = new ToolReviewController(
                 diffRepository,
                 toolMessageController,
@@ -986,7 +986,8 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
                 (cn.lineai.data.repository.ToolSettingsRepository) toolSettingsRepository,
                 toolExecutor,
                 toolRegistry,
-                (cn.lineai.data.repository.ExtensionRepository) extensionRepository
+                (cn.lineai.data.repository.ExtensionRepository) extensionRepository,
+                promptTemplateRepository
         );
         generationFlowController = new GenerationFlowController(
                 messages,

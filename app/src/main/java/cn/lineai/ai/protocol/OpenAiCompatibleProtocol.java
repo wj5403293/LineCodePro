@@ -11,6 +11,11 @@ import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.ai.stream.ThinkTagParser;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
+import cn.lineai.ai.protocol.reasoning.DashscopeReasoningStrategy;
+import cn.lineai.ai.protocol.reasoning.DeepseekReasoningStrategy;
+import cn.lineai.ai.protocol.reasoning.DefaultReasoningStrategy;
+import cn.lineai.ai.protocol.reasoning.MinimaxReasoningStrategy;
+import cn.lineai.ai.protocol.reasoning.MoonshotReasoningStrategy;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolRegistry;
 import java.util.ArrayList;
@@ -21,6 +26,34 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
+
+    private final ReasoningStrategyRegistry reasoningStrategyRegistry = createDefaultRegistry();
+
+    private static ReasoningStrategyRegistry createDefaultRegistry() {
+        ReasoningStrategyRegistry registry = new ReasoningStrategyRegistry();
+        registry.register(new DashscopeReasoningStrategy());
+        registry.register(new MinimaxReasoningStrategy());
+        registry.register(new DeepseekReasoningStrategy());
+        registry.register(new MoonshotReasoningStrategy());
+        registry.register(new DefaultReasoningStrategy());
+        return registry;
+    }
+
+    @Override
+    public boolean supportsNativeTools(ModelConfig model) {
+        return OpenAiCompatibleCapabilities.supportsNativeTools(model);
+    }
+
+    @Override
+    public boolean supportsDedicatedCompression() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsImageGeneration() {
+        return true;
+    }
+
     @Override
     public ModelCompletionResponse complete(ModelConfig config, List<ModelMessage> messages) throws ModelCompletionException {
         String raw = "";
@@ -329,42 +362,11 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
         String model = ModelContextParser.apiModelId(config.getModelId()).toLowerCase(java.util.Locale.ROOT);
         String effort = options.getReasoningEffort();
         boolean enabled = !AiBehaviorSettings.REASONING_OFF.equals(effort);
-        if (base.contains("dashscope") || base.contains("aliyuncs") || model.contains("qwen")) {
-            body.put("enable_thinking", enabled);
-            if (enabled) {
-                body.put("thinking_budget", thinkingBudget(effort));
-            }
-            if (options.isPreserveReasoning()) {
-                body.put("preserve_thinking", true);
-            }
-            return;
-        }
-        if (base.contains("minimax") || model.contains("minimax") || model.contains("abab") || model.contains("m2")) {
-            body.put("reasoning_split", enabled);
-            return;
-        }
-        if (base.contains("deepseek") || model.contains("deepseek")) {
-            body.put("thinking", new JSONObject().put("type", enabled ? "enabled" : "disabled"));
-            if (enabled) {
-                body.put("reasoning_effort", AiBehaviorSettings.REASONING_MAX.equals(effort) ? "max" : "high");
-            }
-            return;
-        }
-        if (base.contains("moonshot") || base.contains("kimi") || model.contains("kimi")
-                || base.contains("bigmodel") || base.contains("zhipu") || model.contains("glm")
-                || base.contains("mimo") || base.contains("xiaomi") || model.contains("mimo")) {
-            JSONObject thinking = new JSONObject().put("type", enabled ? "enabled" : "disabled");
-            if (options.isPreserveReasoning() && (base.contains("moonshot") || base.contains("kimi") || model.contains("kimi"))) {
-                thinking.put("keep", "all");
-            }
-            body.put("thinking", thinking);
-            if (options.isPreserveReasoning() && (base.contains("bigmodel") || base.contains("zhipu") || model.contains("glm"))) {
-                body.put("clear_thinking", false);
-            }
-            return;
-        }
-        if (enabled) {
-            body.put("reasoning", new JSONObject().put("effort", effort));
+        ReasoningRequestContext context = new ReasoningRequestContext(
+                enabled, effort, options.isPreserveReasoning(), base, model, thinkingBudget(effort));
+        ReasoningRequestStrategy strategy = reasoningStrategyRegistry.find(base, model);
+        if (strategy != null) {
+            strategy.apply(body, context);
         }
     }
 

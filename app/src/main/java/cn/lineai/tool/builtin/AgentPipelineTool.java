@@ -3,6 +3,7 @@ package cn.lineai.tool.builtin;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,6 +24,11 @@ public final class AgentPipelineTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.SYSTEM;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.AGENT_PIPELINE;
     }
 
     @Override

@@ -1,8 +1,10 @@
 package cn.lineai.tool.builtin;
 
+import android.content.Context;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.io.File;
 import java.util.Arrays;
@@ -22,6 +24,20 @@ public final class ListDirectoryTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.READ;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.READ;
+    }
+
+    @Override
+    public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
+        String path = input.optString("path");
+        if (path.length() > 0) {
+            return displayPath(workspacePath, path);
+        }
+        return null;
     }
 
     @Override
@@ -69,5 +85,39 @@ public final class ListDirectoryTool extends BaseTool {
         } catch (Exception e) {
             return error("列目录失败: " + e.getMessage());
         }
+    }
+
+    /** 将绝对路径转换为相对于工作区的展示路径。 */
+    private static String displayPath(String workspacePath, String path) {
+        if (path == null || path.trim().length() == 0) return "";
+        String value = path.trim().replace('\\', '/');
+        if (value.startsWith("file://")) {
+            value = value.substring("file://".length());
+        }
+        while (value.length() > 1 && value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        if (value.length() == 0) return "";
+        if (!value.startsWith("/")) {
+            while (value.startsWith("./")) {
+                value = value.substring(2);
+            }
+            return value;
+        }
+        String root = workspacePath == null ? "" : workspacePath.trim().replace('\\', '/');
+        while (root.length() > 1 && root.endsWith("/")) {
+            root = root.substring(0, root.length() - 1);
+        }
+        if (root.length() == 0 || !root.startsWith("/")) return value;
+        if (value.equals(root)) return ".";
+        String prefix = root + "/";
+        if (value.startsWith(prefix)) {
+            String relative = value.substring(prefix.length());
+            while (relative.startsWith("./")) {
+                relative = relative.substring(2);
+            }
+            return relative;
+        }
+        return value;
     }
 }

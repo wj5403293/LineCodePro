@@ -7,7 +7,7 @@ import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.ToolModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.ai.prompt.SystemPromptProvider;
-import cn.lineai.ai.protocol.OpenAiCompatibleCapabilities;
+import cn.lineai.ai.protocol.ModelProtocolFactory;
 import cn.lineai.context.ContextManager;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
@@ -22,7 +22,6 @@ import cn.lineai.model.InputAttachment;
 import cn.lineai.model.MessageContentSanitizer;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
-import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelStore;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolRegistry;
@@ -62,6 +61,7 @@ final class ModelPromptController {
     private final ToolSettingsStore toolSettingsRepository;
     private final ToolRegistry toolRegistry;
     private final cn.lineai.state.TodoStateStore todoStateStore;
+    private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
     private final Host host;
 
     ModelPromptController(
@@ -292,7 +292,7 @@ final class ModelPromptController {
             return "## 可用工具\n当前没有可用工具。";
         }
         toolRegistry.reloadExtensions();
-        return toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), supportsNativeTools(selectedModel));
+        return toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel));
     }
 
     private String buildAttachmentPrompt(List<ChatMessage> history) {
@@ -342,18 +342,6 @@ final class ModelPromptController {
             return left;
         }
         return left + "\n\n" + right;
-    }
-
-    private boolean supportsNativeTools(ModelConfig selectedModel) {
-        if (selectedModel == null) {
-            return false;
-        }
-        ModelProtocolType type = selectedModel.getProtocolType();
-        if (type == ModelProtocolType.OPENAI_COMPATIBLE) {
-            return OpenAiCompatibleCapabilities.supportsNativeTools(selectedModel);
-        }
-        return type == ModelProtocolType.ANTHROPIC_MESSAGES
-                || type == ModelProtocolType.CODEX_RESPONSES;
     }
 
     private boolean hasRemainingToolCalls(ModelConfig selectedModel, int usedToolCallCount) {

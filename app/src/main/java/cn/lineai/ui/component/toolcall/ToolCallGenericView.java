@@ -10,12 +10,13 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 import org.json.JSONObject;
 
-public final class ToolCallGenericView extends BaseToolCallView {
+public final class ToolCallGenericView extends BaseToolCallView implements ToolCallCardView {
     private final String label;
 
     public ToolCallGenericView(Context context, String label) {
@@ -82,10 +83,21 @@ public final class ToolCallGenericView extends BaseToolCallView {
         }
     }
 
+    @Override
+    public void setToolReviewListener(ToolReviewListener listener) {
+        // Generic view does not use tool review
+    }
+
+    @Override
+    public void setProjectPath(String projectPath) {
+        // Generic view does not use project path
+    }
+
     private int iconFor(String name) {
-        if (ToolCallUtils.isShellTool(name)) return IconButtonView.TERMINAL;
-        if (ToolCallUtils.isHttpTool(name) || ToolCallUtils.isCustomMcpTool(name)) return IconButtonView.MCP;
-        if (ToolCallUtils.isDeleteTool(name)) return IconButtonView.TRASH_2;
+        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
+        if (category == ToolDisplayCategory.SHELL) return IconButtonView.TERMINAL;
+        if (category == ToolDisplayCategory.HTTP || ToolCallUtils.isCustomMcpTool(name)) return IconButtonView.MCP;
+        if (category == ToolDisplayCategory.DELETE) return IconButtonView.TRASH_2;
         return IconButtonView.MCP;
     }
 

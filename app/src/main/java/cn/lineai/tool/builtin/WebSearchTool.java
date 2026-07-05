@@ -5,6 +5,7 @@ import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.util.List;
 import org.json.JSONObject;
@@ -37,6 +38,11 @@ public final class WebSearchTool extends BaseTool {
     }
 
     @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.READ;
+    }
+
+    @Override
     public boolean isConcurrencySafe() {
         return true;
     }
@@ -59,13 +65,13 @@ public final class WebSearchTool extends BaseTool {
         }
         int limit = input.optInt("limit", 5);
         try {
-            List<WebSearchService.SearchResultItem> results = webSearchService.search(config(), query, limit);
+            List<SearchResultItem> results = webSearchService.search(config(), query, limit);
             if (results.isEmpty()) {
                 return ok("未搜索到与 \"" + query + "\" 相关的网页结果。");
             }
             StringBuilder content = new StringBuilder();
             for (int i = 0; i < results.size(); i++) {
-                WebSearchService.SearchResultItem item = results.get(i);
+                SearchResultItem item = results.get(i);
                 if (i > 0) {
                     content.append("\n\n");
                 }

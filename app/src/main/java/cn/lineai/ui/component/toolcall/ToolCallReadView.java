@@ -9,22 +9,30 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
 import org.json.JSONObject;
 
-public final class ToolCallReadView extends BaseToolCallView {
+public final class ToolCallReadView extends BaseToolCallView implements ToolCallCardView {
     private String projectPath = "";
 
     public ToolCallReadView(Context context) {
         super(context);
     }
 
+    @Override
     public void setProjectPath(String projectPath) {
         this.projectPath = projectPath == null ? "" : projectPath;
     }
 
+    @Override
+    public void setToolReviewListener(ToolReviewListener listener) {
+        // Read view does not use tool review
+    }
+
+    @Override
     public void bind(ToolCall toolCall, ToolResult result) {
         removeAllViews();
         String name = toolCall == null ? "" : toolCall.getName();
@@ -86,9 +94,10 @@ public final class ToolCallReadView extends BaseToolCallView {
     }
 
     private String actionLabel(String name) {
-        if ("image_generation".equals(name)) return getContext().getString(R.string.tool_call_image_generation);
+        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
+        if (category == ToolDisplayCategory.IMAGE_GENERATION) return getContext().getString(R.string.tool_call_image_generation);
         if ("image_understanding".equals(name)) return getContext().getString(R.string.tool_call_image_understanding);
-        if (ToolCallUtils.isPhoneControlTool(name)) return ToolCallInputParser.phoneControlActionName(getContext(), name);
+        if (category == ToolDisplayCategory.PHONE_CONTROL) return ToolCallInputParser.phoneControlActionName(getContext(), name);
         if ("web_search".equals(name)) return getContext().getString(R.string.tool_call_action_search);
         if ("web_fetch".equals(name)) return getContext().getString(R.string.tool_call_action_fetch);
         if ("glob".equals(name)) return getContext().getString(R.string.tool_call_action_match);
@@ -97,6 +106,7 @@ public final class ToolCallReadView extends BaseToolCallView {
     }
 
     private int iconFor(String name) {
+        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
         if ("glob".equals(name) || "web_search".equals(name)) {
             return IconButtonView.SEARCH;
         }
@@ -109,10 +119,10 @@ public final class ToolCallReadView extends BaseToolCallView {
         if ("image_understanding".equals(name)) {
             return IconButtonView.PAINTBRUSH;
         }
-        if ("image_generation".equals(name)) {
+        if (category == ToolDisplayCategory.IMAGE_GENERATION) {
             return IconButtonView.SPARKLES;
         }
-        if (ToolCallUtils.isPhoneControlTool(name)) {
+        if (category == ToolDisplayCategory.PHONE_CONTROL) {
             return IconButtonView.SMARTPHONE;
         }
         return IconButtonView.EXPAND;

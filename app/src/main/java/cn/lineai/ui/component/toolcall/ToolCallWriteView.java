@@ -17,7 +17,7 @@ import cn.lineai.ui.theme.LineTheme;
 import java.util.Locale;
 import org.json.JSONObject;
 
-public final class ToolCallWriteView extends BaseToolCallView {
+public final class ToolCallWriteView extends BaseToolCallView implements ToolCallCardView {
     private ToolReviewListener toolReviewListener;
     private String projectPath = "";
     private boolean diffExpanded;

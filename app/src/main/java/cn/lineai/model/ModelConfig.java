@@ -182,6 +182,7 @@ public final class ModelConfig {
         return Math.max(0, limit);
     }
 
+    @Deprecated
     public static boolean supportsDedicatedCompression(ModelProtocolType type) {
         return type == ModelProtocolType.OPENAI_COMPATIBLE || type == ModelProtocolType.CODEX_RESPONSES;
     }

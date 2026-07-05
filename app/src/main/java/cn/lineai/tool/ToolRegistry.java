@@ -21,6 +21,7 @@ public final class ToolRegistry {
     private static final String CUSTOM_MCP_PREFIX = "mcpx_";
 
     private final Map<String, BaseTool> tools = new LinkedHashMap<>();
+    private final Map<String, ToolDisplayCategory> displayCategoryCache = new LinkedHashMap<>();
     private final Context context;
 
     public ToolRegistry() {
@@ -45,11 +46,17 @@ public final class ToolRegistry {
     public void register(BaseTool tool) {
         if (tool != null) {
             tools.put(tool.getName(), tool);
+            displayCategoryCache.put(tool.getName(), tool.getDisplayCategory());
         }
     }
 
     public BaseTool get(String name) {
         return tools.get(name);
+    }
+
+    public ToolDisplayCategory getCachedDisplayCategory(String name) {
+        ToolDisplayCategory category = displayCategoryCache.get(name);
+        return category != null ? category : ToolDisplayCategory.GENERIC;
     }
 
     public List<BaseTool> getAll() {
@@ -150,6 +157,7 @@ public final class ToolRegistry {
         for (String name : names) {
             if (isExtensionToolName(name)) {
                 tools.remove(name);
+                displayCategoryCache.remove(name);
             }
         }
     }

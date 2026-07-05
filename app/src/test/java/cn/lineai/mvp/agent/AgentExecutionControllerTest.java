@@ -30,7 +30,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingAllowsShellExecute() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         BaseTool shell = new FakeTool("shell_execute", ToolCategory.SYSTEM);
 
@@ -44,7 +44,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void localExploreRejectsShellExecute() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         BaseTool shell = new FakeTool("shell_execute", ToolCategory.SYSTEM);
 
@@ -58,7 +58,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingStillRejectsAgentAndPipelineAndDelete() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertFalse(controller.isAgentToolAllowed(
                 new FakeTool("agent", ToolCategory.SYSTEM),
@@ -80,7 +80,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingKeepsReadWriteAndHttpServer() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertTrue(controller.isAgentToolAllowed(
                 new FakeTool("file_read", ToolCategory.READ),
@@ -107,7 +107,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingRejectsCustomToolNotInWhitelist() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         HashSet<String> customToolNames = new HashSet<>();
         customToolNames.add("agentx_demo");
@@ -122,7 +122,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingAllowsCustomToolInWhitelist() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         HashSet<String> customToolNames = new HashSet<>();
         customToolNames.add("agentx_demo");
@@ -137,7 +137,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void localExploreAllowsReadToolsOnly() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertTrue(controller.isAgentToolAllowed(
                 new FakeTool("file_read", ToolCategory.READ),
@@ -159,7 +159,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void subCodingRolePromptMentionsShellExecuteAndWriteScope() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         String prompt = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING);
 
@@ -170,7 +170,7 @@ public final class AgentExecutionControllerTest {
     @Test
     public void exploreRolePromptRemainsReadOnly() {
         AgentExecutionController controller = new AgentExecutionController(
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         String prompt = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE);
 
@@ -186,7 +186,7 @@ public final class AgentExecutionControllerTest {
         registry.register(shell);
         ConfirmingSettings settings = new ConfirmingSettings();
         ToolExecutor executor = new ToolExecutor(registry, settings);
-        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> {
             assertEquals("agent_call_agent_0", displayToolCallId);
@@ -216,7 +216,7 @@ public final class AgentExecutionControllerTest {
         registry.register(shell);
         ConfirmingSettings settings = new ConfirmingSettings();
         ToolExecutor executor = new ToolExecutor(registry, settings);
-        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
             @Override
@@ -249,7 +249,7 @@ public final class AgentExecutionControllerTest {
 
     @Test
     public void agentRolePromptSwitchesToShellInRemoteMode() {
-        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null, null);
         String localRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, false);
         String remoteRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, true);
         assertTrue("local role should mention file tools", localRole.contains("file_read"));
@@ -261,7 +261,7 @@ public final class AgentExecutionControllerTest {
 
     @Test
     public void agentRolePromptExploreInRemoteModeRecommendsShell() {
-        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null, null);
         String remoteExplore = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE, true);
         assertTrue(remoteExplore.contains("远程 Shell"));
         assertTrue(remoteExplore.contains("shell_execute"));
@@ -273,7 +273,7 @@ public final class AgentExecutionControllerTest {
         registry.register(new ConfirmTool("shell_execute"));
         ConfirmingSettings settings = new ConfirmingSettings();
         ToolExecutor executor = new ToolExecutor(registry, settings);
-        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "accepted");
         RecordingHost host = new RecordingHost();
@@ -301,7 +301,7 @@ public final class AgentExecutionControllerTest {
         registry.register(new ConfirmTool("shell_execute"));
         ConfirmingSettings settings = new ConfirmingSettings();
         ToolExecutor executor = new ToolExecutor(registry, settings);
-        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null);
+        AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "rejected");
         RecordingHost host = new RecordingHost();

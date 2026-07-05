@@ -117,6 +117,7 @@ public final class MainDependencies {
                 new CodexResponsesProtocol(),
                 promptTemplateRepository);
         toolRegistry = new ToolRegistry(context, ipcProviderManager);
+        cn.lineai.ui.component.toolcall.ToolCallUtils.setToolRegistry(toolRegistry);
         toolExecutor = new ToolExecutor(toolRegistry, toolSettingsRepository, diffRepository);
         toolExecutionCoordinator = new ToolExecutionCoordinator(toolRegistry);
         systemPromptProvider = new SystemPromptProvider(context, promptTemplateRepository);

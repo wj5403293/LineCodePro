@@ -6,6 +6,7 @@ import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,6 +32,23 @@ public final class PhoneSwipeTool extends BaseTool {
     @Override
     public ToolCategory getCategory() {
         return ToolCategory.SYSTEM;
+    }
+
+    @Override
+    public ToolDisplayCategory getDisplayCategory() {
+        return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
+        if (ctx == null) return getName();
+        return ctx.getString(R.string.tool_call_phone_summary_swipe,
+                input.optInt("x1"), input.optInt("y1"), input.optInt("x2"), input.optInt("y2"));
+    }
+
+    @Override
+    public String getActionName(Context ctx) {
+        return ctx == null ? getName() : ctx.getString(R.string.tool_call_phone_action_swipe);
     }
 
     @Override

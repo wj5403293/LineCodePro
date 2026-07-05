@@ -23,6 +23,21 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class CodexResponsesProtocol extends AbstractHttpModelProtocol {
+    @Override
+    public boolean supportsNativeTools(ModelConfig model) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsDedicatedCompression() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsImageGeneration() {
+        return true;
+    }
+
     static final String CODEX_PROTOCOL_VERSION = "0.120.0";
     static final String CODEX_ORIGINATOR = "codex_cli_rs";
     private static final String CODEX_INSTALLATION_ID = UUID.nameUUIDFromBytes(

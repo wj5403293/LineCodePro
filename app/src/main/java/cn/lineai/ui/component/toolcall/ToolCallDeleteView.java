@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public final class ToolCallDeleteView extends BaseToolCallView {
+public final class ToolCallDeleteView extends BaseToolCallView implements ToolCallCardView {
     private ToolReviewListener toolReviewListener;
     private String projectPath = "";
 

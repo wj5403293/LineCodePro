@@ -389,6 +389,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 ```
 
-许可证全文见 [`LICENSE`](LICENSE)，简要版权声明见 [`COPYING`](COPYING)，在线副本：<https://www.gnu.org/licenses/gpl-3.0.txt>。
+许可证全文见 [`LICENSE`](LICENSE)，在线副本：<https://www.gnu.org/licenses/gpl-3.0.txt>。
 
 随 APK 一起分发的第三方库各自遵循自己的许可证：commonmark（BSD-2）、JSch（BSD 风格）、org.json（JSON License）。

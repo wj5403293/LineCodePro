@@ -391,6 +391,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 ```
 
-Full text in [`LICENSE`](LICENSE). Short notice in [`COPYING`](COPYING). Online copy at <https://www.gnu.org/licenses/gpl-3.0.txt>.
+Full text in [`LICENSE`](LICENSE). Online copy at <https://www.gnu.org/licenses/gpl-3.0.txt>.
 
 Third-party libraries shipped with the APK keep their own licenses: commonmark (BSD-2), JSch (BSD-style), org.json (JSON License).

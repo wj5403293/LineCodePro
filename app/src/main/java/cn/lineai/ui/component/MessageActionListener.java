@@ -6,4 +6,12 @@ public interface MessageActionListener {
     void onCopyMessage(ChatMessage message);
 
     void onRecallMessage(ChatMessage message);
+
+    void onQuoteMessage(ChatMessage message);
+
+    void onShareMessage(ChatMessage message);
+
+    void onSelectText(ChatMessage message);
+
+    void onMultiSelectToggle();
 }

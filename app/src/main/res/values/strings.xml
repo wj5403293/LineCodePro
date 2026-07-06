@@ -879,7 +879,16 @@
     <string name="header_more_desc">More</string>
 
     <string name="message_action_copy_desc">Copy message</string>
+    <string name="message_action_quote_desc">Quote message</string>
+    <string name="message_action_share_desc">Share message</string>
+    <string name="message_action_select_desc">Select text</string>
     <string name="message_action_recall_desc">Recall message</string>
+    <string name="message_action_multi_select_desc">Multi-select</string>
+    <string name="dialog_export_format_title">Export format</string>
+    <string name="dialog_select_text_title">Long press to select text</string>
+    <string name="quote_preview_label">Quoted</string>
+    <string name="export_button_label">Export</string>
+    <string name="toast_clipboard_large">Content is large, only part may be copied</string>
 
     <string name="message_list_scroll_to_bottom_desc">Scroll to bottom</string>
     <string name="message_list_configure_title">Configure a model first</string>

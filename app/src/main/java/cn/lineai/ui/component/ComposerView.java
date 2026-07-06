@@ -25,13 +25,14 @@ import cn.lineai.model.ChatUiState;
 import cn.lineai.model.InputAttachment;
 import cn.lineai.model.InputSettings;
 import cn.lineai.model.ModelConfig;
+import cn.lineai.mvp.QuoteController;
 import cn.lineai.ui.theme.LineTheme;
 import cn.lineai.ui.util.SlashCommandCatalog;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public final class ComposerView extends LinearLayout {
+public final class ComposerView extends LinearLayout implements QuoteController.QuotePreview {
     public interface Listener {
         void onSend(String text, List<InputAttachment> attachments);
 
@@ -48,7 +49,18 @@ public final class ComposerView extends LinearLayout {
         void onAiReasoningEffortChanged(String effort);
     }
 
+    /**
+     * 关闭引用预览时的回调，便于 QuoteController 清理自身状态。
+     */
+    public interface QuoteDismissListener {
+        void onQuoteDismissed();
+    }
+
     private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private LinearLayout quotePreviewLayout;
+    private TextView quotePreviewText;
+    private IconButtonView quoteCloseButton;
+    private QuoteDismissListener quoteDismissListener;
     private LinearLayout modelSelectorButton;
     private TextView modelText;
     private IconButtonView modelChevron;
@@ -79,6 +91,8 @@ public final class ComposerView extends LinearLayout {
         setBackgroundColor(LineTheme.BG);
         setWillNotDraw(false);
         LineTheme.padding(this, LineTheme.LG, LineTheme.SM, LineTheme.LG, LineTheme.LG);
+
+        buildQuotePreview();
 
         attachmentScroll = new HorizontalScrollView(context);
         attachmentScroll.setHorizontalScrollBarEnabled(false);
@@ -277,6 +291,65 @@ public final class ComposerView extends LinearLayout {
 
     public void setListener(Listener listener) {
         this.listener = listener;
+    }
+
+    public void setQuoteDismissListener(QuoteDismissListener listener) {
+        this.quoteDismissListener = listener;
+    }
+
+    private void buildQuotePreview() {
+        Context context = getContext();
+        quotePreviewLayout = new LinearLayout(context);
+        quotePreviewLayout.setOrientation(HORIZONTAL);
+        quotePreviewLayout.setGravity(Gravity.CENTER_VERTICAL);
+        quotePreviewLayout.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_ELEVATED, 14, LineTheme.BORDER_LIGHT));
+        LineTheme.padding(quotePreviewLayout, LineTheme.SM, LineTheme.SM, LineTheme.SM, LineTheme.SM);
+
+        View quoteBar = new View(context);
+        quoteBar.setBackground(LineTheme.rounded(context, LineTheme.ACCENT, 2));
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 3), LayoutParams.MATCH_PARENT);
+        barParams.rightMargin = LineTheme.dp(context, LineTheme.SM);
+        quotePreviewLayout.addView(quoteBar, barParams);
+
+        quotePreviewText = LineTheme.text(context, "", LineTheme.FONT_SM, LineTheme.TEXT_SECONDARY, Typeface.NORMAL);
+        quotePreviewText.setMaxLines(2);
+        quotePreviewText.setEllipsize(TextUtils.TruncateAt.END);
+        quotePreviewLayout.addView(quotePreviewText, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+
+        quoteCloseButton = new IconButtonView(context, IconButtonView.CLOSE);
+        quoteCloseButton.setIconColor(LineTheme.TEXT_TERTIARY);
+        quoteCloseButton.setIconSizeDp(28, 16);
+        quoteCloseButton.setOnClickListener(v -> {
+            hideQuote();
+            if (quoteDismissListener != null) {
+                quoteDismissListener.onQuoteDismissed();
+            }
+        });
+        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(LineTheme.dp(context, 28), LineTheme.dp(context, 28));
+        closeParams.leftMargin = LineTheme.dp(context, LineTheme.SM);
+        quotePreviewLayout.addView(quoteCloseButton, closeParams);
+
+        quotePreviewLayout.setVisibility(GONE);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = LineTheme.dp(context, LineTheme.SM);
+        addView(quotePreviewLayout, params);
+    }
+
+    @Override
+    public void showQuote(String previewText) {
+        if (quotePreviewLayout == null) {
+            return;
+        }
+        quotePreviewText.setText(previewText == null ? "" : previewText);
+        quotePreviewLayout.setVisibility(VISIBLE);
+    }
+
+    @Override
+    public void hideQuote() {
+        if (quotePreviewLayout == null) {
+            return;
+        }
+        quotePreviewLayout.setVisibility(GONE);
     }
 
     public void setDraft(String text) {

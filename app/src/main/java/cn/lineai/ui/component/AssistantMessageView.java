@@ -61,7 +61,7 @@ public final class AssistantMessageView extends LinearLayout {
         addView(toolCallsContainer, toolParams);
 
         actionBar = new MessageActionBarView(context, MessageActionBarView.ALIGN_LEFT, false);
-        actionBar.setListener(new MessageActionBarView.Listener() {
+        actionBar.setActionListener(new MessageActionBarView.ActionListener() {
             @Override
             public void onCopy() {
                 if (actionListener != null && currentMessage != null) {
@@ -70,7 +70,32 @@ public final class AssistantMessageView extends LinearLayout {
             }
 
             @Override
-            public void onRecall() {
+            public void onQuote() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onQuoteMessage(currentMessage);
+                }
+            }
+
+            @Override
+            public void onShare() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onShareMessage(currentMessage);
+                }
+            }
+        });
+        actionBar.setSelectListener(new MessageActionBarView.SelectListener() {
+            @Override
+            public void onSelect() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onSelectText(currentMessage);
+                }
+            }
+
+            @Override
+            public void onMultiSelect() {
+                if (actionListener != null) {
+                    actionListener.onMultiSelectToggle();
+                }
             }
         });
         LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LineTheme.dp(context, 22));

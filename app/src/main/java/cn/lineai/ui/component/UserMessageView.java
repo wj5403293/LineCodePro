@@ -42,7 +42,7 @@ public final class UserMessageView extends LinearLayout {
         addView(attachmentList, attachmentParams);
 
         actionBar = new MessageActionBarView(context, MessageActionBarView.ALIGN_RIGHT, true);
-        actionBar.setListener(new MessageActionBarView.Listener() {
+        actionBar.setActionListener(new MessageActionBarView.ActionListener() {
             @Override
             public void onCopy() {
                 if (actionListener != null && currentMessage != null) {
@@ -50,6 +50,36 @@ public final class UserMessageView extends LinearLayout {
                 }
             }
 
+            @Override
+            public void onQuote() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onQuoteMessage(currentMessage);
+                }
+            }
+
+            @Override
+            public void onShare() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onShareMessage(currentMessage);
+                }
+            }
+        });
+        actionBar.setSelectListener(new MessageActionBarView.SelectListener() {
+            @Override
+            public void onSelect() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onSelectText(currentMessage);
+                }
+            }
+
+            @Override
+            public void onMultiSelect() {
+                if (actionListener != null) {
+                    actionListener.onMultiSelectToggle();
+                }
+            }
+        });
+        actionBar.setRecallListener(new MessageActionBarView.RecallListener() {
             @Override
             public void onRecall() {
                 if (actionListener != null && currentMessage != null) {

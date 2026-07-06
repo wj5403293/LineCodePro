@@ -1,8 +1,6 @@
 package cn.lineai.ui;
 
 import android.app.Dialog;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -26,7 +24,11 @@ import cn.lineai.model.InputAttachment;
 import cn.lineai.model.SheetOption;
 import cn.lineai.mvp.MainContract;
 import cn.lineai.mvp.MainUiController;
+import cn.lineai.mvp.QuoteController;
+import cn.lineai.mvp.ShareController;
 import cn.lineai.security.UrlPolicy;
+import cn.lineai.share.ExportFormatResolver;
+import cn.lineai.share.ShareHelper;
 import cn.lineai.ui.component.AboutScreenView;
 import cn.lineai.ui.component.AttachmentPickerSheetView;
 import cn.lineai.ui.component.BackNavigation;
@@ -68,11 +70,13 @@ import cn.lineai.ui.component.SshSettingsScreenView;
 import cn.lineai.ui.component.StorageManagementScreenView;
 import cn.lineai.ui.component.TerminalProviderDetailScreenView;
 import cn.lineai.ui.component.TermuxIntegrationScreenView;
+import cn.lineai.ui.component.TextSelectionDialog;
 import cn.lineai.ui.component.ThemeSettingsScreenView;
 import cn.lineai.ui.component.ToolSettingsScreenView;
 import cn.lineai.ui.component.TutorialScreenView;
 import cn.lineai.ui.theme.LineTheme;
 import cn.lineai.ui.util.KeyboardController;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 
@@ -129,10 +133,14 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     private String attachmentPickerSource = InputAttachment.SOURCE_LOCAL;
     private boolean attachmentPickerLoading;
     private FileTreeNode attachmentPickerTree;
+    private final ShareController shareController;
+    private final QuoteController quoteController;
 
     public MainChatView(Context context, MainUiController presenter) {
         super(context);
         this.presenter = presenter;
+        this.quoteController = new QuoteController();
+        this.shareController = new ShareController(new ExportFormatResolver());
         setBackgroundColor(LineTheme.BG);
 
         MainChatViewLayoutBuilder.Result layout = MainChatViewLayoutBuilder.build(context);
@@ -199,18 +207,50 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                     MainChatView.this.presenter.onRecallMessage(message.getId());
                 }
             }
+
+            @Override
+            public void onQuoteMessage(ChatMessage message) {
+                quoteController.setQuote(message.getContent());
+            }
+
+            @Override
+            public void onShareMessage(ChatMessage message) {
+                shareController.showFormatPicker(getContext(), Collections.singletonList(message));
+            }
+
+            @Override
+            public void onSelectText(ChatMessage message) {
+                TextSelectionDialog.show(getContext(), message.getContent());
+            }
+
+            @Override
+            public void onMultiSelectToggle() {
+                messageListView.enterMultiSelectMode();
+            }
         });
         contentView.addView(messageListView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 0,
                 1f
         ));
+        messageListView.setMultiSelectListener(new ChatMessageListView.MultiSelectListener() {
+            @Override
+            public void onExportRequested(List<ChatMessage> selectedMessages) {
+                shareController.showFormatPicker(getContext(), selectedMessages);
+            }
+
+            @Override
+            public void onMultiSelectExit() {
+                messageListView.exitMultiSelectMode();
+            }
+        });
 
         composerView = new ComposerView(context);
         composerView.setListener(new ComposerView.Listener() {
             @Override
             public void onSend(String text, List<InputAttachment> attachments) {
-                MainChatView.this.presenter.onSendMessage(text, attachments);
+                String finalText = quoteController.composeWithQuote(text);
+                MainChatView.this.presenter.onSendMessage(finalText, attachments);
             }
 
             @Override
@@ -243,6 +283,8 @@ public final class MainChatView extends FrameLayout implements MainContract.View
                 MainChatView.this.presenter.onAiReasoningEffortChanged(effort);
             }
         });
+        quoteController.setPreview(composerView);
+        composerView.setQuoteDismissListener(() -> quoteController.clearQuote());
         contentView.addView(composerView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -821,11 +863,8 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         if (text == null || text.length() == 0) {
             return;
         }
-        ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard != null) {
-            clipboard.setPrimaryClip(ClipData.newPlainText("LineCode message", text));
-            Toast.makeText(getContext(), getContext().getString(R.string.toast_copied), Toast.LENGTH_SHORT).show();
-        }
+        ShareHelper.copy(getContext(), text);
+        Toast.makeText(getContext(), getContext().getString(R.string.toast_copied), Toast.LENGTH_SHORT).show();
     }
 
     @Override

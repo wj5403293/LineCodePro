@@ -881,6 +881,15 @@
 
     <string name="message_action_copy_desc">复制消息</string>
     <string name="message_action_recall_desc">撤回消息</string>
+    <string name="message_action_quote_desc">引用消息</string>
+    <string name="message_action_share_desc">分享消息</string>
+    <string name="message_action_select_desc">选中文字</string>
+    <string name="message_action_multi_select_desc">多选</string>
+    <string name="dialog_export_format_title">导出格式</string>
+    <string name="dialog_select_text_title">长按选中文字</string>
+    <string name="quote_preview_label">引用</string>
+    <string name="export_button_label">导出</string>
+    <string name="toast_clipboard_large">内容较长，仅部分可能被复制</string>
 
     <string name="message_list_scroll_to_bottom_desc">滚动到底部</string>
     <string name="message_list_configure_title">请先配置模型</string>

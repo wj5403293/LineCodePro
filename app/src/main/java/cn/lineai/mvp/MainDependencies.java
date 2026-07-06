@@ -43,6 +43,7 @@ import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.ipc.IpcProviderScanner;
 import cn.lineai.model.ModelRepository;
 import cn.lineai.model.ModelStore;
+import cn.lineai.share.ExportFormatResolver;
 import cn.lineai.ssh.SshService;
 import cn.lineai.state.TodoStateStore;
 import cn.lineai.tool.ToolExecutionCoordinator;
@@ -106,6 +107,9 @@ public final class MainDependencies {
     final KeepAliveRepository keepAliveRepository;
     final PhoneControlController phoneControlController;
     final ErrorLogController errorLogController;
+    public final ExportFormatResolver exportFormatResolver;
+    public final ShareController shareController;
+    public final QuoteController quoteController;
 
     public MainDependencies(Context context) {
         this.context = context;
@@ -161,6 +165,9 @@ public final class MainDependencies {
         keepAliveRepository = new KeepAliveRepository(context);
         phoneControlController = new PhoneControlController(phoneControlRepository);
         errorLogController = new ErrorLogController(errorLogRepository);
+        this.exportFormatResolver = new ExportFormatResolver();
+        this.shareController = new ShareController(exportFormatResolver);
+        this.quoteController = new QuoteController();
     }
 
     private ToolCallViewFactoryRegistry createToolCallViewFactoryRegistry() {

@@ -64,8 +64,40 @@ public final class AssistantMessageView extends LinearLayout {
         actionBar.setListener(new MessageActionBarView.Listener() {
             @Override
             public void onCopy() {
+                android.widget.Toast.makeText(context, "[DEBUG] onCopy", android.widget.Toast.LENGTH_SHORT).show();
                 if (actionListener != null && currentMessage != null) {
                     actionListener.onCopyMessage(currentMessage);
+                }
+            }
+
+            @Override
+            public void onQuote() {
+                android.widget.Toast.makeText(context, "[DEBUG] onQuote", android.widget.Toast.LENGTH_SHORT).show();
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onQuoteMessage(currentMessage);
+                }
+            }
+
+            @Override
+            public void onShare() {
+                android.widget.Toast.makeText(context, "[DEBUG] onShare", android.widget.Toast.LENGTH_SHORT).show();
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onShareMessage(currentMessage);
+                }
+            }
+
+            @Override
+            public void onSelect() {
+                android.widget.Toast.makeText(context, "[DEBUG] onSelect: listener=" + (actionListener != null) + " msg=" + (currentMessage != null), android.widget.Toast.LENGTH_SHORT).show();
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onSelectMessage(currentMessage, AssistantMessageView.this);
+                }
+            }
+
+            @Override
+            public void onMultiSelect() {
+                if (actionListener != null && currentMessage != null) {
+                    actionListener.onMultiSelectMessage(currentMessage);
                 }
             }
 

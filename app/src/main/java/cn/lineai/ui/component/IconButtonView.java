@@ -86,6 +86,7 @@ public final class IconButtonView extends ImageButton {
     public static final int PLAY = 77;
     public static final int CIRCLE_ALERT = 78;
     public static final int MCP = 79;
+    public static final int QUOTE = 80;
 
     private int iconType;
     private int iconColor = Color.WHITE;
@@ -295,6 +296,8 @@ public final class IconButtonView extends ImageButton {
                 return R.drawable.ic_lucide_circle_alert;
             case MCP:
                 return R.drawable.ic_lineai_mcp;
+            case QUOTE:
+                return R.drawable.ic_lucide_message_square;
             default:
                 return R.drawable.ic_lucide_plus;
         }

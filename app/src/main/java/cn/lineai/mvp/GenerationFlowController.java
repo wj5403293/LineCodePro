@@ -41,6 +41,7 @@ import org.json.JSONObject;
 
 final class GenerationFlowController {
     private static final long STREAM_RENDER_INTERVAL_MS = 80L;
+    private static final int SMOOTH_CHARS_PER_TICK = 12; // 聊天模式每次最多释放字符数
     private static final String SHELL_EXECUTE_TOOL = "shell_execute";
     private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
@@ -181,6 +182,7 @@ final class GenerationFlowController {
     private int pendingStreamGenerationId = -1;
     private boolean streamRenderScheduled;
     private long lastStreamRenderAt;
+    private boolean smoothStreamEnabled = false; // 聊天模式平滑输出
     private PendingToolExecution pendingToolExecution;
     private String sessionAutoConfirmedConversationId = "";
 
@@ -455,6 +457,10 @@ final class GenerationFlowController {
         });
     }
 
+    void setSmoothStream(boolean enabled) {
+        this.smoothStreamEnabled = enabled;
+    }
+
     void flushPendingAssistantDelta() {
         streamRenderScheduled = false;
         if (pendingStreamTextDelta.length() == 0 && pendingStreamReasoningDelta.length() == 0) {
@@ -462,12 +468,23 @@ final class GenerationFlowController {
         }
         int generationId = pendingStreamGenerationId;
         String assistantId = pendingStreamAssistantId;
-        String textDelta = pendingStreamTextDelta.toString();
-        String reasoningDelta = pendingStreamReasoningDelta.toString();
-        pendingStreamTextDelta.setLength(0);
-        pendingStreamReasoningDelta.setLength(0);
-        pendingStreamGenerationId = -1;
-        pendingStreamAssistantId = "";
+        String textDelta;
+        String reasoningDelta;
+        if (smoothStreamEnabled && pendingStreamTextDelta.length() > SMOOTH_CHARS_PER_TICK) {
+            // 平滑模式：每次只释放有限字符
+            textDelta = pendingStreamTextDelta.substring(0, SMOOTH_CHARS_PER_TICK);
+            pendingStreamTextDelta.delete(0, SMOOTH_CHARS_PER_TICK);
+            reasoningDelta = "";
+            // 不清空 generationId/assistantId，下次继续
+            scheduleAssistantDeltaFlush();
+        } else {
+            textDelta = pendingStreamTextDelta.toString();
+            reasoningDelta = pendingStreamReasoningDelta.toString();
+            pendingStreamTextDelta.setLength(0);
+            pendingStreamReasoningDelta.setLength(0);
+            pendingStreamGenerationId = -1;
+            pendingStreamAssistantId = "";
+        }
         if (!chatSessionStore.isActiveGeneration(generationId)) {
             return;
         }

@@ -72,6 +72,20 @@ public final class ComposerView extends LinearLayout {
     private String selectedModelId = "";
     private List<ModelConfig> availableModels = Collections.emptyList();
     private Listener listener;
+    private String quoteText = null;
+    private LinearLayout quoteBlock;
+    private LinearLayout pendingContainer; // 垂直堆叠容器
+    private final List<QueuedItem> pendingQueue = new ArrayList<>();
+    private boolean wasStreaming = false;
+
+    private static final class QueuedItem {
+        final String text;
+        final List<InputAttachment> attachments;
+        QueuedItem(String text, List<InputAttachment> attachments) {
+            this.text = text;
+            this.attachments = attachments;
+        }
+    }
 
     public ComposerView(Context context) {
         super(context);
@@ -137,6 +151,35 @@ public final class ComposerView extends LinearLayout {
         android.view.View divider = new android.view.View(context);
         divider.setBackgroundColor(LineTheme.BORDER_LIGHT);
         panel.addView(divider, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
+
+        // Quote block (hidden by default)
+        quoteBlock = new LinearLayout(context);
+        quoteBlock.setOrientation(HORIZONTAL);
+        quoteBlock.setGravity(Gravity.CENTER_VERTICAL);
+        quoteBlock.setBackgroundColor(0xFF1E1E2E);
+        LineTheme.padding(quoteBlock, LineTheme.MD, LineTheme.SM, LineTheme.SM, LineTheme.SM);
+        quoteBlock.setVisibility(GONE);
+        android.view.View quoteBar = new android.view.View(context);
+        quoteBar.setBackgroundColor(LineTheme.ACCENT);
+        quoteBlock.addView(quoteBar, new LinearLayout.LayoutParams(LineTheme.dp(context, 3), LayoutParams.MATCH_PARENT));
+        TextView quotePreview = LineTheme.text(context, "", LineTheme.FONT_XS, LineTheme.TEXT_SECONDARY, Typeface.ITALIC);
+        quotePreview.setSingleLine(true);
+        quotePreview.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams qtp = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        qtp.leftMargin = LineTheme.dp(context, LineTheme.SM);
+        quoteBlock.addView(quotePreview, qtp);
+        IconButtonView quoteClose = new IconButtonView(context, IconButtonView.CLOSE);
+        quoteClose.setIconColor(LineTheme.TEXT_TERTIARY);
+        quoteClose.setIconSizeDp(24, 14);
+        quoteClose.setOnClickListener(v -> clearQuote());
+        quoteBlock.addView(quoteClose, new LinearLayout.LayoutParams(LineTheme.dp(context, 24), LineTheme.dp(context, 24)));
+        panel.addView(quoteBlock, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        // Pending queue container (vertical stack, each queued message is a row)
+        pendingContainer = new LinearLayout(context);
+        pendingContainer.setOrientation(VERTICAL);
+        pendingContainer.setVisibility(GONE);
+        panel.addView(pendingContainer, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
         LinearLayout inputRow = new LinearLayout(context);
         inputRow.setOrientation(HORIZONTAL);
@@ -211,8 +254,12 @@ public final class ComposerView extends LinearLayout {
         sendButton.setIconSizeDp(40, 22);
         sendButton.setOnClickListener(v -> {
             if (streaming) {
-                if (listener != null) {
-                    listener.onStop();
+                if (canSend()) {
+                    // 输入框有内容：追加排队（不打断AI）
+                    queueCurrentInput();
+                } else {
+                    // 输入框为空：停止AI（render()检测到停止后自动发送队列）
+                    if (listener != null) listener.onStop();
                 }
                 return;
             }
@@ -332,6 +379,7 @@ public final class ComposerView extends LinearLayout {
     }
 
     public void render(ChatUiState state) {
+        boolean wasStreamingBefore = streaming;
         streaming = state.isStreaming();
         modelText.setText(state.getModelLabel());
         selectedModelId = state.getSelectedModelId();
@@ -343,6 +391,10 @@ public final class ComposerView extends LinearLayout {
         if (streaming && modePopup != null) {
             modePopup.dismiss();
         }
+        // Auto-send queued message when streaming finishes
+        if (wasStreamingBefore && !streaming && !pendingQueue.isEmpty()) {
+            post(() -> sendPending());
+        }
         if (streaming && modelPopup != null) {
             modelPopup.dismiss();
         }
@@ -351,7 +403,7 @@ public final class ComposerView extends LinearLayout {
         } else {
             updateSlashPopup();
         }
-        input.setEnabled(!streaming);
+        input.setEnabled(true); // Allow typing while AI is streaming
         attachButton.setEnabled(!streaming);
         attachButton.setAlpha(streaming ? 0.62f : 1f);
         input.setHint(state.hasConfiguredModel()
@@ -373,10 +425,25 @@ public final class ComposerView extends LinearLayout {
     private void updateSendButton() {
         boolean hasContent = canSend();
         if (streaming) {
-            sendButton.setIconType(IconButtonView.STOP);
-            sendButton.setIconColor(LineTheme.TEXT_ON_COLOR);
-            sendButton.setIconSizeDp(40, 18);
-            sendButton.setBackground(LineTheme.rounded(getContext(), LineTheme.DANGER, 20));
+            if (!pendingQueue.isEmpty() && !hasContent) {
+                // 有队列 + 输入框空：红色停止按钮（按=停止AI并发送队列）
+                sendButton.setIconType(IconButtonView.STOP);
+                sendButton.setIconColor(LineTheme.TEXT_ON_COLOR);
+                sendButton.setIconSizeDp(40, 18);
+                sendButton.setBackground(LineTheme.rounded(getContext(), 0xFFFF8800, 20));
+            } else if (hasContent) {
+                // 有内容：橙色箭头（按=追加排队）
+                sendButton.setIconType(IconButtonView.ARROW_UP);
+                sendButton.setIconColor(LineTheme.TEXT_ON_COLOR);
+                sendButton.setIconSizeDp(40, 22);
+                sendButton.setBackground(LineTheme.rounded(getContext(), 0xFFFFAA33, 20));
+            } else {
+                // 无内容无队列：红色停止
+                sendButton.setIconType(IconButtonView.STOP);
+                sendButton.setIconColor(LineTheme.TEXT_ON_COLOR);
+                sendButton.setIconSizeDp(40, 18);
+                sendButton.setBackground(LineTheme.rounded(getContext(), LineTheme.DANGER, 20));
+            }
         } else {
             sendButton.setIconType(IconButtonView.ARROW_UP);
             sendButton.setIconColor(hasContent ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT_TERTIARY);
@@ -392,10 +459,21 @@ public final class ComposerView extends LinearLayout {
     }
 
     private boolean submitCurrentInput() {
-        if (streaming || !canSend()) {
+        if (!canSend()) {
+            return true;
+        }
+        if (streaming) {
+            // Enter键在streaming时：追加排队
+            queueCurrentInput();
             return true;
         }
         String text = input.getText().toString();
+        // Prepend quote if present
+        if (quoteText != null && quoteText.length() > 0) {
+            String quoted = "> " + quoteText.replace("\n", "\n> ") + "\n\n";
+            text = quoted + text;
+            clearQuote();
+        }
         SlashCommandCatalog.Parsed parsed = SlashCommandCatalog.parse(text);
         if (parsed != null) {
             if (listener == null) {
@@ -430,6 +508,106 @@ public final class ComposerView extends LinearLayout {
                 && event.getAction() == KeyEvent.ACTION_DOWN
                 && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
                 && !event.isShiftPressed();
+    }
+
+    public void setQuoteText(String text) {
+        quoteText = text;
+        if (text != null && text.length() > 0) {
+            TextView preview = (TextView) quoteBlock.getChildAt(1);
+            preview.setText(text.length() > 80 ? text.substring(0, 80) + "..." : text);
+            quoteBlock.setVisibility(VISIBLE);
+            input.requestFocus();
+        } else {
+            quoteBlock.setVisibility(GONE);
+        }
+    }
+
+    public void clearQuote() {
+        quoteText = null;
+        quoteBlock.setVisibility(GONE);
+    }
+
+    private void queueCurrentInput() {
+        String text = input.getText().toString();
+        if (quoteText != null && quoteText.length() > 0) {
+            String quoted = "> " + quoteText.replace("\n", "\n> ") + "\n\n";
+            text = quoted + text;
+            clearQuote();
+        }
+        pendingQueue.add(new QueuedItem(text, new ArrayList<>(attachments)));
+        input.setText("");
+        clearAttachments();
+        // Update pending block
+        updatePendingBlock();
+        updateSendButton();
+    }
+
+    private void updatePendingBlock() {
+        pendingContainer.removeAllViews();
+        if (pendingQueue.isEmpty()) {
+            pendingContainer.setVisibility(GONE);
+            return;
+        }
+        Context ctx = getContext();
+        // 显示最多4条，多了折叠
+        int showCount = Math.min(pendingQueue.size(), 4);
+        for (int i = 0; i < showCount; i++) {
+            final int index = i;
+            QueuedItem item = pendingQueue.get(i);
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setBackgroundColor(0xFF252536);
+            LineTheme.padding(row, LineTheme.MD, 4, LineTheme.SM, 4);
+            // 左侧橙色竖条
+            android.view.View bar = new android.view.View(ctx);
+            bar.setBackgroundColor(0xFFFFAA33);
+            row.addView(bar, new LinearLayout.LayoutParams(LineTheme.dp(ctx, 3), LineTheme.dp(ctx, 20)));
+            // 序号 + 预览文字
+            String preview = (i + 1) + ". " + (item.text.length() > 30 ? item.text.substring(0, 30) + "..." : item.text);
+            TextView tv = LineTheme.text(ctx, preview, LineTheme.FONT_XS, 0xFFFFAA33, Typeface.NORMAL);
+            tv.setSingleLine(true);
+            tv.setEllipsize(TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams tvp = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+            tvp.leftMargin = LineTheme.dp(ctx, LineTheme.SM);
+            row.addView(tv, tvp);
+            // 单条删除按钮
+            IconButtonView close = new IconButtonView(ctx, IconButtonView.CLOSE);
+            close.setIconColor(LineTheme.TEXT_TERTIARY);
+            close.setIconSizeDp(20, 12);
+            close.setOnClickListener(v -> {
+                if (index < pendingQueue.size()) {
+                    pendingQueue.remove(index);
+                    updatePendingBlock();
+                    updateSendButton();
+                }
+            });
+            row.addView(close, new LinearLayout.LayoutParams(LineTheme.dp(ctx, 20), LineTheme.dp(ctx, 20)));
+            pendingContainer.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        }
+        // 超过4条时显示折叠提示
+        if (pendingQueue.size() > 4) {
+            TextView more = LineTheme.text(ctx, "   ... 还有 " + (pendingQueue.size() - 4) + " 条排队中", LineTheme.FONT_XS, 0xFFCC8800, Typeface.ITALIC);
+            LineTheme.padding(more, LineTheme.MD, 2, 0, 4);
+            pendingContainer.addView(more, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        }
+        pendingContainer.setVisibility(VISIBLE);
+    }
+
+    private void sendPending() {
+        if (pendingQueue.isEmpty()) return;
+        QueuedItem item = pendingQueue.remove(0);
+        updatePendingBlock();
+        if (listener != null) {
+            listener.onSend(item.text, item.attachments != null ? item.attachments : Collections.emptyList());
+        }
+    }
+
+    private void clearPending() {
+        pendingQueue.clear();
+        pendingContainer.removeAllViews();
+        pendingContainer.setVisibility(GONE);
+        updateSendButton();
     }
 
     private void updateEnterKeyBehavior(String behavior) {
@@ -756,65 +934,188 @@ public final class ComposerView extends LinearLayout {
         modelChevron.setIconColor(streaming ? LineTheme.TEXT_TERTIARY : LineTheme.TEXT_SECONDARY);
     }
 
+    private PopupWindow modelSubPopup;
+    
     private void showModelPopup(View anchor) {
         if (streaming) return;
         dismissSlashPopup();
         input.clearFocus();
         if (modelPopup != null && modelPopup.isShowing()) { modelPopup.dismiss(); return; }
         Context ctx = getContext();
-        int popupWidth = LineTheme.dp(ctx, 240);
-        int rowHeight = LineTheme.dp(ctx, 38);
-        int separatorHeight = LineTheme.dp(ctx, 1);
+        int rowHeight = LineTheme.dp(ctx, 40);
         int manageRowHeight = LineTheme.dp(ctx, 36);
-        int modelCount = availableModels.size();
-        int visibleRows = Math.min(modelCount, 8);
-        int popupHeight = rowHeight * visibleRows + separatorHeight + manageRowHeight + LineTheme.dp(ctx, 6);
-        LinearLayout content = new LinearLayout(ctx);
-        content.setOrientation(VERTICAL);
-        content.setBackground(LineTheme.roundedStroke(ctx, LineTheme.INPUT_BG, 14, LineTheme.BORDER_LIGHT));
-        LineTheme.padding(content, 3, 3, 3, 3);
-        if (modelCount > 8) {
-            android.widget.ScrollView sw = new android.widget.ScrollView(ctx);
-            LinearLayout sc = new LinearLayout(ctx);
-            sc.setOrientation(VERTICAL);
-            for (int i = 0; i < modelCount; i++) {
-                ModelConfig m = availableModels.get(i);
-                sc.addView(modelOptionRow(ctx, m, m.getId().equals(selectedModelId)),
-                        new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
-            }
-            sw.addView(sc, new android.widget.ScrollView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-            content.addView(sw, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, rowHeight * visibleRows));
-        } else {
-            for (int i = 0; i < modelCount; i++) {
-                ModelConfig m = availableModels.get(i);
-                content.addView(modelOptionRow(ctx, m, m.getId().equals(selectedModelId)),
-                        new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
+        int popupWidth = LineTheme.dp(ctx, 140);
+    
+        // Deduplicate sources by providerLabel
+        java.util.LinkedHashMap<String, String> sources = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashMap<String, ModelConfig> sourceFirstModel = new java.util.LinkedHashMap<>();
+        for (ModelConfig m : availableModels) {
+            String key = m.getProviderLabel().length() > 0 ? m.getProviderLabel() : "Other";
+            if (!sources.containsKey(key)) {
+                sources.put(key, m.getBaseUrl());
+                sourceFirstModel.put(key, m);
             }
         }
-        View divider = new View(ctx);
-        divider.setBackgroundColor(LineTheme.BORDER_LIGHT);
-        content.addView(divider, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, separatorHeight));
-        TextView manageItem = LineTheme.textMedium(ctx, "\u2699 \u7ba1\u7406\u6a21\u578b...", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY);
+    
+        if (sources.isEmpty()) {
+            // No models configured, just open manage
+            if (listener != null) listener.onModelManageClick();
+            return;
+        }
+    
+        // Build source list popup
+        LinearLayout content = new LinearLayout(ctx);
+        content.setOrientation(VERTICAL);
+        content.setBackground(LineTheme.roundedStroke(ctx, LineTheme.INPUT_BG, 12, LineTheme.BORDER_LIGHT));
+        LineTheme.padding(content, 4, 4, 4, 4);
+    
+        java.util.List<String> sourceNames = new java.util.ArrayList<>(sources.keySet());
+        for (String sName : sourceNames) {
+            // Find current model for this source
+            String currentModelName = "";
+            for (ModelConfig m : availableModels) {
+                String pk = m.getProviderLabel().length() > 0 ? m.getProviderLabel() : "Other";
+                if (pk.equals(sName) && m.getId().equals(selectedModelId)) {
+                    currentModelName = m.getName().length() > 0 ? m.getName() : m.getModelId();
+                    break;
+                }
+            }
+    
+            LinearLayout row = new LinearLayout(ctx);
+            row.setOrientation(HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            boolean isActive = currentModelName.length() > 0;
+            row.setBackground(LineTheme.rounded(ctx, isActive ? 0xFF1A2A1A : android.graphics.Color.TRANSPARENT, 8));
+            LineTheme.padding(row, LineTheme.SM, 0, LineTheme.SM, 0);
+            row.setClickable(true);
+    
+            TextView nameView = LineTheme.textMedium(ctx, sName, LineTheme.FONT_SM, isActive ? LineTheme.ACCENT : LineTheme.TEXT);
+            nameView.setSingleLine(true);
+            row.addView(nameView, new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+    
+            // Small arrow indicating submenu
+            TextView arrow = LineTheme.text(ctx, "\u203A", LineTheme.FONT_SM, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+            row.addView(arrow, new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+    
+            final String sourceName = sName;
+            row.setOnClickListener(v -> showModelSubMenu(v, sourceName, sources.get(sourceName)));
+            content.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
+        }
+    
+        // Manage button
+        View div = new View(ctx);
+        div.setBackgroundColor(LineTheme.BORDER_LIGHT);
+        content.addView(div, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 1));
+        TextView manageItem = LineTheme.textMedium(ctx, "\u2699 \u7ba1\u7406\u6a21\u578b...", LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY);
         manageItem.setGravity(Gravity.CENTER_VERTICAL);
-        manageItem.setSingleLine(true);
-        manageItem.setPadding(LineTheme.dp(ctx, LineTheme.MD), 0, LineTheme.dp(ctx, LineTheme.MD), 0);
+        manageItem.setPadding(LineTheme.dp(ctx, LineTheme.SM), 0, 0, 0);
         manageItem.setClickable(true);
         manageItem.setOnClickListener(v -> {
             if (modelPopup != null) modelPopup.dismiss();
-            post(() -> {
-                if (listener != null) listener.onModelManageClick();
-            });
+            post(() -> { if (listener != null) listener.onModelManageClick(); });
         });
         content.addView(manageItem, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, manageRowHeight));
+    
+        int popupHeight = rowHeight * sourceNames.size() + manageRowHeight + LineTheme.dp(ctx, 12);
         modelPopup = new PopupWindow(content, popupWidth, popupHeight, true);
         modelPopup.setOutsideTouchable(true);
         modelPopup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        modelPopup.setOnDismissListener(() -> { if (modelSubPopup != null && modelSubPopup.isShowing()) modelSubPopup.dismiss(); });
         int[] location = new int[2];
         anchor.getLocationOnScreen(location);
         int screenWidth = ctx.getResources().getDisplayMetrics().widthPixels;
         int centeredX = location[0] + (anchor.getWidth() - popupWidth) / 2;
         int popupX = Math.max(LineTheme.dp(ctx, LineTheme.SM), Math.min(centeredX, screenWidth - popupWidth - LineTheme.dp(ctx, LineTheme.SM)));
         modelPopup.showAtLocation(this, Gravity.NO_GRAVITY, popupX, Math.max(0, location[1] - popupHeight - LineTheme.dp(ctx, 8)));
+    }
+    
+    private void showModelSubMenu(View sourceRow, String sourceName, String baseUrl) {
+        if (modelSubPopup != null && modelSubPopup.isShowing()) modelSubPopup.dismiss();
+        Context ctx = getContext();
+        int rowHeight = LineTheme.dp(ctx, 36);
+        int subWidth = LineTheme.dp(ctx, 160);
+    
+        // Collect models for this source
+        java.util.List<ModelConfig> models = new java.util.ArrayList<>();
+        for (ModelConfig m : availableModels) {
+            String pk = m.getProviderLabel().length() > 0 ? m.getProviderLabel() : "Other";
+            if (pk.equals(sourceName)) models.add(m);
+        }
+    
+        LinearLayout sub = new LinearLayout(ctx);
+        sub.setOrientation(VERTICAL);
+        sub.setBackground(LineTheme.roundedStroke(ctx, LineTheme.INPUT_BG, 10, LineTheme.BORDER_LIGHT));
+        LineTheme.padding(sub, 4, 4, 4, 4);
+    
+        // Query button
+        TextView queryBtn = LineTheme.textMedium(ctx, "\u2193 \u67e5\u8be2\u6a21\u578b", LineTheme.FONT_XS, LineTheme.ACCENT);
+        queryBtn.setGravity(Gravity.CENTER);
+        queryBtn.setBackground(LineTheme.roundedStroke(ctx, LineTheme.SURFACE_LIGHT, 6, LineTheme.ACCENT));
+        LineTheme.padding(queryBtn, 0, 3, 0, 3);
+        queryBtn.setClickable(true);
+        queryBtn.setOnClickListener(v -> {
+            queryBtn.setText("\u67e5\u8be2\u4e2d...");
+            new Thread(() -> {
+                try {
+                    String url = (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + "models";
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
+                    java.io.InputStream is = c.getInputStream();
+                    java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+                    byte[] buf = new byte[4096]; int n;
+                    while ((n = is.read(buf)) != -1) bos.write(buf, 0, n);
+                    is.close();
+                    org.json.JSONArray data = new org.json.JSONObject(bos.toString("UTF-8")).getJSONArray("data");
+                    post(() -> {
+                        queryBtn.setText("\u2193 " + data.length() + "\u4e2a\u6a21\u578b");
+                        // Rebuild submenu with fetched models
+                        if (modelSubPopup != null) modelSubPopup.dismiss();
+                        if (modelPopup != null) modelPopup.dismiss();
+                        // Save models and refresh
+                        // For now just show toast
+                        android.widget.Toast.makeText(ctx, "\u67e5\u5230 " + data.length() + " \u4e2a\u6a21\u578b\uff0c\u8bf7\u5728\u7ba1\u7406\u6a21\u578b\u4e2d\u5bfc\u5165", android.widget.Toast.LENGTH_SHORT).show();
+                    });
+                } catch (Exception e) {
+                    post(() -> queryBtn.setText("\u67e5\u8be2\u5931\u8d25"));
+                }
+            }).start();
+        });
+        sub.addView(queryBtn, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(ctx, 28)));
+    
+        // Model items
+        for (ModelConfig m : models) {
+            boolean sel = m.getId().equals(selectedModelId);
+            TextView item = LineTheme.textMedium(ctx, m.getName().length() > 0 ? m.getName() : m.getModelId(), LineTheme.FONT_SM, sel ? LineTheme.TEXT_ON_COLOR : LineTheme.TEXT);
+            item.setSingleLine(true);
+            item.setEllipsize(TextUtils.TruncateAt.END);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            item.setBackground(LineTheme.rounded(ctx, sel ? LineTheme.ACCENT : android.graphics.Color.TRANSPARENT, 8));
+            LineTheme.padding(item, LineTheme.SM, 0, LineTheme.SM, 0);
+            item.setClickable(true);
+            final String mid = m.getId();
+            item.setOnClickListener(v2 -> {
+                if (modelSubPopup != null) modelSubPopup.dismiss();
+                if (modelPopup != null) modelPopup.dismiss();
+                post(() -> { if (listener != null && !mid.equals(selectedModelId)) listener.onModelQuickSwitch(mid); });
+            });
+            sub.addView(item, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, rowHeight));
+        }
+    
+        int subHeight = LineTheme.dp(ctx, 28) + rowHeight * Math.min(models.size(), 8) + LineTheme.dp(ctx, 8);
+        if (subHeight > LineTheme.dp(ctx, 320)) subHeight = LineTheme.dp(ctx, 320);
+        modelSubPopup = new PopupWindow(sub, subWidth, subHeight, false);
+        modelSubPopup.setOutsideTouchable(true);
+        modelSubPopup.setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+    
+        // Position to the right of the source row
+        int[] loc = new int[2];
+        sourceRow.getLocationOnScreen(loc);
+        int subX = loc[0] + sourceRow.getWidth() + LineTheme.dp(ctx, 4);
+        int screenW = ctx.getResources().getDisplayMetrics().widthPixels;
+        if (subX + subWidth > screenW - LineTheme.dp(ctx, 8)) {
+            subX = loc[0] - subWidth - LineTheme.dp(ctx, 4);
+        }
+        modelSubPopup.showAtLocation(this, Gravity.NO_GRAVITY, subX, loc[1]);
     }
 
     private LinearLayout modelOptionRow(Context ctx, ModelConfig model, boolean selected) {

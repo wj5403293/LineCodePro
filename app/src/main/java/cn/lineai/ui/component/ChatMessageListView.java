@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AbsListView;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -37,9 +38,15 @@ public final class ChatMessageListView extends FrameLayout {
     private final MessageAdapter adapter;
     private final IconButtonView scrollToBottomButton;
     private boolean followTailEnabled;
+    private boolean programmaticScroll; // 程序触发的滚动不关闭 followTail
     private ToolReviewListener toolReviewListener;
     private MarkdownLinkHandler markdownLinkHandler;
     private MessageActionListener messageActionListener;
+    private MultiSelectListener multiSelectListener;
+
+    public interface MultiSelectListener {
+        void onMultiSelectTriggered(int position);
+    }
 
     public ChatMessageListView(Context context) {
         super(context);
@@ -56,7 +63,7 @@ public final class ChatMessageListView extends FrameLayout {
         listView.setDividerHeight(0);
         listView.setFadingEdgeLength(0);
         listView.setFastScrollEnabled(false);
-        listView.setFocusable(false);
+        listView.setFocusable(true);
         listView.setOverScrollMode(OVER_SCROLL_IF_CONTENT_SCROLLS);
         listView.setPadding(0, LineTheme.dp(context, LineTheme.SM), 0, LineTheme.dp(context, LineTheme.SM));
         listView.setSelector(new ColorDrawable(Color.TRANSPARENT));
@@ -85,6 +92,12 @@ public final class ChatMessageListView extends FrameLayout {
         listView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
+                if (programmaticScroll) {
+                    if (scrollState == AbsListView.OnScrollListener.SCROLL_STATE_IDLE) {
+                        programmaticScroll = false;
+                    }
+                    return;
+                }
                 if (scrollState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL
                         || scrollState == AbsListView.OnScrollListener.SCROLL_STATE_FLING) {
                     followTailEnabled = false;
@@ -96,6 +109,13 @@ public final class ChatMessageListView extends FrameLayout {
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
                 updateScrollToBottomVisibility();
             }
+        });
+
+        listView.setOnItemLongClickListener((parent, view, position, id) -> {
+            if (multiSelectListener != null) {
+                multiSelectListener.onMultiSelectTriggered(position);
+            }
+            return true;
         });
     }
 
@@ -127,6 +147,14 @@ public final class ChatMessageListView extends FrameLayout {
         adapter.setMessageActionListener(listener);
     }
 
+    public void setMultiSelectListener(MultiSelectListener listener) {
+        multiSelectListener = listener;
+    }
+
+    public List<ChatMessage> getMessages() {
+        return adapter.getMessages();
+    }
+
     private void scrollToBottom() {
         followTailEnabled = true;
         scrollToBottomInternal(true);
@@ -139,23 +167,41 @@ public final class ChatMessageListView extends FrameLayout {
             return;
         }
         int target = count - 1;
-        listView.setSelection(target);
-        listView.post(() -> {
-            int childIndex = target - listView.getFirstVisiblePosition();
-            if (childIndex >= 0 && childIndex < listView.getChildCount()) {
-                View child = listView.getChildAt(childIndex);
-                int viewportBottom = listView.getHeight() - listView.getPaddingBottom();
-                int delta = child.getBottom() - viewportBottom;
-                if (delta > 0) {
-                    if (animated) {
-                        listView.smoothScrollBy(delta, 180);
-                    } else {
-                        listView.setSelectionFromTop(target, viewportBottom - child.getHeight());
+        if (!animated) {
+            // streaming跟随模式：先确保最后一项可见，然后平滑滚到底部
+            if (listView.getLastVisiblePosition() < target) {
+                listView.setSelection(target);
+            }
+            listView.post(() -> {
+                int childIndex = target - listView.getFirstVisiblePosition();
+                if (childIndex >= 0 && childIndex < listView.getChildCount()) {
+                    View child = listView.getChildAt(childIndex);
+                    int viewportBottom = listView.getHeight() - listView.getPaddingBottom();
+                    int delta = child.getBottom() - viewportBottom;
+                    if (delta > 0) {
+                        programmaticScroll = true;
+                        listView.smoothScrollBy(delta, 120);
                     }
                 }
-            }
-            updateScrollToBottomVisibility();
-        });
+                updateScrollToBottomVisibility();
+            });
+        } else {
+            // 用户点击按钮：平滑滚动到底部
+            listView.setSelection(target);
+            listView.post(() -> {
+                int childIndex = target - listView.getFirstVisiblePosition();
+                if (childIndex >= 0 && childIndex < listView.getChildCount()) {
+                    View child = listView.getChildAt(childIndex);
+                    int viewportBottom = listView.getHeight() - listView.getPaddingBottom();
+                    int delta = child.getBottom() - viewportBottom;
+                    if (delta > 0) {
+                        programmaticScroll = true;
+                        listView.smoothScrollBy(delta, 250);
+                    }
+                }
+                updateScrollToBottomVisibility();
+            });
+        }
     }
 
     private void updateScrollToBottomVisibility() {
@@ -254,6 +300,10 @@ public final class ChatMessageListView extends FrameLayout {
 
         MessageAdapter(Context context) {
             this.context = context;
+        }
+
+        List<ChatMessage> getMessages() {
+            return new ArrayList<>(visibleMessages);
         }
 
         boolean render(ChatUiState state) {

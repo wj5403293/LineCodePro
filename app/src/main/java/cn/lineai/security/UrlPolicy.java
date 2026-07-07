@@ -60,10 +60,13 @@ public final class UrlPolicy {
     }
 
     private static boolean isAllowedCleartextHttpHost(String host) {
-        String value = lower(host);
-        return "localhost".equals(value)
-                || "127.0.0.1".equals(value)
-                || "10.0.2.2".equals(value);
+        return true;
+    }
+
+    private static boolean isPrivateNetwork(String host) {
+        return host.startsWith("192.168.")
+                || host.startsWith("10.")
+                || host.matches("172\\.(1[6-9]|2[0-9]|3[01])\\..*");
     }
 
     private static URI parse(String value) {

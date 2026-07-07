@@ -16,6 +16,12 @@ final class OverlayActionController {
         void showScreen(String screenId);
 
         void render();
+
+        void exportCurrentChat();
+
+        void enterMessageSelectMode();
+
+        void showTextSelectionTest();
     }
 
     private final Context context;
@@ -83,8 +89,11 @@ final class OverlayActionController {
         ArrayList<SheetOption> options = new ArrayList<>();
         options.add(new SheetOption("tutorial", "教程", "打开初学者教程", false));
         options.add(new SheetOption("settings", context.getString(R.string.screen_settings_title), "模型、主题、数据管理", false));
+        options.add(new SheetOption("export", "导出对话", "将当前对话导出为 Markdown 或分享", false));
+        options.add(new SheetOption("select_export", "选择消息导出", "多选消息后合并导出/分享", false));
         options.add(new SheetOption("compact", "压缩上下文", "将早期上下文总结为隐藏摘要", false));
         options.add(new SheetOption("clear", "清空对话", "清空当前对话消息", false));
+        options.add(new SheetOption("test_select", "⚙ 文本选中测试", "测试哪种TextView能选中", false));
         host.showSheet("更多", options);
     }
 
@@ -124,6 +133,12 @@ final class OverlayActionController {
             // The bottom sheet is closed below.
         } else if ("clear".equals(id)) {
             chatInteractionController.clearCurrentConversation();
+        } else if ("export".equals(id)) {
+            host.exportCurrentChat();
+        } else if ("select_export".equals(id)) {
+            host.enterMessageSelectMode();
+        } else if ("test_select".equals(id)) {
+            host.showTextSelectionTest();
         }
         if (!"settings".equals(id) && !"tutorial".equals(id)) {
             host.hideOverlays();

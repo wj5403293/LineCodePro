@@ -11,6 +11,10 @@ public final class MessageActionBarView extends LinearLayout {
     public static final int ALIGN_RIGHT = 1;
     private final IconButtonView copyButton;
     private final IconButtonView recallButton;
+    private final IconButtonView quoteButton;
+    private final IconButtonView shareButton;
+    private final IconButtonView selectButton;
+    private final IconButtonView multiSelectButton;
 
     public MessageActionBarView(Context context, int align, boolean recallEnabled) {
         super(context);
@@ -22,6 +26,22 @@ public final class MessageActionBarView extends LinearLayout {
         copyButton.setContentDescription(context.getString(R.string.message_action_copy_desc));
         addView(copyButton, iconParams(context));
 
+        quoteButton = icon(context, IconButtonView.QUOTE);
+        quoteButton.setContentDescription("引用");
+        addView(quoteButton, iconParams(context));
+
+        shareButton = icon(context, IconButtonView.EXTERNAL_LINK);
+        shareButton.setContentDescription("分享");
+        addView(shareButton, iconParams(context));
+
+        selectButton = icon(context, IconButtonView.FILE_PEN_LINE);
+        selectButton.setContentDescription("选中文字");
+        addView(selectButton, iconParams(context));
+
+        multiSelectButton = icon(context, IconButtonView.CIRCLE_CHECK);
+        multiSelectButton.setContentDescription("多选导出");
+        addView(multiSelectButton, iconParams(context));
+
         IconButtonView recall = null;
         if (recallEnabled) {
             recall = icon(context, IconButtonView.ROTATE_CCW);
@@ -32,23 +52,22 @@ public final class MessageActionBarView extends LinearLayout {
     }
 
     public void setListener(Listener listener) {
-        copyButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onCopy();
-            }
-        });
+        copyButton.setOnClickListener(v -> { if (listener != null) listener.onCopy(); });
+        quoteButton.setOnClickListener(v -> { if (listener != null) listener.onQuote(); });
+        shareButton.setOnClickListener(v -> { if (listener != null) listener.onShare(); });
+        selectButton.setOnClickListener(v -> { if (listener != null) listener.onSelect(); });
+        multiSelectButton.setOnClickListener(v -> { if (listener != null) listener.onMultiSelect(); });
         if (recallButton != null) {
-            recallButton.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onRecall();
-                }
-            });
+            recallButton.setOnClickListener(v -> { if (listener != null) listener.onRecall(); });
         }
     }
 
     public interface Listener {
         void onCopy();
-
+        void onQuote();
+        void onShare();
+        void onSelect();
+        void onMultiSelect();
         void onRecall();
     }
 

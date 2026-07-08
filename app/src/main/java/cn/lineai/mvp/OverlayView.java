@@ -19,4 +19,10 @@ public interface OverlayView {
     void hideDirectoryPicker();
 
     void hideAttachmentPicker();
+
+    void exportCurrentChat();
+
+    void enterMessageSelectMode();
+
+    void showTextSelectionTest();
 }

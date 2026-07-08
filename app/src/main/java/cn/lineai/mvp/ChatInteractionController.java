@@ -174,6 +174,7 @@ final class ChatInteractionController {
         ModelCancellationToken cancellationToken = new ModelCancellationToken();
         host.setCurrentCancellationToken(cancellationToken);
         chatSessionStore.setStreaming(true);
+        generationFlowController.setSmoothStream(cn.lineai.model.ChatMode.CHAT.equals(chatModeRepository.getMode()));
         host.startGenerationKeepAlive();
         host.render();
 
@@ -227,6 +228,7 @@ final class ChatInteractionController {
             return;
         }
         chatModeRepository.applyMode(mode, toolSettingsRepository);
+        generationFlowController.setSmoothStream(cn.lineai.model.ChatMode.CHAT.equals(mode));
         host.syncModePermission();
         host.render();
     }

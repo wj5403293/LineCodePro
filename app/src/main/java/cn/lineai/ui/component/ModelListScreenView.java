@@ -26,6 +26,8 @@ public final class ModelListScreenView extends LinearLayout {
 
         void onAddModel();
 
+        void onBatchImport();
+
         void onSelectModel(String id);
 
         void onEditModel(String id);
@@ -117,6 +119,21 @@ public final class ModelListScreenView extends LinearLayout {
     private void renderList() {
         Context context = getContext();
         list.removeAllViews();
+
+        // Batch import button
+        if (allowManagement) {
+            TextView importBtn = LineTheme.textMedium(context, "⬇ 一键导入模型", LineTheme.FONT_SM, LineTheme.ACCENT);
+            importBtn.setGravity(Gravity.CENTER);
+            importBtn.setBackground(LineTheme.roundedStroke(context, LineTheme.SURFACE_LIGHT, 8, LineTheme.ACCENT));
+            LineTheme.padding(importBtn, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
+            importBtn.setClickable(true);
+            importBtn.setFocusable(true);
+            importBtn.setOnClickListener(v -> listener.onBatchImport());
+            LinearLayout.LayoutParams ibp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            ibp.bottomMargin = LineTheme.dp(context, LineTheme.MD);
+            list.addView(importBtn, ibp);
+        }
+
         if (models.isEmpty()) {
             String emptyText = allowManagement
                     ? context.getString(R.string.screen_models_empty_can_add)

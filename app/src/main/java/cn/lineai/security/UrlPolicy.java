@@ -77,7 +77,14 @@ public final class UrlPolicy {
     }
 
     private static boolean isAllowedCleartextHttpHost(String host) {
-        return true;
+        if (host == null || host.length() == 0) {
+            return false;
+        }
+        String h = host.toLowerCase(Locale.ROOT);
+        if ("localhost".equals(h) || "127.0.0.1".equals(h) || "10.0.2.2".equals(h) || "::1".equals(h)) {
+            return true;
+        }
+        return isPrivateNetwork(h);
     }
 
     private static boolean isPrivateNetwork(String host) {

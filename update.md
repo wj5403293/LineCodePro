@@ -1,5 +1,148 @@
 # 更新日志
 
+## v1.1.9
+
+### 消息引用与多选分享
+
+- **`QuoteController` 纯逻辑控制器** - 新增 `cn.lineai.mvp.QuoteController`，持有引用文本与预览接口 `QuotePreview`（`showQuote` / `hideQuote`），提供 `setQuote` / `clearQuote` / `hasQuote` / `composeWithQuote`；`composeWithQuote` 自动把引用拼成 `"> ..."` 块再插入用户输入并清空，发送时一次完成。`setQuote` 文本超过 80 字符自动截断为预览。
+- **`ComposerView` 引用预览条** - `ComposerView` 实现 `QuotePreview`，在输入框上方构建圆角描边的引用预览条：左侧 3dp 宽 `LineTheme.ACCENT` 竖线、中间预览文本 2 行 `END` 省略、右侧 28dp `IconButtonView.CLOSE` 关闭按钮；通过 `QuoteDismissListener` 在关闭时通知 `QuoteController.clearQuote`。
+- **引用文本解析与渲染** - `UserMessageView` 在 `bind` 时解析 `"> quoted\n> lines\n\nactual"` 格式，把引用部分抽到 `quoteTextView` 单独渲染（最多 3 行省略），主消息文本只保留后半段；空引用时自动隐藏引用条，避免在历史消息上误显示引用块。
+- **多选分享模式** - `ChatMessageListView` 新增 `multiSelectMode` / `selectedMessageIds` / `MultiSelectListener`；`buildMultiSelectBar` 在底部构建高 8dp 浮起的操作条（选中计数 + 导出按钮 + 关闭按钮）；`MessageActionBarView` 新增 `MultiSelectButton`（`IconButtonView.CHECK_SQUARE`）入口；`enterMultiSelectMode` / `exitMultiSelectMode` 切换模式并清空选择。
+- **多选消息转 `ChatMessage` 列表** - `ChatMessageListView.getSelectedMessages` 通过 `adapter.getVisibleMessages` 过滤选中 id 输出完整消息列表，供 `ShareController.showFormatPicker` 复用导出流程。
+- **多选发送队列** - `ComposerView` 在流式生成期间允许输入；发送按钮三态：流式 + 有内容 → 橙色 `IconButtonView.ARROW_UP` 追加排队、流式 + 无内容 + 有队列 → 橙色停止、流式 + 无内容 + 无队列 → 红色停止；`render` 监听 `wasStreamingBefore && !streaming` 自动 `post(sendPending)`，把队列消息在 AI 停下的瞬间继续发送。
+- **`MessageActionBarView` 拆分接口** - `Listener` 重构为 `ActionListener`（`onCopy` / `onQuote` / `onShare`）+ `SelectListener`（`onSelect` / `onMultiSelect`）+ `RecallListener`（`onRecall`）三组接口；新增 `IconButtonView.SHARE` / `QUOTE` / `TEXT_CURSOR` / `CHECK_SQUARE` 4 个图标常量与对应 `ic_lucide_share_2` / `ic_lucide_quote` / `ic_lucide_text_cursor` / `ic_lucide_check_square` 矢量图。
+- **`MessageActionListener` 接口扩展** - 新增 `onQuoteMessage` / `onShareMessage` / `onSelectText` / `onMultiSelectToggle` 四个回调；`AssistantMessageView` / `UserMessageView` 同步绑定到 `setActionListener` + `setSelectListener` + `setRecallListener`，`streaming` 构造参数时 `setActionsVisible(false)` 隐藏引用/分享/选中/多选按钮。
+
+### 多格式聊天记录导出
+
+- **`ExportFormat` / `ExportResult` 抽象** - 新增 `cn.lineai.share.ExportFormat` 接口（`displayName` / `execute`）与 `cn.lineai.share.ExportResult` 不可变结果类，支持 `ACTION_SHARE_FILE`（带 `File` + `mimeType` + `Uri`）/ `ACTION_CLIPBOARD`（带 `content`）/ `ACTION_SHARE_TEXT`（带 `content`）三类动作。
+- **`ExportFormatResolver` 解析器** - 默认注册 5 种格式：`ClipboardFormat` / `PlainTextFormat` / `MarkdownFormat` / `PdfFormat` / `ChatImageFormat`；`getDisplayNames` / `get` / `size` 供 `ShareController.showFormatPicker` 弹窗消费，`register` 允许扩展。
+- **`PlainTextFormat` / `MarkdownFormat`** - 纯文本格式用 `【我】` / `【AI】` 标签分段、末尾追加 `FOOTER_PLAIN = "—— 来自 LineCode Pro"`；Markdown 格式用 `##` 二级标题 + `---` 分隔 + `FOOTER_MD = "*—— 来自 LineCode Pro*"`。`ChatMessages.toPlainText` / `toMarkdown` 静态方法支持单元测试直接构造。
+- **`ChatImageFormat` + `ChatBitmapRenderer`** - 用 `ChatLayout.measure` 阶段按 28sp 字体 + `IMG_WIDTH=720` 测每行宽度算出总高，再用 `ChatCanvas.draw` 在 `0xFF1E1E2E` 背景上按"我"/"AI"角色绘制深浅气泡（`0xFF3B3B5C` / `0xFF2A2A3E` 圆角 24）+ LTGRAY 角色名；最终 `Bitmap.compress(PNG, 100)` 写入 `cache/share/chat_screenshot.png`。
+- **`PdfFormat` + `PdfRenderer`** - 自实现 A4（595×842pt）PDF 渲染：标题 + 正文双 `TextPaint`，每行按 `measureText` 自适应宽度自动换行，遇 `\n` 强制断行，遇页底 `finishPage` + `startNewPage`；最终由 `PdfExporter.save` 写入 `cache/share/`，再通过 `ShareFileProvider.uriFor` 转 `content://` URI。
+- **`ChatMessages.wrapText` 通用换行** - 用 `Paint.measureText` 在指定 `maxWidth` 内逐字符测量，超过则回退到上一换行点；保留原始 `\n`，跳过段落间尾随空白，避免切到字符中间。
+- **`ShareController` 调度中心** - 构造注入 `ExportFormatResolver`；`showFormatPicker` 弹 `AlertDialog` 列出 `displayNames`，选择后调用 `format.execute` 并按 `ExportResult.action` 派发到 `ShareHelper.shareFile` / `ShareHelper.copy` / `ShareHelper.shareText`；`ClipboardFormat` 在文本 > 5000 字时 `shouldWarn` 提示"内容较长，仅部分可能被复制"。
+
+### 分享体验优化
+
+- **合并转发多选 + 格式选择** - `MainChatView.showMultiSelectDialog` 弹 `setMultiChoiceItems` 多选列表（每行 `[角色] 前 50 字`），预选中长按触发的 `position`；`showMergeFormatDialog` 提供 5 种导出：对话截图 / PDF / Markdown / 纯文本分享 / 复制到剪贴板，分别走 `shareAsChatImage` / `shareAsPdfWithName` / `shareAsFile` / `Intent.ACTION_SEND` / `ClipboardManager.setPrimaryClip`。
+- **AI 取名文件名** - `askFileNameAndShare` 弹自定义圆角卡片布局（深色卡片 + 提示文字 + 输入框 + "AI 取名"胶囊按钮），AI 取名按钮调用 `generateSmartFileName`：从首段有效内容（去 `^[#>*\-\s]+` 头，长度 ≥ 4 截到 20 字）抽取文件名，缺省回退到 `chat_<时间戳末 4 位>`；最后用 `name.replaceAll("[/\\\\:*?\"<>|]", "_")` 清洗非法字符再拼上后缀。
+- **PDF / 对话截图生成器（`MainChatView` 内部版）** - 独立的 `shareAsPdfInternal` 用 `PdfDocument` + 双 `Paint` 手动绘制 A4 页面，分页阈值 `pageHeight - margin`；`shareAsChatImage` 用 `wrapText` + `Paint.measureText` 二次测量得到真实换行结果，再画左右气泡（用户右侧 `0xFF3B5998`、AI 左侧 `0xFF2D2D44`）+ 深色背景 + 居中页脚 `—— 来自 LineCode Pro`。
+- **`ShareFileProvider`（`cn.lineai.log`）** - 全新自定义 `ContentProvider`（authority `<applicationId>.fileprovider`）替代 `ShareFileProvider`（`cn.lineai.share`），提供 `getType`（按扩展名返回 `application/octet-stream` / `application/pdf` / `image/png` / `text/plain`）、`openFile`（只读 + 规范化路径防穿越 + 文件存在校验）、`query`（返回 `OpenableColumns.DISPLAY_NAME` + `SIZE` 的 `MatrixCursor`，QQ/微信读取文件前会先 `query`）、`insert` / `update` / `delete` 全部禁用。`uriFor` 用 `new Uri.Builder().scheme("content").authority(...).appendPath(name)` 拼装 URI。
+- **悬浮窗"再发"按钮** - `launchShareIntent` 启动分享 chooser 后延迟 6 秒 `postDelayed(showFloatingShareButton)`，使用 `WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY` 弹出 3 键悬浮条（"再发"紫色 + "返回"灰色 + "关闭"）；无悬浮窗权限时弹 `Settings.ACTION_MANAGE_OVERLAY_PERMISSION` 引导页；`onWindowFocusChanged(hasWindowFocus=true)` 时自动清理悬浮窗与 `pendingShareFile`。
+- **`MainChatView` 长按多选入口** - `messageListView.setOnItemLongClickListener` 触发 `MultiSelectListener.onMultiSelectTriggered(position)`，弹 `showMultiSelectDialog(position)` 时预选该位置。
+- **长按文字选中** - `MainChatView.triggerTextSelection` 用 `EditText.setKeyListener(null) + setTextIsSelectable(true) + selectAll()` 构造只读可复制的对话框，规避 `setTextIsSelectable` 在聊天项内拦截兄弟按钮触摸事件的问题（同步在 `UserMessageView` / `MarkdownTextBlockView` 注释中明示）。
+- **复制逻辑统一** - `MainChatView.copyMessage` 改用 `ShareHelper.copy`，与导出格式共享同一份 `ClipboardManager.setPrimaryClip("chat", text)` 实现。
+
+### 安全设置与 HTTP 限制旁路
+
+- **独立 `SecuritySettingsScreenView` 页面** - 新增 `cn.lineai.ui.component.SecuritySettingsScreenView extends ScreenScaffoldView`，拆出"HTTPS 与 HTTP 限制"+"浏览器 JavaScript"两个分区；`ScreenFactories.SecuritySettingsScreenFactory` 注册 `screenId = "security"`，由 `SettingsScreenView` 改为点击跳转到该新页面。
+- **`UrlPolicy` 放宽模式** - 新增 `volatile relaxedHttpEnabled` 静态开关 + `setRelaxedHttpEnabled` / `isRelaxedHttpEnabled` 访问器；`normalizeHttpOrHttpsUrl` / `normalizeBrowserUrl` / `requireHttpOrLocalCleartextUrl` / `isHttpOrLocalCleartext` 四处在原 `isAllowedCleartextHttpHost` 校验之前先判断 `relaxedHttpEnabled`，开启时任意 `http://` 与 `https://` 一律放行。
+- **`network_security_config.xml` 调整** - `base-config` 由 `cleartextTrafficPermitted="false"` 改为 `"true"`（让任意 http 请求至少能进到应用层），通过注释明确"cleartext 控制交由 `cn.lineai.security.UrlPolicy` 而非此处"，避免误以为系统层关闭。
+- **`OutputSettings` 持久化字段** - 新增 `allowAnyHttp` 字段（`isAllowAnyHttp` / `setAllowAnyHttp`），由 `OutputSettingsRepository` 读写；`SettingsManagementController` 透传 `onAllowAnyHttpChanged` 回调到 `OutputSettingsController`，最终调用 `UrlPolicy.setRelaxedHttpEnabled`。
+- **`minSdk` 升级到 26** - `app/build.gradle.kts.defaultConfig.minSdk` 从 24 提升到 26，与 `OutputSettings` 持久化、安全设置页、`TYPE_APPLICATION_OVERLAY` 等新 API 对齐。
+
+### 数据库备份与恢复
+
+- **`LineCodeDatabaseBackup` 自动备份** - 新增 `cn.lineai.data.db.LineCodeDatabaseBackup`，单线程 `ExecutorService` 串行化备份任务，目录 `context.getDir("backups", MODE_PRIVATE)/linecode/`，文件 `backup-<timestamp>.json` + `latest.json`（固定文件名），最多保留 `MAX_BACKUPS = 3` 份（`pruneOldBackups` 按时间戳删旧）。`saveAsync` 失败吞异常，绝不抛到主流程。
+- **`LineCodeDatabaseArchive.exportFullSnapshot`** - 与现有 `exportSnapshot`（脱敏空 messages 正文）并列新增"完整导出"方法，遍历 `TABLES` 时对 `TABLE_MESSAGE_TEXT_CHUNKS` 表调用专用 `exportMessageTextChunksTable`，其他表复用 `exportTable`，输出 JSON 携带 `"full": true` 标记；`exportSnapshot` 与 `exportFullSnapshot` 共享 `LineCodeArchiveCodec.ENTRY_DATABASE` 文件名。
+- **`LineCodeDatabaseErrorHandler` 自定义损坏处理** - 实现 `DatabaseErrorHandler` 替换 `DefaultDatabaseErrorHandler`：`onCorruption` 走"复制为 `.corrupted-<timestamp>` 存档 → 写入 `.needs-restore` 标记 → 删除损坏库文件"三步，全部 `try/catch Throwable` 吞异常，避免向上抛出二次崩溃。
+- **`needs-restore` 自动恢复** - `LineCodeDatabase.onOpen` 新增 `maybeRestoreFromBackup`：`LineCodeSchema.DATABASE_NAME + ".needs-restore"` 标志存在时调用 `LineCodeDatabaseBackup.restoreLatest(this)` 把 `latest.json` 数据导入当前空库（`LineCodeDatabaseArchive` 反序列化），恢复成功/失败均删除标志，保留空库兜底。`integrityOk` 用 `PRAGMA integrity_check(1)` 启动期自检；`backupAsync` 公开方法供 `ConversationRepository` 在事务 `setTransactionSuccessful` 之后异步触发一次。
+- **`ConversationRepository` 事务后自动备份** - `appendMessages` 在 `db.endTransaction()` 后调用 `database.backupAsync()`，保证每次成功落库后 6 个提交窗口内都有可用备份，应对系统杀死进程导致的库损坏。
+
+### 工具调用系统重构
+
+- **`ToolDisplayCategory` 枚举** - 新增 `cn.lineai.tool.ToolDisplayCategory`（`READ` / `WRITE` / `DELETE` / `SHELL` / `AGENT` / `AGENT_PIPELINE` / `TODO` / `IMAGE_GENERATION` / `PHONE_CONTROL` / `HTTP` / `GENERIC`），把工具显示路由从 UI 字符串判断改为枚举。
+- **`ToolDisplayResolver` 解析器** - 新增 `cn.lineai.tool.ToolDisplayResolver` 取代 `ToolCallUtils` 的字符串散落判断，方法：`getDisplayCategory(name)`（优先用 `ToolRegistry.getCachedDisplayCategory`，缺省走 `fallbackDisplayCategory` 覆盖 `file_read` / `glob` / `list_dir` / `web_search` / `web_fetch` / `image_understanding` → `READ`、`file_write` / `file_edit` → `WRITE`、`file_delete` → `DELETE`、`http_server` → `HTTP`、`shell_execute` → `SHELL`、`agent` / `agentx_` → `AGENT`、`agent_pipeline` → `AGENT_PIPELINE`、`todo_update` → `TODO`、`image_generation` → `IMAGE_GENERATION`、`phone_*` → `PHONE_CONTROL`、`mcpx_` → `GENERIC`）、`getDisplayLabel` / `getActionName` 直接从 `BaseTool` 拿。静态 `setDefault` / `getDefault` 提供全局默认实例。
+- **`ToolCallCardView` 统一接口** - 新增 `cn.lineai.ui.component.toolcall.ToolCallCardView` 接口（`setToolReviewListener` / `setProjectPath` / `bind(ToolCall, ToolResult)`），让 `ToolCallBlockView` 不再依赖具体子类型（之前对 `ToolCallWriteView` / `ToolCallDeleteView` / `ToolCallReadView` / `ToolCallShellView` / `ToolCallTodoView` / `ToolCallAgentView` / `ToolCallAgentPipelineView` 一连串 `instanceof` 判断）。
+- **`ToolCallViewFactory` + `ToolCallViewFactoryRegistry`** - 新增 `cn.lineai.ui.component.toolcall.ToolCallViewFactory`（`createView(Context) -> ToolCallCardView`），内置 `ReadToolCallViewFactory` / `WriteToolCallViewFactory` / `DeleteToolCallViewFactory` / `ShellToolCallViewFactory` / `TodoToolCallViewFactory` / `AgentToolCallViewFactory` / `AgentPipelineToolCallViewFactory` / `HttpToolCallViewFactory` / `ImageGenerationToolCallViewFactory` / `PhoneControlToolCallViewFactory` / `GenericToolCallViewFactory` 11 个实现。`ToolCallViewFactoryRegistry` 按 `ToolDisplayCategory` 注册工厂，`createView(Context, category)` 返回对应 `ToolCallCardView`。
+- **`ToolCallBlockView` 简化渲染** - 把 100+ 行 `if/else instanceof` 链替换为 `REGISTRY.createView(ctx, ToolCallUtils.getDisplayCategory(name))` + `childView.setToolReviewListener` + `childView.setProjectPath` + `addView(childView)` + `childView.bind` 5 行；`setToolReviewListener` / `setProjectPath` 也改用统一的 `ToolCallCardView` 接口。
+- **`NestedToolCallParser` 嵌套工具调用解析** - 新增 `cn.lineai.tool.NestedToolCallParser.parse(JSONArray) -> List<NestedCall>`，把 Agent / Pipeline progress 数组中 `{"id", "name", "arguments", "result": {...}}` 解析为 `NestedCall(call, result)`，`ToolCallAgentView` / `ToolCallAgentPipelineView` 不再内嵌 JSON 解析逻辑。
+
+### UI / 数据层解耦
+
+- **UI 模型类独立包** - 新增 `cn.lineai.model` 下 6 个 UI 层不可变数据类：`ConversationUiModel` / `DiffUiModel` / `ExtensionItemUiModel` / `ExtensionKindUiModel` / `KeepAliveSettings` / `StorageStatsUiModel`，把 `Conversation` / `DiffRecord` / `ExtensionItem` / `ExtensionKind` / `KeepAliveSettings`（数据层原定义）等实体映射为 UI 专用模型，View 层只接收 UI 模型。
+- **`ExtensionActionCallback` 回调接口** - 新增 `cn.lineai.mvp.ExtensionActionCallback`（`onSave` / `onDelete` / `onTest` 等），把扩展详情页的操作从 View 直接调用 Repository 改为回调到 Coordinator，View 不再依赖 Repository。
+- **`DiffLoader` 接口** - 新增 `cn.lineai.ui.component.toolcall.DiffLoader`（`loadDiff(diffId) -> DiffRecord`），由 Controller/Assembler 实现，注入到 `ToolCallWriteView`，View 层不再直接持有 `DiffRepository`。
+- **`CardViewHelper` 圆角卡片工具** - 新增 `cn.lineai.ui.component.CardViewHelper`，统一封装"圆角背景 + padding + 标题 + 描述"组合，被多个 Screen 复用，删除 `ExtensionDetailScreenView` 等页面内重复的卡片段。
+- **`StringUtils` 字符串工具** - 新增 `cn.lineai.util.StringUtils`，提供空值 / 截断 / 路径安全 / 字符计数等纯函数，被多个 Repository 复用。
+- **`SkillFrontmatterParser` + `SkillFileManager` + `SkillPromptBuilder`** - 把 `SkillRepository` 中"读 frontmatter + 文件管理 + prompt 拼装"三段混在一起的代码拆为 3 个独立类：`SkillFrontmatterParser` 解析 YAML frontmatter（`SkillPromptBuilder` 装配系统提示词、`SkillFileManager` 负责文件 IO + 缓存）。`SkillRepository` 内部行数从 665 减少到 ~50，只剩数据库 CRUD。
+- **`ModelRepository` SQLite 迁移** - 新增 `cn.lineai.data.repository.ModelRepository implements ModelStore`：`ensureModelConfigColumns` 自检并补齐 `model_configs` 表列；`migrateLegacyPreferencesIfNeeded` 检测 `linecode_models` SharedPreferences 中的 `sqlite_migrated` 标记，未迁移时把 `KEY_MODELS` JSON 数组和 `KEY_SELECTED_ID` 一次性导入 SQLite；之后 `getModels` / `getModel` / `save` / `deleteModels` / `setSelectedModelId` / `getSelectedModel` / `clearAll` 全部走 SQLite（`ORDER BY selected DESC, updated_at DESC`）。
+- **`ToolSettingsScreenView` 默认模式硬编码修复** - 之前默认执行模式硬编码为 `null`，改为从 `ToolSettingsRepository.getDefaultExecutionMode()` 读取，避免初次安装后界面显示空白。
+- **`ComposerView` 等视图成员变量可修改** - `ComposerView` / `DrawerView` / `KeepAliveSettingsScreenView` 等视图的成员变量从 `final` 改为非 `final`，便于子类扩展与运行时切换。
+
+### Agent 能力增强
+
+- **`ModelProtocol` 默认方法** - `ModelProtocol` 接口新增 `supportsNativeTools()` / `supportsContextCompaction()` / `supportsImageGeneration()` / `supportsImageUnderstanding()` 4 个 `default` 方法返回 `true`；`AnthropicMessagesProtocol` / `CodexResponsesProtocol` / `LocalGgufProtocol` / `OpenAiCompatibleProtocol` 按需覆写其中部分为 `false`，调用方代码从 `if (protocol instanceof ...)` 改为 `if (!protocol.supportsXxx())`。
+- **`ReasoningRequestStrategy` 推理策略** - 新增 `cn.lineai.ai.protocol.ReasoningRequestStrategy` 接口（`matches(baseUrl, modelId)` + `apply(JSONObject body, ReasoningRequestContext context)`）与 `ReasoningStrategyRegistry`（按顺序注册、按 `matches` 找到第一个命中的策略）。`OpenAiCompatibleProtocol` 把原来硬编码的 `if (url.contains("deepseek"))` 等分支改为遍历 registry；新增 `DefaultReasoningStrategy`（`matches` 始终返回 `true` 兜底）/ `DeepseekReasoningStrategy` / `DashscopeReasoningStrategy` / `MoonshotReasoningStrategy` / `MinimaxReasoningStrategy` 5 个实现。
+- **多厂商推理支持** - 实现了 `DeepseekReasoningStrategy`（`baseUrl` 命中 `deepseek` 时在请求体加 `reasoning_effort` 字段）、`DashscopeReasoningStrategy`（`baseUrl` 命中 `dashscope.aliyuncs` 时加 `enable_thinking` + `thinking_budget`）、`MoonshotReasoningStrategy`（`baseUrl` 命中 `moonshot` 时加 `reasoning_content` 字段）等。`ReasoningRequestContext` 携带 `enabled` / `effort` / `preserveReasoning` / `baseUrl` / `modelId` / `thinkingBudget` 全部上下文，避免在每个策略里重新拼装。
+- **Web 搜索多提供商** - 新增 `cn.lineai.tool.builtin.WebSearchProvider` 接口（`providerId` + `buildRequest` + `normalizeResults`）+ `WebSearchProviderRegistry`（注册 + 按 `providerId` 取出）；实现 `BingSearchProvider` / `BraveSearchProvider` / `SerpApiSearchProvider` / `TavilySearchProvider` / `DefaultSearchProvider` / `QueryCountSearchProvider` 6 个。`WebSearchService` 原本 160+ 行 `if (provider.equals(...))` 重构为注册表查找 + 通用 `HttpRequest` 调度；`SearchRequest` 与 `SearchResultItem` 数据类明确请求/响应契约。
+- **扩展管理策略模式** - 新增 `cn.lineai.mvp.ExtensionKindDescriptor` 抽象接口 + `ExtensionKindRegistry` 注册表 + `AgentKindDescriptor` / `McpKindDescriptor` / `LinecodeKindDescriptor` / `SkillsKindDescriptor` 4 个实现。`ExtensionManagementController` / `ExtensionDetailScreenView` 把 `if (kind == AGENT) ... else if (kind == MCP) ...` 链条改为遍历注册表 + `descriptor.canHandle(item)` 分发，新增扩展类型只需注册 descriptor，不再动业务代码。
+- **Agent 角色提示词模板** - `assets/prompts/` 新增 5 个 Agent 模板：`agent-role-coding-local.txt` / `agent-role-coding-remote.txt`（编程型 Agent 区分本地/远端 shell 模式）、`agent-role-explore-local.txt` / `agent-role-explore-remote.txt`（探索型 Agent 同样区分）、`agent-system-prompt-template.txt`（系统提示词主模板，含 `{{ROLE_PROMPT}}` / `{{TASK_DESCRIPTION}}` / `{{WORKSPACE_CONTEXT}}` / `{{SCOPE_CONTEXT}}` / `{{EXTENSIONS_CONTEXT}}` / `{{TOOLS_CONTEXT}}` 占位符）。`PromptTemplateRepository` 新增 `getTemplateText(id)` 读取方法。
+- **流式渲染独立控制器** - 新增 `cn.lineai.mvp.StreamingRenderController` 把流式渲染的缓冲 / 调度 / 状态机从 `GenerationFlowController` 拆出来，便于针对 streaming 路径做单元测试与扩展。
+
+### 工具系统增强
+
+- **`BaseTool.NAME` 常量** - 25 个内置工具（`FileReadTool` / `FileWriteTool` / `FileEditTool` / `FileDeleteTool` / `GlobTool` / `ListDirectoryTool` / `HttpServerTool` / `ImageGenerationTool` / `ImageUnderstandingTool` / `ImageResponseParser` / `PhoneClickTool` / `PhoneClickViewTool` / `PhoneLongPressTool` / `PhoneSwipeTool` / `PhoneGlobalActionTool` / `PhoneScreenshotTool` / `PhoneViewHierarchyTool` / `ShellExecuteTool` / `WebFetchTool` / `WebSearchTool` / `TodoUpdateTool` / `AgentTool` / `AgentPipelineTool` / `CustomAgentExtensionTool` / `CustomMcpHttpTool`）全部添加 `public static final String NAME` 常量；`ToolCategory.isReadType` / `isWriteType` / `isDeleteType` / `isHttpType` / `isShellType` / `isAgentType` / `isAgentPipelineType` / `isTodoType` / `isImageGenerationType` / `isImageUnderstandingType` / `isPhoneControlTool` 全部从硬编码字符串改为引用常量。所有工具 `getName()` 返回 `NAME`，避免工具重命名时漏改一处。
+- **`BaseTool` 扩展方法** - `requiresConfirmation` 标记 `@Deprecated`，新增 `needsConfirmation()`（`default false`）和 `isAllowedInReadonlyMode()`（`default false`）分别表达"是否需要用户确认"和"在只读模式下是否允许执行"；新增 `promptSupplement(String executionMode, boolean isSsh)`（`default null`）允许工具按执行模式与 SSH 标识补充提示文本，例如 `ImageUnderstandingTool` 在 SSH 模式下提示"通过 SFTP 读取 SSH 工作区图片"。
+- **`ToolResult` 快捷工厂** - 新增 `static success(output)` / `error(error)` / `withReview(output, toolCallId, toolName, diffId, reviewState, reviewMessage)` 三个工厂方法，4 个旧构造器标记 `@Deprecated`，调用方从 `new ToolResult("", "", msg, true)` 简化为 `ToolResult.error(msg)`。
+- **`ToolContext` 依赖注入扩展** - 新增 `ToolSettingsStore` / `ModelStore` / `SshFileTreeStore` / `ModelProtocolFactory` / `ModelClient` / `PromptTemplateRepository` 6 个可选依赖字段 + 4 个新构造器重载；`ToolExecutor` 在执行工具前调用 `needsInjection` 检查并 `injectDependencies` 把 Executor 持有的依赖注入到 `ToolContext`，工具不再需要在自己的 `execute` 里 `new ModelRepository(context)`。
+- **`ToolExecutor` 8 参数构造器** - 新增 `ToolExecutor(registry, settingsRepository, diffRepository, modelRepository, sshFileTreeRepository, modelProtocolFactory, modelClient, promptTemplateRepository)` 全量依赖构造器；`MainDependencies` 改为调用 8 参数版，把整套依赖一次注入。
+- **`ToolRegistry.getCachedDisplayCategory`** - 新增 `getCachedDisplayCategory(name)` 内部缓存 `Map<String, ToolDisplayCategory>`，避免每次 `getDisplayCategory` 都重新计算；启动期一次性 `preload` 全部内置工具。
+- **图片生成工具依赖注入修复** - `ImageGenerationTool` 之前在自己构造时 `new` 一堆 repository，`dc6d82e` 改为从 `ToolContext` 取 `toolSettingsStore` / `modelRepository` / `modelProtocolFactory` / `modelClient` / `sshFileTreeRepository`，与 `ImageUnderstandingTool` 对齐；`ImageUnderstandingTool` 同步从 `Context` 构造改为 `ToolContext` 注入，并新增 `promptSupplement` 在 SSH 模式返回 "SFTP 读取图片" 提示。
+- **`WebSearchTool` 环境提示** - `WebSearchTool.getDescription` 末尾追加"环境补充：搜索结果中给出的 URL 必须在 `web_fetch` 之前先用 `UrlPolicy` 校验"提示，提醒模型筛选可用 URL。
+- **部分工具 readonly / confirmation 标识** - `FileReadTool` / `ListDirectoryTool` 标记 `isAllowedInReadonlyMode = true`（只读模式下仍允许执行）；`FileWriteTool` / `FileEditTool` / `FileDeleteTool` / `ShellExecuteTool` / `WebSearchTool` 等写操作工具标记 `needsConfirmation` 走原 `requiresConfirmation` 路径；`ImageGenerationTool` / `ImageUnderstandingTool` 标记 `needsConfirmation` 由用户在工具设置里决定。
+- **`ImageGenerationTool` 协议工厂修复** - 之前 `ImageGenerationTool` 缺少 `modelProtocolFactory` 注入导致 `create(model.getProtocolType())` NPE，`dc6d82e` 注入后由 `ImageResponseParser` 统一解析图片 URL/Base64。
+- **`HostBase` 抽象宿主** - 新增 `cn.lineai.mvp.HostBase implements CoordinatorHost`，把 `MainCoordinator` 公共方法（`basename` / `parentPath` / `projectPath` / `projectLabel` / `isSshExecutionMode` / `isTerminalProviderExecutionMode` / `showNotice` / `isViewAttached` / `viewHideOverlays` / `viewShowScreen` / `viewShowChatScreen` / `refreshVisibleScreen` / `returnToScreen`）抽到 `HostBase`，各 Controller 改为 `extends HostBase` 减少样板代码。
+- **`ErrorLogController` / `PhoneControlController`** - 新增两个轻量 Controller，把 `ErrorLogRepository` / `PhoneControlRepository` 暴露给 `MainCoordinator`；`ErrorLogController` 提供 `list()` / `clear()`；`PhoneControlController` 提供 `isAccessibilityEnabled` / `isDisclaimerAccepted` / `isPermissionEnabled` / `setPermissionEnabled` / `setDisclaimerAccepted`。
+- **`ToolCallTextParser` 健壮性** - 内部实现对工具调用文本解析失败时返回空数组而非抛异常；`ToolPromptRenderer` 路径从 `data/repository` 移到 `ai/prompt`，与 `SystemPromptProvider` 同包。
+
+### 视图组件优化
+
+- **`ChatMessageListView` 缓存复用重构** - 移除 `canReturnCachedView` 与 `bindCachedView` 两个内部方法，引入通用 `obtain(Class<T> type, String key, T created)` 工具：先查 `rowCache.get(key)`，类型匹配且 `getParent() == null` 则复用，否则用 `created` 替换并 `putCache`；`putCache` 顺手清理旧 view 的 `tag`。模型切换通知的缓存命中后不再调用 `bind`，直接复用 `convertView`。
+- **`UserMessageView` / `AssistantMessageView` 复用判断** - `getView` 中先判断 `convertView` 是否同类型实例（`UserMessageView` / `AssistantMessageView`），同类型直接 `setXxxListener` + `bind` 复用；不同类型才走 `obtain` 路径，避免每条消息都 `new` 视图实例触发 `setToolReviewListener` / `setProjectPath` 副作用。
+- **`MainChatView` 长按多选入口** - `listView.setOnItemLongClickListener` 把 `position` 透传给 `MultiSelectListener`，触发 `showMultiSelectDialog`。
+- **`MarkdownTextBlockView` 触摸事件修复** - 删除原 `setTextIsSelectable(true)`，通过注释明确"会偷走兄弟按钮的触摸事件，改由 `TextSelectionDialog` 弹可选择 EditText"。
+- **`ComposerView` 多选发送队列渲染** - `render(ChatUiState state)` 中检测 `wasStreamingBefore && !streaming && !pendingQueue.isEmpty()` 时 `post(sendPending)` 自动续发；`input.setEnabled(true)` 允许在流式期间继续输入；`attachButton` 仍按 `streaming` 灰化。
+- **`UserMessageView` 引用块** - 新增 `quoteBlockView`（圆角深色 + 左侧 3dp `LineTheme.ACCENT` 竖线 + 最多 3 行省略的斜体引用文本）作为 `contentText` 之上的子视图，宽度限制与主气泡一致；空引用时 `setVisibility(GONE)` 隐藏。
+- **`ChatMessageListView` 多选模式滚动条控制** - `updateScrollToBottomVisibility` 在 `multiSelectMode` 开启时强制隐藏"滚动到底部"按钮，避免遮挡底部操作条；`programmaticScroll` 标志在 `smoothScrollBy` 期间抑制"用户主动滚动"判断，避免流式跟随后误关闭 `followTailEnabled`。
+- **`IconButtonView` 新增 4 个图标** - `SHARE` (80) / `QUOTE` (81) / `TEXT_CURSOR` (82) / `CHECK_SQUARE` (83)，对应 `ic_lucide_share_2` / `ic_lucide_quote` / `ic_lucide_text_cursor` / `ic_lucide_check_square` 4 个矢量图。
+- **`MainChatView` 合并转发/AI 取名 UI** - 自定义圆角卡片布局：深色 `0xFF2A2A3E` 圆角 18 卡片 + "后缀自动添加: .pdf" 灰色提示 + `EditText` 圆角描边输入框（自动 selectAll + `inputType=text`）+ 紫色 `0xFF5B4FCF` 圆角 14 "AI 取名" 胶囊按钮。
+
+### 许可证与构建优化
+
+- **许可证资源打包方式重构** - 移除 `app/src/main/resources/META-INF/LICENSE`（674 行）与 `app/build.gradle.kts` 中 `META-INF/resources/META-INF/LICENSE` 的 `assets` 注入配置；新增 `app/build.gradle.kts` 自定义 `generateLicenseCopy` 任务，把仓库根 `LICENSE` 文件自动复制到 `app/build/generated/assets/license/LICENSE`，由 `processReleaseResources` / `processDebugResources` 作为额外 `inputs.file` 包含；统一许可证加载来源到根目录文件。
+- **移除冗余 COPYING 文件** - 删除仓库根 `COPYING` 副本；同步更新中英文 `README.md` / `README_CN.md` 中对 `COPYING` 的引用，统一指向根目录 `LICENSE` 作为唯一许可证来源。
+
+### 国际化与多语言
+
+- **新增 11 条字符串** - `values/strings.xml` 与 `values-zh/strings.xml` 同步添加：`message_action_quote_desc`（引用消息）/ `message_action_share_desc`（分享消息）/ `message_action_select_desc`（选中文字）/ `message_action_multi_select_desc`（多选）/ `dialog_export_format_title`（导出格式）/ `dialog_select_text_title`（长按选中文字）/ `quote_preview_label`（引用）/ `export_button_label`（导出）/ `toast_clipboard_large`（内容较长，仅部分可能被复制）。
+- **安全设置页文案** - `settings_row_security_allow_any_http_title` / `settings_row_security_allow_any_http_desc` / `screen_security_title` / `screen_security_section_http` / `screen_security_section_browser` 5 条新字符串。
+
+### 兼容性
+
+- **数据库迁移** - `LineCodeSchema` 表结构未变，仅在 `LineCodeDatabase.onOpen` 启动期增加 `integrity_check(1)` 自检与 `maybeRestoreFromBackup` 恢复，旧数据库直接打开不会丢失数据。
+- **旧 `ToolSettingsRepository` API 兼容** - 旧调用方通过 `@Deprecated` 构造器仍可工作，新代码改用 `MainDependencies` 注入的 `ToolSettingsStore` 接口。
+- **`ModelConfig` 旧构造器兼容** - 3 个旧 `@Deprecated` 构造器（`ModelConfig(id, name, protocolType, ..., modelId)` 等）保留可用；新代码使用 `ModelConfig.builder(...).toolCallLimit(...).compressionModelEnabled(...).build()` 链式构造。
+
+### 版本
+
+- 版本号升级到 `1.1.9`
+- `versionCode` 升级到 `22`
+- `minSdk` 升级到 `26`
+
+### 测试
+
+- 新增 `QuoteControllerTest`（94 行）覆盖 `setQuoteStoresText` / `composeWithQuotePrefixesQuote` / `composeWithQuoteClearsAfterSend` / `composeWithoutQuoteReturnsInputUnchanged` / `clearQuoteRemovesQuote` / `setQuoteNotifiesPreview` / `clearQuoteHidesPreview` / `longQuoteIsTruncatedInPreview` 等用例
+- 新增 `ChatMessagesTest`（41 行）覆盖 `toPlainText` / `toMarkdown` / `wrapText` 三种格式的转换与换行
+- 新增 `ExportFormatResolverTest`（49 行）覆盖默认注册顺序 / `register` 扩展 / `get` / `size` / `getDisplayNames` 行为
+- 新增 `ExportResultTest`（32 行）覆盖 `forFile` / `forClipboard` / `forShareText` 三种 action 的字段填充
+- 扩展 `AgentExecutionControllerTest`（+52 行）覆盖 `dc6d82e` 引入的 `isAllowedInReadonlyMode` / `needsConfirmation` / `promptSupplement(executionMode, isSsh)` 三组新方法
+- `SlashCommandCatalogTest` 之前用例保持通过
+- 已验证 `./gradlew :app:testDebugUnitTest` / `./gradlew :app:lintDebug` / `./gradlew :app:assembleDebug` / `./gradlew :app:assembleDebugUserCert`
+
+---
+
 ## v1.1.8
 
 ### 聊天输入框斜杠命令

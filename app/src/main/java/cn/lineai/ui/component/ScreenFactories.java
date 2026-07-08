@@ -809,11 +809,6 @@ public final class ScreenFactories {
                 }
 
                 @Override
-                public void onBatchImport() {
-                    view.showBatchImportDialog(controller);
-                }
-
-                @Override
                 public void onSelectModel(String id) {
                     controller.onModelSelected(id);
                 }
@@ -851,10 +846,6 @@ public final class ScreenFactories {
                 }
 
                 @Override
-                public void onBatchImport() {
-                }
-
-                @Override
                 public void onSelectModel(String id) {
                     controller.onImageUnderstandingModelSelected(id);
                 }
@@ -887,10 +878,6 @@ public final class ScreenFactories {
 
                 @Override
                 public void onAddModel() {
-                }
-
-                @Override
-                public void onBatchImport() {
                 }
 
                 @Override

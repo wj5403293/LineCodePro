@@ -20,8 +20,6 @@ final class OverlayActionController {
         void exportCurrentChat();
 
         void enterMessageSelectMode();
-
-        void showTextSelectionTest();
     }
 
     private final Context context;
@@ -93,7 +91,6 @@ final class OverlayActionController {
         options.add(new SheetOption("select_export", "选择消息导出", "多选消息后合并导出/分享", false));
         options.add(new SheetOption("compact", "压缩上下文", "将早期上下文总结为隐藏摘要", false));
         options.add(new SheetOption("clear", "清空对话", "清空当前对话消息", false));
-        options.add(new SheetOption("test_select", "⚙ 文本选中测试", "测试哪种TextView能选中", false));
         host.showSheet("更多", options);
     }
 
@@ -137,8 +134,6 @@ final class OverlayActionController {
             host.exportCurrentChat();
         } else if ("select_export".equals(id)) {
             host.enterMessageSelectMode();
-        } else if ("test_select".equals(id)) {
-            host.showTextSelectionTest();
         }
         if (!"settings".equals(id) && !"tutorial".equals(id)) {
             host.hideOverlays();

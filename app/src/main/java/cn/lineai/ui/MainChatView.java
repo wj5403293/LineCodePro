@@ -600,6 +600,20 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     }
 
     @Override
+    public void exportCurrentChat() {
+        if (lastState == null || lastState.getMessages().isEmpty()) {
+            Toast.makeText(getContext(), "当前没有对话内容", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        shareController.showFormatPicker(getContext(), lastState.getMessages());
+    }
+
+    @Override
+    public void enterMessageSelectMode() {
+        exportCurrentChat();
+    }
+
+    @Override
     public void showScreen(String screenId) {
         showScreen(screenId, true);
     }

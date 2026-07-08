@@ -23,6 +23,4 @@ public interface OverlayView {
     void exportCurrentChat();
 
     void enterMessageSelectMode();
-
-    void showTextSelectionTest();
 }

@@ -1700,6 +1700,20 @@ public final class MainCoordinator extends MainCoordinatorDelegates {
         public void render() {
             MainCoordinator.this.render();
         }
+
+        @Override
+        public void exportCurrentChat() {
+            if (view != null) {
+                view.exportCurrentChat();
+            }
+        }
+
+        @Override
+        public void enterMessageSelectMode() {
+            if (view != null) {
+                view.enterMessageSelectMode();
+            }
+        }
     }
 
     private class AttachmentPickerHost implements AttachmentPickerCoordinator.Host {

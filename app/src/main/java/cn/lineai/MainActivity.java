@@ -66,6 +66,14 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     }
 
     @Override
+    protected void onPause() {
+        if (presenter != null) {
+            presenter.onEnterBackground();
+        }
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
         unregisterBackCallback();
         presenter.destroy();

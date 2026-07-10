@@ -18,6 +18,7 @@ import cn.lineai.ai.protocol.reasoning.MinimaxReasoningStrategy;
 import cn.lineai.ai.protocol.reasoning.MoonshotReasoningStrategy;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolRegistry;
+import cn.lineai.util.StringUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -116,7 +117,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
                 }
                 JSONObject event = new JSONObject(data);
                 if (event.has("error")) {
-                    throw new ModelCompletionException("OpenAI 流式错误: " + event.opt("error"));
+                    throw new ModelCompletionException("OpenAI 流式错误: " + describeError(event.opt("error")));
                 }
                 JSONArray choices = event.optJSONArray("choices");
                 if (choices == null || choices.length() == 0) {
@@ -374,5 +375,29 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
         JSONObject body = new JSONObject();
         applyReasoningRequest(config, body, options == null ? ModelRequestOptions.defaults() : options);
         return body;
+    }
+
+    /**
+     * 把 SSE 错误字段可读地转为文本。{@code error} 可能是字符串或 JSON 对象：
+     * 对象时直接 {@code JSONObject.toString()} 会把中文转义成 {@code \\uXXXX}，
+     * 因此优先读取 {@code message}/{@code type} 字段，最后统一做一次 Unicode 转义解码。
+     */
+    private static String describeError(Object error) {
+        if (error == null) {
+            return "";
+        }
+        if (error instanceof JSONObject) {
+            JSONObject obj = (JSONObject) error;
+            String message = obj.optString("message");
+            if (message != null && message.length() > 0) {
+                return StringUtils.decodeUnicodeEscapes(message);
+            }
+            String type = obj.optString("type");
+            if (type != null && type.length() > 0) {
+                return StringUtils.decodeUnicodeEscapes(type);
+            }
+            return StringUtils.decodeUnicodeEscapes(obj.optString("code"));
+        }
+        return StringUtils.decodeUnicodeEscapes(error.toString());
     }
 }

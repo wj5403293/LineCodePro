@@ -27,6 +27,7 @@ import cn.lineai.tool.ToolExecutionCoordinator;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.tool.builtin.ShellExecuteTool;
+import cn.lineai.util.StringUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -916,6 +917,7 @@ final class GenerationFlowController {
     }
 
     private void failGeneration(int generationId, String assistantId, String text) {
+        final String displayText = StringUtils.decodeUnicodeEscapes(text);
         mainThread.post(() -> {
             streamingRenderController.flush();
             if (!chatSessionStore.isActiveGeneration(generationId)) {
@@ -924,9 +926,9 @@ final class GenerationFlowController {
             int index = findMessageIndex(assistantId);
             if (index >= 0) {
                 ChatMessage message = messages.get(index);
-                messages.set(index, message.withContent(text, message.getReasoningContent(), false));
+                messages.set(index, message.withContent(displayText, message.getReasoningContent(), false));
             } else {
-                messages.add(new ChatMessage(host.nextId(), ChatMessage.Role.ASSISTANT, text, false));
+                messages.add(new ChatMessage(host.nextId(), ChatMessage.Role.ASSISTANT, displayText, false));
             }
             streamingRenderController.removeRawText(assistantId);
             finishActiveGeneration();
@@ -1103,11 +1105,11 @@ final class GenerationFlowController {
         }
         String message = error.getMessage();
         if (message != null && message.trim().length() > 0) {
-            return message.trim();
+            return StringUtils.decodeUnicodeEscapes(message.trim());
         }
         Throwable cause = error.getCause();
         if (cause != null && cause.getMessage() != null && cause.getMessage().trim().length() > 0) {
-            return cause.getMessage().trim();
+            return StringUtils.decodeUnicodeEscapes(cause.getMessage().trim());
         }
         String name = error.getClass().getSimpleName();
         return name.length() == 0 ? "未知错误" : name;

@@ -587,6 +587,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         bottomSheetView.close();
         directoryPickerSheetView.close();
         attachmentPickerSheetView.close();
+        composerView.dismissSlashPopup();
     }
 
     @Override

@@ -770,7 +770,7 @@ public final class ComposerView extends LinearLayout implements QuoteController.
         slashPopup.showAtAnchor(this);
     }
 
-    private void dismissSlashPopup() {
+    public void dismissSlashPopup() {
         if (slashPopup != null) {
             slashPopup.dismiss();
         }

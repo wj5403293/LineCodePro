@@ -620,4 +620,9 @@ abstract class MainCoordinatorDelegates implements MainUiController {
             delegateRender();
         }
     }
+
+    @Override
+    public void onEnterBackground() {
+        delegateView().hideOverlays();
+    }
 }

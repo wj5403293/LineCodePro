@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Set;
 
 public final class ChatMessageListView extends FrameLayout {
+    private static final int MULTI_SELECT_BAR_EXTRA_PADDING = 64;
+
     private final ListView listView;
     private final MessageAdapter adapter;
     private final IconButtonView scrollToBottomButton;
@@ -87,6 +89,16 @@ public final class ChatMessageListView extends FrameLayout {
         addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
                 post(this::updateScrollToBottomVisibility));
         buildMultiSelectBar();
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            if (!multiSelectMode) {
+                return;
+            }
+            Object item = adapter.getItem(position);
+            if (item instanceof ChatMessage) {
+                toggleSelection(((ChatMessage) item).getId());
+            }
+        });
 
         listView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -154,6 +166,8 @@ public final class ChatMessageListView extends FrameLayout {
         } else {
             selectedMessageIds.add(messageId);
         }
+        adapter.multiSelectMode = true;
+        adapter.selectedMessageIds = selectedMessageIds;
         updateMultiSelectCount();
         adapter.notifyDataSetChanged();
     }
@@ -161,9 +175,13 @@ public final class ChatMessageListView extends FrameLayout {
     public void enterMultiSelectMode() {
         multiSelectMode = true;
         selectedMessageIds.clear();
+        adapter.multiSelectMode = true;
+        adapter.selectedMessageIds = selectedMessageIds;
         if (multiSelectBar != null) {
             multiSelectBar.setVisibility(VISIBLE);
         }
+        listView.setPadding(0, LineTheme.dp(getContext(), LineTheme.SM), 0,
+                LineTheme.dp(getContext(), LineTheme.SM) + MULTI_SELECT_BAR_EXTRA_PADDING);
         updateMultiSelectCount();
         updateScrollToBottomVisibility();
         invalidate();
@@ -174,9 +192,13 @@ public final class ChatMessageListView extends FrameLayout {
     public void exitMultiSelectMode() {
         multiSelectMode = false;
         selectedMessageIds.clear();
+        adapter.multiSelectMode = false;
+        adapter.selectedMessageIds = java.util.Collections.emptySet();
         if (multiSelectBar != null) {
             multiSelectBar.setVisibility(GONE);
         }
+        listView.setPadding(0, LineTheme.dp(getContext(), LineTheme.SM), 0,
+                LineTheme.dp(getContext(), LineTheme.SM));
         updateMultiSelectCount();
         updateScrollToBottomVisibility();
         invalidate();
@@ -376,6 +398,8 @@ public final class ChatMessageListView extends FrameLayout {
         private boolean thinkingAutoExpand;
         private boolean thinkingScroll;
         private boolean codeWrapEnabled;
+        private boolean multiSelectMode;
+        private Set<String> selectedMessageIds = java.util.Collections.emptySet();
         private String conversationId = "";
         private String projectPath = "";
         private ToolReviewListener toolReviewListener;
@@ -517,6 +541,7 @@ public final class ChatMessageListView extends FrameLayout {
                     UserMessageView view = (UserMessageView) convertView;
                     view.setMessageActionListener(messageActionListener);
                     view.bind(message);
+                    applyMultiSelectStyle(view, message);
                     return view;
                 }
                 if (!isUser && convertView instanceof AssistantMessageView) {
@@ -526,6 +551,7 @@ public final class ChatMessageListView extends FrameLayout {
                     view.setMessageActionListener(messageActionListener);
                     view.setProjectPath(projectPath);
                     view.bind(message, thinkingAutoExpand, thinkingScroll, codeWrapEnabled);
+                    applyMultiSelectStyle(view, message);
                     return view;
                 }
             }
@@ -534,6 +560,7 @@ public final class ChatMessageListView extends FrameLayout {
                 UserMessageView view = obtain(UserMessageView.class, cacheKey, new UserMessageView(context));
                 view.setMessageActionListener(messageActionListener);
                 view.bind(message);
+                applyMultiSelectStyle(view, message);
                 return view;
             }
             AssistantMessageView view = obtain(AssistantMessageView.class, cacheKey, new AssistantMessageView(context));
@@ -542,7 +569,25 @@ public final class ChatMessageListView extends FrameLayout {
             view.setMessageActionListener(messageActionListener);
             view.setProjectPath(projectPath);
             view.bind(message, thinkingAutoExpand, thinkingScroll, codeWrapEnabled);
+            applyMultiSelectStyle(view, message);
             return view;
+        }
+
+        private void applyMultiSelectStyle(View view, ChatMessage message) {
+            if (message == null || message.getId() == null) {
+                view.setBackground(null);
+                view.setPadding(0, 0, 0, 0);
+                return;
+            }
+            if (multiSelectMode && selectedMessageIds.contains(message.getId())) {
+                view.setBackground(LineTheme.roundedStroke(
+                        context, LineTheme.ACCENT, 12, LineTheme.ACCENT));
+                view.setPadding(LineTheme.dp(context, 4), LineTheme.dp(context, 4),
+                        LineTheme.dp(context, 4), LineTheme.dp(context, 4));
+            } else {
+                view.setBackground(null);
+                view.setPadding(0, 0, 0, 0);
+            }
         }
 
         void setToolReviewListener(ToolReviewListener listener) {

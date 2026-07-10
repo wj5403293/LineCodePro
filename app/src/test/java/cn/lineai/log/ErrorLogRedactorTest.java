@@ -20,4 +20,23 @@ public final class ErrorLogRedactorTest {
         Assert.assertTrue(redacted.contains("[REDACTED]"));
         Assert.assertTrue(redacted.contains("[BASE64_REDACTED]"));
     }
+
+    @Test
+    public void redactsLargePayloadWithoutOom() {
+        StringBuilder raw = new StringBuilder();
+        raw.append("Authorization: Bearer sk-test-secret\n");
+        raw.append("data:image/png;base64,");
+        for (int i = 0; i < 2_000_000; i++) {
+            raw.append('a');
+        }
+        String input = raw.toString();
+        Assert.assertTrue(input.length() > 1 << 20);
+
+        String redacted = ErrorLogRedactor.redact(input);
+
+        Assert.assertFalse(redacted.contains("sk-test-secret"));
+        Assert.assertTrue(redacted.contains("[REDACTED]"));
+        Assert.assertTrue(redacted.contains("[BASE64_REDACTED]"));
+        Assert.assertTrue(redacted.contains("[REDACTED_TRUNCATED]"));
+    }
 }

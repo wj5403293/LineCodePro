@@ -37,11 +37,12 @@ import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.data.repository.StorageStatsRepository;
 import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
+import cn.lineai.ui.theme.LineTheme;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.log.ErrorLogRepository;
 import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.ipc.IpcProviderScanner;
-import cn.lineai.model.ModelRepository;
+import cn.lineai.data.repository.ModelRepository;
 import cn.lineai.model.ModelStore;
 import cn.lineai.share.ExportFormatResolver;
 import cn.lineai.ssh.SshService;
@@ -111,7 +112,7 @@ public final class MainDependencies {
     public final QuoteController quoteController;
 
     public MainDependencies(Context context) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         modelRepository = new ModelRepository(context);
         aiBehaviorSettingsRepository = new AiBehaviorSettingsRepository(context);
         chatModeRepository = new ChatModeRepository(context);
@@ -120,7 +121,7 @@ public final class MainDependencies {
         cn.lineai.security.UrlPolicy.setRelaxedHttpEnabled(outputSettingsRepository.get().isAllowAnyHttp());
         themeSettingsRepository = new ThemeSettingsRepository(context);
         promptTemplateRepository = new PromptTemplateRepository(context);
-        themeSettingsRepository.applyCurrentTheme();
+        LineTheme.apply(themeSettingsRepository.resolveCurrentPalette());
         conversationRepository = new ConversationRepository(context);
         projectRepository = new ProjectRepository(context);
         learningContextRepository = new LearningContextRepository(context);
@@ -148,8 +149,8 @@ public final class MainDependencies {
         toolCallViewFactoryRegistry = createToolCallViewFactoryRegistry();
         cn.lineai.ui.component.toolcall.ToolCallViewFactoryRegistry.setDefault(toolCallViewFactoryRegistry);
         toolExecutor = new ToolExecutor(toolRegistry, toolSettingsRepository, diffRepository,
-                (ModelStore) modelRepository, sshFileTreeRepository, new cn.lineai.ai.protocol.ModelProtocolFactory(),
-                modelClient, promptTemplateRepository);
+                (ModelStore) modelRepository, sshFileTreeRepository, new cn.lineai.ai.DefaultModelServiceProvider(),
+                promptTemplateRepository);
         toolExecutionCoordinator = new ToolExecutionCoordinator(toolRegistry);
         systemPromptProvider = new SystemPromptProvider(context, promptTemplateRepository);
         storagePermissionManager = new StoragePermissionManager(context);

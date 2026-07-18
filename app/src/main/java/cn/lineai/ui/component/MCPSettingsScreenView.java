@@ -102,32 +102,20 @@ public final class MCPSettingsScreenView extends ScreenScaffoldView {
 
     private void addToolCards(LinearLayout content) {
         for (McpToolConfig config : state.getConfigs()) {
-            if (!shouldShow(config)) {
+            if (!config.shouldShowForMode(state.getExecutionMode())) {
                 continue;
             }
-            addToolCard(content, iconFor(config.getId()), config);
+            addToolCard(content, iconFor(config.getIconKey()), config);
         }
     }
 
-    private boolean shouldShow(McpToolConfig config) {
-        if (EXECUTION_LOCAL.equals(state.getExecutionMode())) {
-            return !"shell".equals(config.getId());
-        }
-        return "shell".equals(config.getId())
-                || cn.lineai.tool.builtin.WebSearchTool.NAME.equals(config.getId())
-                || cn.lineai.tool.builtin.ImageUnderstandingTool.NAME.equals(config.getId())
-                || cn.lineai.tool.builtin.ImageGenerationTool.NAME.equals(config.getId())
-                || "todo".equals(config.getId())
-                || cn.lineai.tool.builtin.AgentTool.NAME.equals(config.getId());
-    }
-
-    private int iconFor(String id) {
-        if ("shell".equals(id)) return IconButtonView.TERMINAL;
-        if (cn.lineai.tool.builtin.WebSearchTool.NAME.equals(id)) return IconButtonView.SEARCH;
-        if (cn.lineai.tool.builtin.ImageUnderstandingTool.NAME.equals(id)) return IconButtonView.PAINTBRUSH;
-        if (cn.lineai.tool.builtin.ImageGenerationTool.NAME.equals(id)) return IconButtonView.SPARKLES;
-        if (cn.lineai.tool.builtin.AgentTool.NAME.equals(id)) return IconButtonView.BRAIN;
-        if ("todo".equals(id)) return IconButtonView.SCROLL_TEXT;
+    private static int iconFor(String iconKey) {
+        if ("shell".equals(iconKey)) return IconButtonView.TERMINAL;
+        if ("web_search".equals(iconKey)) return IconButtonView.SEARCH;
+        if ("image_understanding".equals(iconKey)) return IconButtonView.PAINTBRUSH;
+        if ("image_generation".equals(iconKey)) return IconButtonView.SPARKLES;
+        if ("agent".equals(iconKey)) return IconButtonView.BRAIN;
+        if ("todo".equals(iconKey)) return IconButtonView.SCROLL_TEXT;
         return IconButtonView.MCP;
     }
 

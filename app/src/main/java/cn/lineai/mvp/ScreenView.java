@@ -3,6 +3,14 @@ package cn.lineai.mvp;
 public interface ScreenView {
     void showScreen(String screenId);
 
+    default void showScreen(String screenId, boolean forward) {
+        showScreen(screenId);
+    }
+
+    default void showScreen(String screenId, boolean forward, boolean animate) {
+        showScreen(screenId, forward);
+    }
+
     void showChatScreen();
 
     void openExternalUrl(String url);

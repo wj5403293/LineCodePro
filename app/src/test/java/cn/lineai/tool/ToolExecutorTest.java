@@ -4,6 +4,7 @@ import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.McpSettingsState;
 import cn.lineai.model.McpToolConfig;
 import cn.lineai.model.WebSearchConfig;
+import cn.lineai.tool.ToolInfo;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -20,7 +21,7 @@ public final class ToolExecutorTest {
         registry.register(new ThrowingTool());
         ToolExecutor executor = new ToolExecutor(registry, new AllowAllToolSettingsStore());
 
-        ToolResult result = executor.execute(new ToolCall("call_1", "throwing_tool", "{}"), new ToolContext(""));
+        ToolResult result = executor.execute(new ToolCall("call_1", "throwing_tool", "{}"), ToolContext.builder().homePath("").build());
 
         Assert.assertTrue(result.isError());
         Assert.assertTrue(result.getContent().contains("工具执行失败"));
@@ -121,7 +122,7 @@ public final class ToolExecutorTest {
         }
 
         @Override
-        public Set<String> getEnabledToolNames(Collection<BaseTool> implementedTools) {
+        public Set<String> getEnabledToolNames(Collection<ToolInfo> implementedTools) {
             return getEnabledToolNames();
         }
 
@@ -146,7 +147,7 @@ public final class ToolExecutorTest {
         }
 
         @Override
-        public String buildToolPrompt(Collection<BaseTool> implementedTools, boolean nativeToolProtocol) {
+        public String buildToolPrompt(Collection<ToolInfo> implementedTools, boolean nativeToolProtocol) {
             return "";
         }
     }

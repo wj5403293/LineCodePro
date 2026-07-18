@@ -34,7 +34,7 @@ final class StorageMaintenanceController {
             StorageStatsRepository storageStatsRepository,
             Host host
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.messages = messages;
         this.chatSessionStore = chatSessionStore;
         this.conversationRepository = conversationRepository;

@@ -24,8 +24,6 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import cn.lineai.R;
-import cn.lineai.ai.ModelCompletionException;
-import cn.lineai.ai.protocol.ModelCatalogClient;
 import cn.lineai.log.ErrorLog;
 import cn.lineai.log.ErrorLogRedactor;
 import cn.lineai.model.ModelConfig;
@@ -43,6 +41,8 @@ public final class ModelAddScreenView extends LinearLayout {
         void onSave(ModelConfig model);
 
         void onTest(ModelConfig model);
+
+        List<String> onFetchModelCatalog(ModelProtocolType type, String baseUrl, String apiKey) throws Exception;
     }
 
     private final String[] providerLabels = new String[4];
@@ -53,7 +53,7 @@ public final class ModelAddScreenView extends LinearLayout {
     private EditText nameInput;
     private final ModelProviderPreset preset;
     private final ModelConfig editingModel;
-    private final ModelCatalogClient catalogClient = new ModelCatalogClient();
+    private final Listener listener;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ArrayList<String> fetchedModelIds = new ArrayList<>();
     private final ArrayList<String> fetchedCompressionModelIds = new ArrayList<>();
@@ -95,6 +95,7 @@ public final class ModelAddScreenView extends LinearLayout {
 
     public ModelAddScreenView(Context context, ModelProviderPreset preset, boolean local, ModelConfig editingModel, Listener listener) {
         super(context);
+        this.listener = listener;
         this.editingModel = editingModel;
         boolean editing = editingModel != null;
         this.local = local || (editing && editingModel.getProtocolType() == ModelProtocolType.LOCAL_GGUF);
@@ -625,7 +626,8 @@ public final class ModelAddScreenView extends LinearLayout {
         ModelProtocolType type = protocolType[0];
         new Thread(() -> {
             try {
-                List<String> ids = catalogClient.fetch(type, baseUrl, apiKey);
+                List<String> rawIds = listener.onFetchModelCatalog(type, baseUrl, apiKey);
+                final List<String> ids = rawIds != null ? rawIds : java.util.Collections.<String>emptyList();
                 mainHandler.post(() -> {
                     fetchingModels = false;
                     fetchedModelIds.clear();
@@ -637,14 +639,14 @@ public final class ModelAddScreenView extends LinearLayout {
                     }
                     showModelPicker(ids);
                 });
-            } catch (ModelCompletionException e) {
+            } catch (Exception e) {
                 ErrorLog.record("model_catalog", "模型列表查询失败", e,
                         "protocol=" + type + ", baseUrl=" + baseUrl
                                 + ", apiKey=" + ErrorLogRedactor.redact("Authorization=Bearer " + apiKey));
                 mainHandler.post(() -> {
                     fetchingModels = false;
                     updateQueryState();
-                    Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(getContext(), e.getMessage() != null ? e.getMessage() : "查询失败", Toast.LENGTH_LONG).show();
                 });
             }
         }, "linecode-model-catalog").start();
@@ -658,7 +660,8 @@ public final class ModelAddScreenView extends LinearLayout {
         ModelProtocolType type = protocolType[0];
         new Thread(() -> {
             try {
-                List<String> ids = catalogClient.fetch(type, baseUrl, apiKey);
+                List<String> rawIds = listener.onFetchModelCatalog(type, baseUrl, apiKey);
+                final List<String> ids = rawIds != null ? rawIds : java.util.Collections.<String>emptyList();
                 mainHandler.post(() -> {
                     fetchingCompressionModels = false;
                     fetchedCompressionModelIds.clear();
@@ -670,14 +673,14 @@ public final class ModelAddScreenView extends LinearLayout {
                     }
                     showModelPicker(ids, true);
                 });
-            } catch (ModelCompletionException e) {
+            } catch (Exception e) {
                 ErrorLog.record("model_catalog_compression", "压缩模型列表查询失败", e,
                         "protocol=" + type + ", baseUrl=" + baseUrl
                                 + ", apiKey=" + ErrorLogRedactor.redact("Authorization=Bearer " + apiKey));
                 mainHandler.post(() -> {
                     fetchingCompressionModels = false;
                     updateCompressionQueryState();
-                    Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(getContext(), e.getMessage() != null ? e.getMessage() : "查询失败", Toast.LENGTH_LONG).show();
                 });
             }
         }, "linecode-compression-model-catalog").start();

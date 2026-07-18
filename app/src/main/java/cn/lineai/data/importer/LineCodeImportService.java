@@ -5,7 +5,7 @@ import cn.lineai.data.repository.ConversationRecord;
 import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.SettingsRepository;
 import cn.lineai.model.ModelConfig;
-import cn.lineai.model.ModelRepository;
+import cn.lineai.data.repository.ModelRepository;
 import java.io.File;
 import java.util.Map;
 

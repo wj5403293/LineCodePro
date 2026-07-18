@@ -12,6 +12,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.)
+ * and LineCodeAccessibilityService in :app. See PhoneClickTool for full barrier notes.
+ * No direct dependency on cn.lineai.ui.* classes.
+ */
 public final class PhoneClickViewTool extends BaseTool {
     public static final String NAME = "phone_click_view";
     private final Context context;

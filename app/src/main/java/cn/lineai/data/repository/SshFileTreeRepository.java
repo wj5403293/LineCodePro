@@ -13,10 +13,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
-public final class SshFileTreeRepository implements SshFileTreeStore {
-    private static final int MAX_CHILDREN_PER_DIR = 300;
+public final class SshFileTreeRepository extends FileTreeBaseRepository implements SshFileTreeStore {
     private static final int MAX_SFTP_SCAN_ITEMS = 1200;
-    private static final String[] IGNORED_ENTRIES = {".git", "node_modules", ".gradle", "build", "dist"};
 
     private final SshService sshService;
 
@@ -27,7 +25,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     @Override
     public FileTreeNode buildTree(String rootPath, Set<String> expandedPaths) throws Exception {
         return sshService.withSftp(sftp -> {
-            sftp.cd(normalizeSftpDirectory(rootPath));
+            sftp.cd(normalizePath(rootPath));
             String absolutePath = sftp.pwd();
             return buildSftpTreeNode(sftp, absolutePath, true,
                     expandedPaths == null ? Collections.emptySet() : expandedPaths);
@@ -43,7 +41,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     public boolean directoryExists(String directoryPath) throws Exception {
         return sshService.withSftp(sftp -> {
             try {
-                sftp.cd(normalizeSftpDirectory(directoryPath));
+                sftp.cd(normalizePath(directoryPath));
                 return true;
             } catch (SftpException e) {
                 if (e.id == ChannelSftp.SSH_FX_NO_SUCH_FILE) {
@@ -57,7 +55,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     @Override
     public byte[] readFileBytes(String path, long maxBytes) throws Exception {
         return sshService.withSftp(sftp -> {
-            String cleanPath = normalizeSftpPath(path);
+            String cleanPath = normalizePath(path);
             if (sftp.lstat(cleanPath).isDir()) {
                 throw new IllegalStateException("路径是目录，无法读取文件: " + path);
             }
@@ -87,7 +85,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
 
     private FileTreeNode listDirectoryWithSftp(String directoryPath) throws Exception {
         return sshService.withSftp(sftp -> {
-            sftp.cd(normalizeSftpDirectory(directoryPath));
+            sftp.cd(normalizePath(directoryPath));
             String absolutePath = sftp.pwd();
             String name = basename(absolutePath);
             if (name.length() == 0) {
@@ -102,7 +100,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     public void createFile(String parentPath, String name) throws Exception {
         String cleanName = cleanName(name);
         sshService.withSftp(sftp -> {
-            sftp.cd(normalizeSftpDirectory(parentPath));
+            sftp.cd(normalizePath(parentPath));
             if (exists(sftp, cleanName)) {
                 throw new IllegalStateException("文件已存在: " + cleanName);
             }
@@ -115,7 +113,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     public void createDirectory(String parentPath, String name) throws Exception {
         String cleanName = cleanName(name);
         sshService.withSftp(sftp -> {
-            sftp.cd(normalizeSftpDirectory(parentPath));
+            sftp.cd(normalizePath(parentPath));
             if (exists(sftp, cleanName)) {
                 throw new IllegalStateException("目录已存在: " + cleanName);
             }
@@ -133,7 +131,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
             if (exists(sftp, targetPath)) {
                 throw new IllegalStateException("目标已存在: " + cleanName);
             }
-            sftp.rename(normalizeSftpPath(path), normalizeSftpPath(targetPath));
+            sftp.rename(normalizePath(path), normalizePath(targetPath));
             return null;
         }, 30000);
         return targetPath;
@@ -142,7 +140,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
     @Override
     public void delete(String path) throws Exception {
         sshService.withSftp(sftp -> {
-            deleteRecursively(sftp, normalizeSftpPath(path));
+            deleteRecursively(sftp, normalizePath(path));
             return null;
         }, 120000);
     }
@@ -169,7 +167,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
             boolean forceExpanded,
             Set<String> expandedPaths
     ) throws Exception {
-        String cleanPath = normalizeSftpPath(path);
+        String cleanPath = normalizePath(path);
         boolean directory = sftp.lstat(cleanPath).isDir();
         boolean expanded = directory && (forceExpanded || isExpandedPath(expandedPaths, cleanPath));
         ArrayList<FileTreeNode> children = new ArrayList<>();
@@ -189,7 +187,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
             Set<String> expandedPaths
     ) throws Exception {
         ArrayList<ChannelSftp.LsEntry> entries = new ArrayList<>();
-        sftp.ls(normalizeSftpPath(directoryPath), entry -> {
+        sftp.ls(normalizePath(directoryPath), entry -> {
             String name = entry == null ? "" : entry.getFilename();
             if (shouldSkipEntry(name)) {
                 return ChannelSftp.LsEntrySelector.CONTINUE;
@@ -243,35 +241,13 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
         if (expandedPaths == null || expandedPaths.isEmpty()) {
             return false;
         }
-        String cleanPath = normalizeSftpPath(path);
+        String cleanPath = normalizePath(path);
         return expandedPaths.contains(cleanPath) || expandedPaths.contains(path);
-    }
-
-    private void appendLimited(ArrayList<FileTreeNode> target, List<FileTreeNode> source) {
-        for (FileTreeNode node : source) {
-            if (target.size() >= MAX_CHILDREN_PER_DIR) {
-                return;
-            }
-            target.add(node);
-        }
-    }
-
-    private boolean shouldSkipEntry(String name) {
-        String value = name == null ? "" : name;
-        if (value.length() == 0 || ".".equals(value) || "..".equals(value)) {
-            return true;
-        }
-        for (String ignored : IGNORED_ENTRIES) {
-            if (ignored.equals(value)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean exists(ChannelSftp sftp, String path) throws Exception {
         try {
-            sftp.lstat(normalizeSftpPath(path));
+            sftp.lstat(normalizePath(path));
             return true;
         } catch (SftpException e) {
             if (e.id == ChannelSftp.SSH_FX_NO_SUCH_FILE) {
@@ -285,7 +261,7 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
         if (path == null || path.trim().length() == 0 || ".".equals(path.trim()) || "~".equals(path.trim())) {
             throw new IllegalArgumentException("不能删除 SSH 根目录");
         }
-        String cleanPath = normalizeSftpPath(path);
+        String cleanPath = normalizePath(path);
         if (!exists(sftp, cleanPath)) {
             throw new IllegalStateException("路径不存在: " + path);
         }
@@ -307,30 +283,8 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
         sftp.rm(cleanPath);
     }
 
-    private String normalizeSftpDirectory(String path) {
-        String value = path == null ? "" : path.trim();
-        if (value.length() == 0 || "~".equals(value)) {
-            return ".";
-        }
-        if (value.startsWith("~/")) {
-            return "." + value.substring(1);
-        }
-        return value;
-    }
-
-    private String normalizeSftpPath(String path) {
-        String value = path == null ? "" : path.trim();
-        if (value.length() == 0 || "~".equals(value)) {
-            return ".";
-        }
-        if (value.startsWith("~/")) {
-            return "." + value.substring(1);
-        }
-        return value;
-    }
-
     private String joinRemotePath(String parentPath, String name) {
-        String parent = normalizeSftpPath(parentPath);
+        String parent = normalizePath(parentPath);
         String child = name == null ? "" : name;
         while (parent.length() > 1 && parent.endsWith("/")) {
             parent = parent.substring(0, parent.length() - 1);
@@ -342,35 +296,6 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
             return "/" + child;
         }
         return parent + "/" + child;
-    }
-
-    private String cleanName(String name) {
-        String value = name == null ? "" : name.trim();
-        if (value.length() == 0) {
-            throw new IllegalArgumentException("名称不能为空");
-        }
-        if (value.contains("/") || value.contains("\\") || ".".equals(value) || "..".equals(value)) {
-            throw new IllegalArgumentException("名称不能包含路径分隔符");
-        }
-        return value;
-    }
-
-    private String parentPath(String path) {
-        String value = path == null ? "" : path.trim();
-        int index = value.lastIndexOf('/');
-        if (index <= 0) {
-            throw new IllegalArgumentException("无法解析父目录: " + path);
-        }
-        return value.substring(0, index);
-    }
-
-    private String basename(String path) {
-        String value = path == null ? "" : path.trim();
-        while (value.length() > 1 && value.endsWith("/")) {
-            value = value.substring(0, value.length() - 1);
-        }
-        int index = value.lastIndexOf('/');
-        return index >= 0 ? value.substring(index + 1) : value;
     }
 
     private String join(String parentPath, String name) {
@@ -390,10 +315,6 @@ public final class SshFileTreeRepository implements SshFileTreeStore {
             }
         }
         return "";
-    }
-
-    private String shellQuote(String value) {
-        return "'" + (value == null ? "" : value).replace("'", "'\\''") + "'";
     }
 
     private String directoryOrHome(String path) {

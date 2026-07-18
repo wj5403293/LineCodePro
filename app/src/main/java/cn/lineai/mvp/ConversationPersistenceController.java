@@ -39,7 +39,7 @@ final class ConversationPersistenceController {
             LearningContextStore learningContextStore,
             Host host
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.chatSessionStore = chatSessionStore;
         this.messages = messages;
         this.conversationStore = conversationStore;

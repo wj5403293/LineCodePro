@@ -47,6 +47,8 @@ public final class ComposerView extends LinearLayout implements QuoteController.
         void onModelManageClick();
 
         void onAiReasoningEffortChanged(String effort);
+
+        int onQueryModelCount(String baseUrl) throws Exception;
     }
 
     /**
@@ -1128,30 +1130,7 @@ public final class ComposerView extends LinearLayout implements QuoteController.
         queryBtn.setClickable(true);
         queryBtn.setOnClickListener(v -> {
             queryBtn.setText("\u67e5\u8be2\u4e2d...");
-            new Thread(() -> {
-                try {
-                    String url = (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + "models";
-                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
-                    c.setConnectTimeout(8000); c.setReadTimeout(8000);
-                    java.io.InputStream is = c.getInputStream();
-                    java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-                    byte[] buf = new byte[4096]; int n;
-                    while ((n = is.read(buf)) != -1) bos.write(buf, 0, n);
-                    is.close();
-                    org.json.JSONArray data = new org.json.JSONObject(bos.toString("UTF-8")).getJSONArray("data");
-                    post(() -> {
-                        queryBtn.setText("\u2193 " + data.length() + "\u4e2a\u6a21\u578b");
-                        // Rebuild submenu with fetched models
-                        if (modelSubPopup != null) modelSubPopup.dismiss();
-                        if (modelPopup != null) modelPopup.dismiss();
-                        // Save models and refresh
-                        // For now just show toast
-                        android.widget.Toast.makeText(ctx, "\u67e5\u5230 " + data.length() + " \u4e2a\u6a21\u578b\uff0c\u8bf7\u5728\u7ba1\u7406\u6a21\u578b\u4e2d\u5bfc\u5165", android.widget.Toast.LENGTH_SHORT).show();
-                    });
-                } catch (Exception e) {
-                    post(() -> queryBtn.setText("\u67e5\u8be2\u5931\u8d25"));
-                }
-            }).start();
+            queryModelCount(baseUrl, queryBtn, ctx);
         });
         sub.addView(queryBtn, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LineTheme.dp(ctx, 28)));
     
@@ -1189,6 +1168,22 @@ public final class ComposerView extends LinearLayout implements QuoteController.
             subX = loc[0] - subWidth - LineTheme.dp(ctx, 4);
         }
         modelSubPopup.showAtLocation(this, Gravity.NO_GRAVITY, subX, loc[1]);
+    }
+
+    private void queryModelCount(String baseUrl, TextView queryBtn, Context ctx) {
+        new Thread(() -> {
+            try {
+                int count = listener != null ? listener.onQueryModelCount(baseUrl) : 0;
+                post(() -> {
+                    queryBtn.setText("\u2193 " + count + "\u4e2a\u6a21\u578b");
+                    if (modelSubPopup != null) modelSubPopup.dismiss();
+                    if (modelPopup != null) modelPopup.dismiss();
+                    android.widget.Toast.makeText(ctx, "\u67e5\u5230 " + count + " \u4e2a\u6a21\u578b\uff0c\u8bf7\u5728\u7ba1\u7406\u6a21\u578b\u4e2d\u5bfc\u5165", android.widget.Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception e) {
+                post(() -> queryBtn.setText("查询失败"));
+            }
+        }, "linecode-model-query").start();
     }
 
     private LinearLayout modelOptionRow(Context ctx, ModelConfig model, boolean selected) {

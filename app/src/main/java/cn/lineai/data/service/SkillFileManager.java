@@ -3,6 +3,7 @@ package cn.lineai.data.service;
 import android.content.Context;
 import android.net.Uri;
 import cn.lineai.model.SkillRecord;
+import cn.lineai.model.Strings;
 import cn.lineai.workspace.WorkspacePaths;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -518,7 +519,7 @@ public final class SkillFileManager {
     }
 
     private String safe(String value) {
-        return value == null ? "" : value;
+        return Strings.nullToEmpty(value);
     }
 
     private String trim(String value, char ch) {

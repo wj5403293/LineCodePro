@@ -14,7 +14,7 @@ final class GenerationLifecycleController {
     private boolean keepAliveActive;
 
     GenerationLifecycleController(Context context, ArrayList<ChatMessage> messages) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.messages = messages;
     }
 

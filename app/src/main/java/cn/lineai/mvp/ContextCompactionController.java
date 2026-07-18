@@ -70,7 +70,7 @@ final class ContextCompactionController {
             MainThreadDispatcher mainThread,
             Host host
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.messages = messages;
         this.chatSessionStore = chatSessionStore;
         this.modelRepository = modelRepository;

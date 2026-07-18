@@ -3,9 +3,9 @@ package cn.lineai.ai.prompt;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.McpToolConfig;
-import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolCategory;
-import cn.lineai.tool.ToolRegistry;
+import cn.lineai.tool.ToolInfo;
+import cn.lineai.tool.ToolNames;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,7 +17,7 @@ public class ToolPromptRenderer {
     public static String renderToolPrompt(
             List<McpToolConfig> configs,
             Set<String> enabled,
-            Map<String, BaseTool> toolByName,
+            Map<String, ToolInfo> toolByName,
             boolean nativeToolProtocol
     ) {
         return renderToolPrompt(ToolSettingsStore.EXECUTION_LOCAL, configs, enabled, toolByName, nativeToolProtocol);
@@ -27,7 +27,7 @@ public class ToolPromptRenderer {
             String executionMode,
             List<McpToolConfig> configs,
             Set<String> enabled,
-            Map<String, BaseTool> toolByName,
+            Map<String, ToolInfo> toolByName,
             boolean nativeToolProtocol
     ) {
         if (enabled.isEmpty()) {
@@ -57,11 +57,11 @@ public class ToolPromptRenderer {
             }
             builder.append("### ").append(config.getName()).append('\n');
             for (String toolName : tools) {
-                BaseTool tool = toolByName == null ? null : toolByName.get(toolName);
+                ToolInfo tool = toolByName == null ? null : toolByName.get(toolName);
                 builder.append("  - ").append(toolName);
                 if (tool != null) {
                     builder.append(" [").append(categoryLabel(tool.getCategory()));
-                    if (tool.requiresConfirmation()) {
+                    if (tool.needsConfirmation()) {
                         builder.append(", 需要确认");
                     }
                     builder.append("]：").append(tool.getDescription()).append('\n');
@@ -91,7 +91,7 @@ public class ToolPromptRenderer {
             String executionMode,
             List<McpToolConfig> configs,
             Set<String> enabled,
-            Map<String, BaseTool> toolByName,
+            Map<String, ToolInfo> toolByName,
             boolean nativeToolProtocol
     ) {
         boolean isSsh = ToolSettingsStore.EXECUTION_SSH.equals(executionMode);
@@ -127,11 +127,11 @@ public class ToolPromptRenderer {
             }
             builder.append("### ").append(config.getName()).append('\n');
             for (String toolName : tools) {
-                BaseTool tool = toolByName == null ? null : toolByName.get(toolName);
+                ToolInfo tool = toolByName == null ? null : toolByName.get(toolName);
                 builder.append("  - ").append(toolName);
                 if (tool != null) {
                     builder.append(" [").append(categoryLabel(tool.getCategory()));
-                    if (tool.requiresConfirmation()) {
+                    if (tool.needsConfirmation()) {
                         builder.append(", 需要确认");
                     }
                     builder.append("]：").append(tool.getDescription()).append('\n');
@@ -166,11 +166,11 @@ public class ToolPromptRenderer {
             StringBuilder builder,
             Set<String> enabled,
             Set<String> renderedTools,
-            Map<String, BaseTool> toolByName
+            Map<String, ToolInfo> toolByName
     ) {
         ArrayList<String> extensionTools = new ArrayList<>();
         for (String toolName : enabled) {
-            if (!renderedTools.contains(toolName) && ToolRegistry.isExtensionToolName(toolName)) {
+            if (!renderedTools.contains(toolName) && ToolNames.isExtensionToolName(toolName)) {
                 extensionTools.add(toolName);
             }
         }
@@ -180,7 +180,7 @@ public class ToolPromptRenderer {
         }
         builder.append("### 扩展\n");
         for (String toolName : extensionTools) {
-            BaseTool tool = toolByName == null ? null : toolByName.get(toolName);
+            ToolInfo tool = toolByName == null ? null : toolByName.get(toolName);
             builder.append("  - ").append(toolName);
             if (tool != null) {
                 builder.append(" [").append(categoryLabel(tool.getCategory())).append("]：")
@@ -214,13 +214,13 @@ public class ToolPromptRenderer {
             McpToolConfig config,
             String executionMode,
             boolean isSsh,
-            Map<String, BaseTool> toolByName
+            Map<String, ToolInfo> toolByName
     ) {
         if (config == null || toolByName == null || toolByName.isEmpty()) {
             return null;
         }
         for (String toolName : config.getTools()) {
-            BaseTool tool = toolByName.get(toolName);
+            ToolInfo tool = toolByName.get(toolName);
             if (tool != null) {
                 String supplement = tool.promptSupplement(executionMode, isSsh);
                 if (supplement != null) {

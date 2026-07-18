@@ -10,8 +10,6 @@ import cn.lineai.ai.message.AssistantModelMessage;
 import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.ToolModelMessage;
-import cn.lineai.ai.message.UserModelMessage;
-import cn.lineai.ai.prompt.StringTemplate;
 import cn.lineai.ai.protocol.ModelProtocolFactory;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ExtensionRepository;
@@ -19,10 +17,6 @@ import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ToolSettingsRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.AiBehaviorSettings;
-import cn.lineai.model.ExtensionMcpConfig;
-import cn.lineai.model.McpRequestHeader;
-import cn.lineai.model.McpToolConfig;
-import cn.lineai.model.McpToolSummary;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.tool.BaseTool;
@@ -31,6 +25,7 @@ import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolExecutor;
+import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.tool.builtin.AgentTool;
@@ -42,13 +37,10 @@ import cn.lineai.tool.builtin.FileWriteTool;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class AgentExecutionController {
@@ -64,6 +56,8 @@ public final class AgentExecutionController {
     private final ExtensionRepository extensionRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
+    private final AgentPromptBuilder promptBuilder;
+    private final PipelineDependencyResolver dependencyResolver;
     private ToolReviewAwaiter toolReviewAwaiter;
 
     public interface Host {
@@ -118,6 +112,8 @@ public final class AgentExecutionController {
         this.toolRegistry = toolRegistry;
         this.extensionRepository = extensionRepository;
         this.promptTemplateRepository = promptTemplateRepository;
+        this.promptBuilder = new AgentPromptBuilder(extensionRepository, toolSettingsRepository, promptTemplateRepository);
+        this.dependencyResolver = new PipelineDependencyResolver();
     }
 
     public void setToolReviewAwaiter(ToolReviewAwaiter toolReviewAwaiter) {
@@ -142,10 +138,10 @@ public final class AgentExecutionController {
         String type = AgentTool.normalizeType(input.optString("type"));
         String description = input.optString("description").trim();
         String prompt = input.optString("prompt").trim();
-        ArrayList<String> readScope = scopeList(input.optJSONArray("read_scope"));
-        ArrayList<String> writeScope = scopeList(input.optJSONArray("write_scope"));
-        Set<String> customToolNames = scopeSet(input.optJSONArray("custom_tool_names"));
-        Set<String> customMcpIds = scopeSet(input.optJSONArray("custom_mcp_ids"));
+        ArrayList<String> readScope = promptBuilder.scopeList(input.optJSONArray("read_scope"));
+        ArrayList<String> writeScope = promptBuilder.scopeList(input.optJSONArray("write_scope"));
+        Set<String> customToolNames = promptBuilder.scopeSet(input.optJSONArray("custom_tool_names"));
+        Set<String> customMcpIds = promptBuilder.scopeSet(input.optJSONArray("custom_mcp_ids"));
         String homePath = parentContext == null ? host.projectPath() : parentContext.getHomePath();
         AgentProgressSession progress = new AgentProgressSession(
                 generationId,
@@ -197,15 +193,15 @@ public final class AgentExecutionController {
         if (cancellationToken != null && cancellationToken.isCancelled()) {
             return new ToolResult("", AgentPipelineTool.NAME, AGENT_TERMINATED_MESSAGE, true);
         }
-        ArrayList<PipelineAgent> agents = parsePipelineAgents(input.optJSONArray("agents"));
+        ArrayList<PipelineAgent> agents = dependencyResolver.parsePipelineAgents(input.optJSONArray("agents"));
         if (agents.isEmpty()) {
             return new ToolResult("", AgentPipelineTool.NAME, "agent_pipeline.agents 不能为空。", true);
         }
-        String dependencyError = validatePipelineDependencies(agents);
+        String dependencyError = dependencyResolver.validatePipelineDependencies(agents);
         if (dependencyError.length() > 0) {
             return new ToolResult("", AgentPipelineTool.NAME, dependencyError, true);
         }
-        ArrayList<ArrayList<PipelineAgent>> levels = dependencyLevels(agents);
+        ArrayList<ArrayList<PipelineAgent>> levels = dependencyResolver.dependencyLevels(agents);
         if (levels.isEmpty()) {
             return new ToolResult("", AgentPipelineTool.NAME, "Agent 流水线存在循环依赖或重复 id，无法执行。", true);
         }
@@ -227,7 +223,6 @@ public final class AgentExecutionController {
                             }
                         }
                     } catch (Exception ignored) {
-                        // 进度 payload 解析失败时使用 running
                     }
                     host.addOrReplaceToolResult(new ToolResult(id, name, payload, nextError, "", reviewState, ""));
                     host.render();
@@ -279,7 +274,7 @@ public final class AgentExecutionController {
                     host.addOrReplaceToolResult(finalProgress);
                     return finalProgress;
                 }
-                String agentPrompt = agent.getPrompt() + dependencyOutputContext(agent, results);
+                String agentPrompt = agent.getPrompt() + dependencyResolver.dependencyOutputContext(agent, results);
                 pipelineProgress.beginAgent(agent);
                 AgentProgressSession agentProgress = new AgentProgressSession(
                         generationId,
@@ -372,10 +367,11 @@ public final class AgentExecutionController {
     ) {
         host.syncModePermission();
         ArrayList<BaseTool> agentTools = agentTools(type, host, customToolNames, customMcpIds);
+        List<ToolInfo> agentToolInfos = new ArrayList<>(agentTools);
         Set<String> allowedToolNames = toolNames(agentTools);
         ArrayList<ModelMessage> agentMessages = new ArrayList<>();
-        agentMessages.add(new SystemModelMessage(agentSystemPrompt(type, description, readScope, writeScope, homePath, selectedModel, agentTools, host)));
-        agentMessages.add(new UserModelMessage(prompt));
+        agentMessages.add(new SystemModelMessage(promptBuilder.agentSystemPrompt(type, description, readScope, writeScope, homePath, selectedModel, agentToolInfos, host)));
+        agentMessages.add(new cn.lineai.ai.message.UserModelMessage(prompt));
         int toolCallCount = 0;
         String lastOutput = "";
         long startedAt = System.currentTimeMillis();
@@ -415,7 +411,7 @@ public final class AgentExecutionController {
                     host.scheduleAgentProgressRender(progress);
                 }
                 AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
-                List<BaseTool> nativeTools = modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel) ? agentTools : new ArrayList<>();
+                List<ToolInfo> nativeTools = modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel) ? new ArrayList<>(agentTools) : new ArrayList<>();
                 ModelRequestOptions options = new ModelRequestOptions(
                         aiSettings.getReasoningEffort(),
                         aiSettings.isPreserveReasoningEnabled(),
@@ -605,7 +601,11 @@ public final class AgentExecutionController {
         if (!allowedToolNames.contains(call.getName())) {
             return new ToolResult(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
         }
-        ToolContext context = new ToolContext(homePath, skillWriteRoots(homePath), null, "", null);
+        ToolContext context = ToolContext.builder()
+                .homePath(homePath)
+                .extraWriteRoots(skillWriteRoots(homePath))
+                .toolCallId("")
+                .build();
         ToolResult scopeError = validateAgentWriteScope(call, type, writeScope, context);
         if (scopeError != null) {
             return scopeError;
@@ -670,100 +670,26 @@ public final class AgentExecutionController {
         }
         BaseTool tool = toolRegistry.get(call.getName());
         return tool != null
-                && tool.requiresConfirmation()
+                && tool.needsConfirmation()
                 && !toolReviewAwaiter.isAutoConfirmed(call)
                 && toolSettingsRepository.canExecuteTool(tool.getName(), tool.getCategory()).isAllowed()
                 && (FileDeleteTool.NAME.equals(tool.getName()) || toolSettingsRepository.needsConfirmation(tool.getName()));
     }
 
-    public String agentSystemPrompt(
-            String type,
-            String description,
-            List<String> readScope,
-            List<String> writeScope,
-            String homePath,
-            ModelConfig selectedModel,
-            List<BaseTool> agentTools,
-            Host host
-    ) {
-        host.syncModePermission();
-        boolean remoteMode = host != null && (host.isSshExecutionMode() || host.isTerminalProviderExecutionMode());
-        HashMap<String, String> values = new HashMap<>();
-        values.put("ROLE_PROMPT", agentRolePrompt(type, remoteMode));
-        values.put("TASK_DESCRIPTION", description);
-        values.put("WORKSPACE_CONTEXT", agentWorkspacePrompt(homePath, host, remoteMode));
-        values.put("SCOPE_CONTEXT", agentScopePrompt(type, readScope, writeScope, remoteMode));
-        values.put("EXTENSIONS_CONTEXT", extensionRepository.buildExtensionPrompt(homePath));
-        values.put("TOOLS_CONTEXT", toolSettingsRepository.buildToolPrompt(agentTools, modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel)));
-        return new StringTemplate(promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_AGENT_SYSTEM_PROMPT)).render(values);
-    }
-
     public String agentRolePrompt(String type) {
-        return agentRolePrompt(type, false);
+        return promptBuilder.agentRolePrompt(type);
     }
 
     public String agentRolePrompt(String type, boolean remoteMode) {
-        String templateId;
-        if (remoteMode) {
-            templateId = AgentTool.TYPE_EXPLORE.equals(type)
-                    ? PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_REMOTE
-                    : PromptTemplateRepository.ID_AGENT_ROLE_CODING_REMOTE;
-        } else {
-            templateId = AgentTool.TYPE_EXPLORE.equals(type)
-                    ? PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_LOCAL
-                    : PromptTemplateRepository.ID_AGENT_ROLE_CODING_LOCAL;
-        }
-        if (promptTemplateRepository != null) {
-            return promptTemplateRepository.getTemplateText(templateId);
-        }
-        // fallback for tests without PromptTemplateRepository
-        return fallbackRolePrompt(type, remoteMode);
-    }
-
-    private static String fallbackRolePrompt(String type, boolean remoteMode) {
-        if (remoteMode) {
-            return AgentTool.TYPE_EXPLORE.equals(type)
-                    ? "你是一个远程 Shell 环境下的探索 Agent。可以使用 shell_execute 执行只读命令。\n规则：\n- 只读取代码，不做任何修改。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。"
-                    : "你是一个远程 Shell 环境下的编程 Agent（当前工作区位于 SSH 远端或终端提供者容器内，本地 file_read / file_write / file_edit / glob / list_dir 不一定可用）。\n规则：\n- 必须通过 shell_execute 完成绝大多数工作：先 cat/ls/grep 读取，写入用 sed/awk/python heredoc 或 tee，确认 cat 验证。\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。";
-        } else {
-            return AgentTool.TYPE_EXPLORE.equals(type)
-                    ? "你是一个代码探索 Agent。你的任务是快速定位和分析代码。\n规则：\n- 只读取代码，不做任何修改，不调用任何写入类工具。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。\n- 给出简洁准确的中文回答。"
-                    : "你是一个编程 Agent。你的任务是完成边界清晰的编程子任务。\n规则：\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。\n- 优先使用 file_read / file_write / file_edit / glob / list_dir 完成工作；只有 file 类工具确实无法满足时才使用 shell_execute。";
-        }
-    }
-
-    public String agentWorkspacePrompt(String homePath, Host host) {
-        return agentWorkspacePrompt(homePath, host, host != null && (host.isSshExecutionMode() || host.isTerminalProviderExecutionMode()));
-    }
-
-    public String agentWorkspacePrompt(String homePath, Host host, boolean remoteMode) {
-        String path = homePath == null || homePath.trim().length() == 0 ? promptHomePath(host) : homePath.trim();
-        String modeHint = remoteMode
-                ? "\n当前是 SSH 远端或终端提供者模式：所有命令作用于远端主机上的工作区，文件路径按远端约定解析。"
-                : "\n所有文件路径默认相对此工作区。不要访问未授权路径，不要读取 API key、token、密码等敏感数据。";
-        return "当前工作区: " + path + modeHint;
+        return promptBuilder.agentRolePrompt(type, remoteMode);
     }
 
     public String agentScopePrompt(String type, List<String> readScope, List<String> writeScope) {
-        return agentScopePrompt(type, readScope, writeScope, false);
+        return promptBuilder.agentScopePrompt(type, readScope, writeScope);
     }
 
     public String agentScopePrompt(String type, List<String> readScope, List<String> writeScope, boolean remoteMode) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("## Agent 范围\n");
-        builder.append("read_scope: ").append(scopeSummary(readScope)).append('\n');
-        builder.append("write_scope: ").append(scopeSummary(writeScope)).append('\n');
-        if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            builder.append("这是 explore Agent，write_scope 必须视为无效，禁止任何写入。");
-        } else if (writeScope == null || writeScope.isEmpty()) {
-            builder.append("没有授权写入范围。禁止写入文件；如果任务需要修改文件，直接说明需要主模型重新分配 write_scope。");
-        } else {
-            builder.append("只能写入 write_scope 覆盖的路径。不要修改其它文件，不要把多个 Agent 的职责混到同一个文件里。");
-        }
-        if (remoteMode) {
-            builder.append("\n注意：所有路径都是远端主机上的路径；写入/读取都要通过 shell_execute 调用 sed/awk/python heredoc/cat 等命令，不要尝试调用本地 file 类工具。");
-        }
-        return builder.toString();
+        return promptBuilder.agentScopePrompt(type, readScope, writeScope, remoteMode);
     }
 
     public ToolResult validateAgentWriteScope(
@@ -802,7 +728,7 @@ public final class AgentExecutionController {
             }
             return new ToolResult(call.getId(), call.getName(),
                     "Agent 写入路径超出 write_scope: " + filePath
-                            + "\n允许写入范围: " + scopeSummary(writeScope)
+                            + "\n允许写入范围: " + promptBuilder.scopeSummary(writeScope)
                             + "\n请停止写入并让主模型重新分配。", true);
         } catch (Exception e) {
             return new ToolResult(call.getId(), call.getName(), "Agent 写入范围检查失败: " + e.getMessage(), true);
@@ -827,159 +753,20 @@ public final class AgentExecutionController {
         return targetPath.equals(rootPath) || targetPath.startsWith(rootPath + File.separator);
     }
 
-    public String scopeSummary(List<String> scopes) {
-        if (scopes == null || scopes.isEmpty()) {
-            return "未声明";
-        }
-        StringBuilder builder = new StringBuilder();
-        for (String scope : scopes) {
-            if (scope == null || scope.trim().length() == 0) {
-                continue;
-            }
-            if (builder.length() > 0) {
-                builder.append(", ");
-            }
-            builder.append(scope.trim());
-        }
-        return builder.length() == 0 ? "未声明" : builder.toString();
-    }
-
-    public ArrayList<PipelineAgent> parsePipelineAgents(JSONArray array) {
-        ArrayList<PipelineAgent> agents = new ArrayList<>();
-        if (array == null) {
-            return agents;
-        }
-        HashSet<String> ids = new HashSet<>();
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject object = array.optJSONObject(i);
-            if (object == null) {
-                return new ArrayList<>();
-            }
-            String id = object.optString("id").trim();
-            if (id.length() == 0 || ids.contains(id)) {
-                return new ArrayList<>();
-            }
-            ids.add(id);
-            agents.add(new PipelineAgent(
-                    id,
-                    AgentTool.normalizeType(object.optString("type")),
-                    object.optString("description").trim(),
-                    object.optString("prompt").trim(),
-                    scopeList(object.optJSONArray("read_scope")),
-                    scopeList(object.optJSONArray("write_scope")),
-                    dependencyList(object.optJSONArray("depends_on"))
-            ));
-        }
-        return agents;
+    public ArrayList<PipelineAgent> parsePipelineAgents(org.json.JSONArray array) {
+        return dependencyResolver.parsePipelineAgents(array);
     }
 
     public String validatePipelineDependencies(ArrayList<PipelineAgent> agents) {
-        if (agents == null) {
-            return "agent_pipeline.agents 不能为空。";
-        }
-        for (PipelineAgent agent : agents) {
-            for (String dependency : agent.getDependencies()) {
-                if (agent.getId().equals(dependency)) {
-                    return "Agent 不能依赖自身: " + agent.getId();
-                }
-            }
-        }
-        return "";
+        return dependencyResolver.validatePipelineDependencies(agents);
     }
 
     public ArrayList<ArrayList<PipelineAgent>> dependencyLevels(ArrayList<PipelineAgent> agents) {
-        ArrayList<ArrayList<PipelineAgent>> levels = new ArrayList<>();
-        HashSet<String> allIds = new HashSet<>();
-        for (PipelineAgent agent : agents) {
-            allIds.add(agent.getId());
-        }
-        for (PipelineAgent agent : agents) {
-            for (String dependency : agent.getDependencies()) {
-                if (!allIds.contains(dependency)) {
-                    return new ArrayList<>();
-                }
-            }
-        }
-
-        HashSet<String> completed = new HashSet<>();
-        while (completed.size() < agents.size()) {
-            ArrayList<PipelineAgent> level = new ArrayList<>();
-            for (PipelineAgent agent : agents) {
-                if (completed.contains(agent.getId())) {
-                    continue;
-                }
-                if (completed.containsAll(agent.getDependencies())) {
-                    level.add(agent);
-                }
-            }
-            if (level.isEmpty()) {
-                return new ArrayList<>();
-            }
-            for (PipelineAgent agent : level) {
-                completed.add(agent.getId());
-            }
-            levels.add(level);
-        }
-        return levels;
+        return dependencyResolver.dependencyLevels(agents);
     }
 
     public String dependencyOutputContext(PipelineAgent agent, LinkedHashMap<String, AgentRunResult> results) {
-        if (agent.getDependencies().isEmpty()) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        builder.append("\n\n## 上游 Agent 输出\n");
-        for (String dependency : agent.getDependencies()) {
-            AgentRunResult result = results.get(dependency);
-            if (result == null) {
-                continue;
-            }
-            builder.append("\n### ").append(dependency).append('\n').append(result.getOutput()).append('\n');
-        }
-        builder.append("\n请基于以上结果继续你的任务。");
-        return builder.toString();
-    }
-
-    public ArrayList<String> scopeList(JSONArray array) {
-        ArrayList<String> values = new ArrayList<>();
-        if (array == null) {
-            return values;
-        }
-        for (int i = 0; i < array.length(); i++) {
-            String value = array.optString(i).trim();
-            if (value.length() > 0) {
-                values.add(value);
-            }
-        }
-        return values;
-    }
-
-    public HashSet<String> scopeSet(JSONArray array) {
-        HashSet<String> values = new HashSet<>();
-        if (array == null) {
-            return values;
-        }
-        for (int i = 0; i < array.length(); i++) {
-            String value = array.optString(i).trim();
-            if (value.length() > 0) {
-                values.add(value);
-            }
-        }
-        return values;
-    }
-
-    public ArrayList<String> dependencyList(JSONArray array) {
-        ArrayList<String> dependencies = new ArrayList<>();
-        if (array == null) {
-            return dependencies;
-        }
-        for (int i = 0; i < array.length(); i++) {
-            String value = array.optString(i).trim();
-            if (value.length() > 0) {
-                dependencies.add(value);
-            }
-        }
-        return dependencies;
+        return dependencyResolver.dependencyOutputContext(agent, results);
     }
 
     public List<ToolCall> mergeToolCalls(List<ToolCall> nativeCalls, List<ToolCall> textCalls) {
@@ -1004,12 +791,5 @@ public final class AgentExecutionController {
             }
         }
         return merged;
-    }
-
-    private String promptHomePath(Host host) {
-        if ("ssh".equals(host.projectSource()) && host.projectPath().length() == 0) {
-            return "~";
-        }
-        return host.projectPath();
     }
 }

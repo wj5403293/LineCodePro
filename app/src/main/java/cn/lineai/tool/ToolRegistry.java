@@ -5,6 +5,7 @@ import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpToolSummary;
+import cn.lineai.model.Strings;
 import cn.lineai.tool.builtin.CustomAgentExtensionTool;
 import cn.lineai.tool.builtin.CustomMcpHttpTool;
 import java.util.ArrayList;
@@ -99,6 +100,20 @@ public final class ToolRegistry {
         return selected;
     }
 
+    /** 返回 ToolInfo 视图，供 AI 模块使用而不依赖 BaseTool 具体类型 */
+    public List<ToolInfo> getToolInfoByNameSet(Set<String> names) {
+        ArrayList<ToolInfo> selected = new ArrayList<>();
+        if (names == null || names.isEmpty()) {
+            return selected;
+        }
+        for (BaseTool tool : tools.values()) {
+            if (names.contains(tool.getName())) {
+                selected.add(tool);
+            }
+        }
+        return selected;
+    }
+
     public static JSONArray toJsonArray(Collection<BaseTool> tools) throws org.json.JSONException {
         JSONArray array = new JSONArray();
         if (tools == null) {
@@ -110,16 +125,28 @@ public final class ToolRegistry {
         return array;
     }
 
+    /** ToolInfo 版本的序列化，供 AI 模块使用 */
+    public static JSONArray toToolInfoJsonArray(Collection<ToolInfo> tools) throws org.json.JSONException {
+        JSONArray array = new JSONArray();
+        if (tools == null) {
+            return array;
+        }
+        for (ToolInfo tool : tools) {
+            array.put(tool.toJson());
+        }
+        return array;
+    }
+
     public static boolean isExtensionToolName(String name) {
-        return name != null && (name.startsWith(CUSTOM_AGENT_PREFIX) || name.startsWith(CUSTOM_MCP_PREFIX));
+        return ToolNames.isExtensionToolName(name);
     }
 
     public static boolean isCustomAgentToolName(String name) {
-        return name != null && name.startsWith(CUSTOM_AGENT_PREFIX);
+        return ToolNames.isCustomAgentToolName(name);
     }
 
     public static boolean isCustomMcpToolName(String name) {
-        return name != null && name.startsWith(CUSTOM_MCP_PREFIX);
+        return ToolNames.isCustomMcpToolName(name);
     }
 
     public static String customAgentToolName(ExtensionAgentConfig agent) {
@@ -163,7 +190,7 @@ public final class ToolRegistry {
     }
 
     private static String safeToolNamePart(String value, String fallback, int maxLength) {
-        String raw = value == null ? "" : value.trim();
+        String raw = Strings.nullToEmpty(value).trim();
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < raw.length() && builder.length() < maxLength; i++) {
             char ch = raw.charAt(i);
@@ -185,7 +212,7 @@ public final class ToolRegistry {
     }
 
     private static String trimUnderscore(String value) {
-        String text = value == null ? "" : value;
+        String text = Strings.nullToEmpty(value);
         while (text.contains("__")) {
             text = text.replace("__", "_");
         }
@@ -202,7 +229,7 @@ public final class ToolRegistry {
 
     private static String shortHash(String value) {
         long hash = 5381L;
-        String text = value == null ? "" : value;
+        String text = Strings.nullToEmpty(value);
         for (int i = 0; i < text.length(); i++) {
             hash = (hash * 33L + text.charAt(i)) % 2147483647L;
         }

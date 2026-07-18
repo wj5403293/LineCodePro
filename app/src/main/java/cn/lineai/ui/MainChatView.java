@@ -3,13 +3,10 @@ package cn.lineai.ui;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
@@ -36,7 +33,7 @@ import cn.lineai.ui.component.BottomSheetView;
 import cn.lineai.ui.component.ChatMessageListView;
 import cn.lineai.ui.component.ComposerView;
 import cn.lineai.ui.component.DataSettingsScreenView;
-import cn.lineai.ui.component.DialogDimensions;
+import cn.lineai.ui.component.DialogBuilder;
 import cn.lineai.ui.component.DialogManager;
 import cn.lineai.ui.component.DirectoryPickerSheetView;
 import cn.lineai.ui.component.DrawerView;
@@ -60,6 +57,7 @@ import cn.lineai.ui.component.ModelListScreenView;
 import cn.lineai.ui.component.MainChatViewLayoutBuilder;
 import cn.lineai.ui.component.OutputSettingsScreenView;
 import cn.lineai.ui.component.PromptTemplatesScreenView;
+import cn.lineai.ui.component.OverlayManager;
 import cn.lineai.ui.component.ScreenFactories;
 import cn.lineai.ui.component.ScreenRegistry;
 import cn.lineai.ui.component.SettingsScreenView;
@@ -112,6 +110,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
 
     private final MainUiController presenter;
     private final DialogManager dialogManager = new DialogManager();
+    private OverlayManager overlayManager;
     private final HeaderView headerView;
     private final LinearLayout contentView;
     private final ChatMessageListView messageListView;
@@ -282,6 +281,11 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             public void onAiReasoningEffortChanged(String effort) {
                 MainChatView.this.presenter.onAiReasoningEffortChanged(effort);
             }
+
+            @Override
+            public int onQueryModelCount(String baseUrl) throws Exception {
+                return MainChatView.this.presenter.queryModelCount(baseUrl);
+            }
         });
         quoteController.setPreview(composerView);
         composerView.setQuoteDismissListener(() -> quoteController.clearQuote());
@@ -390,6 +394,8 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         });
         addView(attachmentPickerSheetView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
+        overlayManager = new OverlayManager(drawerView, bottomSheetView, directoryPickerSheetView, attachmentPickerSheetView);
+
         MainChatViewLayoutBuilder.installSystemBarInsetsHandling(this, contentView, screenHost);
         registerScreenFactories();
     }
@@ -460,9 +466,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     @Override
     public void showDrawer() {
         KeyboardController.clearFocusAndHide(this);
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAllExcept(drawerView);
         renderDrawer(lastState);
         drawerView.open();
     }
@@ -470,21 +474,16 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     @Override
     public void showSheet(String title, List<SheetOption> options) {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAllExcept(bottomSheetView);
         bottomSheetView.show(title, options);
     }
 
     @Override
     public void showFileActionDialog(String title, String subtitle, List<SheetOption> options) {
         KeyboardController.clearFocusAndHide(this);
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAllExcept(drawerView);
 
-        Dialog dialog = new Dialog(getContext());
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        Dialog dialog = DialogBuilder.create(getContext());
         dialog.setCanceledOnTouchOutside(true);
 
         LinearLayout panel = new LinearLayout(getContext());
@@ -519,24 +518,13 @@ public final class MainChatView extends FrameLayout implements MainContract.View
             }
         }
 
-        dialog.setContentView(panel);
-        dialog.setOnShowListener(d -> {
-            Window shown = dialog.getWindow();
-            if (shown != null) {
-                shown.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                shown.setLayout(DialogDimensions.insetDialogWidth(getContext()), LayoutParams.WRAP_CONTENT);
-            }
-        });
-        dialog.show();
+        DialogBuilder.showInset(dialog, panel);
     }
 
     @Override
     public void showInputDialog(String title, String message, String initialValue, String actionId) {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAll();
         final String capturedActionId = actionId;
         dialogManager.showInput(getContext(), title, message, null, initialValue,
                 value -> presenter.onDialogInputSubmitted(capturedActionId, value));
@@ -545,10 +533,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     @Override
     public void showConfirmationDialog(String title, String message, String confirmLabel, boolean danger, String actionId) {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAll();
         final String capturedActionId = actionId;
         dialogManager.showConfirm(getContext(), title, message, confirmLabel, danger,
                 () -> presenter.onDialogConfirmed(capturedActionId),
@@ -558,18 +543,14 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     @Override
     public void showDirectoryPicker(String title, String subtitle, FileTreeNode tree, String selectedPath, boolean loading, String message) {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAllExcept(directoryPickerSheetView);
         directoryPickerSheetView.show(title, subtitle, tree, selectedPath, loading, message);
     }
 
     @Override
     public void showAttachmentPicker(String title, FileTreeNode tree, boolean loading, String message, String source) {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
+        overlayManager.closeAllExcept(attachmentPickerSheetView);
         attachmentPickerTitle = title == null ? "" : title;
         attachmentPickerTree = tree;
         attachmentPickerLoading = loading;
@@ -583,10 +564,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
     @Override
     public void hideOverlays() {
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAll();
         composerView.dismissSlashPopup();
     }
 
@@ -630,10 +608,7 @@ public final class MainChatView extends FrameLayout implements MainContract.View
         currentScreenId = screenId == null ? "" : screenId;
         KeyboardController.clearFocusAndHide(screenHost);
         KeyboardController.clearFocusAndHide(this);
-        drawerView.close();
-        bottomSheetView.close();
-        directoryPickerSheetView.close();
-        attachmentPickerSheetView.close();
+        overlayManager.closeAll();
         screenHost.animate().cancel();
         View existing = previousScreenId.length() > 0 ? screenCache.get(previousScreenId) : null;
         if (existing == null || existing.getParent() != screenHost) {

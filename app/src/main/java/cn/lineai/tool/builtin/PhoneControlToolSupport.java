@@ -6,6 +6,13 @@ import cn.lineai.service.LineCodeAccessibilityService;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolResult;
 
+/**
+ * Shared helper for Phone control tools. Provides accessibility service lookup
+ * and standardised "unavailable" result messages.
+ *
+ * <p>Module split barrier: depends on BaseTool, ToolResult, and
+ * LineCodeAccessibilityService in :app. See PhoneClickTool for full barrier notes.
+ */
 final class PhoneControlToolSupport {
     private PhoneControlToolSupport() {
     }

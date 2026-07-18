@@ -65,6 +65,9 @@ public interface MainUiController extends ChatController,
 
     TermuxHelper.TermuxSetupResult setupTermuxSsh(int timeoutMs) throws Exception;
 
+    // Model catalog
+    int queryModelCount(String baseUrl) throws Exception;
+
     void onResume(String currentScreenId);
 
     void onEnterBackground();

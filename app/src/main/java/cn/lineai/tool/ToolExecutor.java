@@ -1,7 +1,5 @@
 package cn.lineai.tool;
 
-import cn.lineai.ai.ModelClient;
-import cn.lineai.ai.protocol.ModelProtocolFactory;
 import cn.lineai.data.repository.DiffRecord;
 import cn.lineai.data.repository.DiffStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
@@ -19,16 +17,15 @@ public final class ToolExecutor {
     private final DiffStore diffRepository;
     private final ModelStore modelRepository;
     private final SshFileTreeStore sshFileTreeRepository;
-    private final ModelProtocolFactory modelProtocolFactory;
-    private final ModelClient modelClient;
+    private final ModelServiceProvider modelServiceProvider;
     private final PromptTemplateRepository promptTemplateRepository;
 
     public ToolExecutor(ToolRegistry registry, ToolSettingsStore settingsRepository) {
-        this(registry, settingsRepository, null, null, null, null, null, null);
+        this(registry, settingsRepository, null, null, null, null, null);
     }
 
     public ToolExecutor(ToolRegistry registry, ToolSettingsStore settingsRepository, DiffStore diffRepository) {
-        this(registry, settingsRepository, diffRepository, null, null, null, null, null);
+        this(registry, settingsRepository, diffRepository, null, null, null, null);
     }
 
     public ToolExecutor(
@@ -37,8 +34,7 @@ public final class ToolExecutor {
             DiffStore diffRepository,
             ModelStore modelRepository,
             SshFileTreeStore sshFileTreeRepository,
-            ModelProtocolFactory modelProtocolFactory,
-            ModelClient modelClient,
+            ModelServiceProvider modelServiceProvider,
             PromptTemplateRepository promptTemplateRepository
     ) {
         this.registry = registry;
@@ -46,8 +42,7 @@ public final class ToolExecutor {
         this.diffRepository = diffRepository;
         this.modelRepository = modelRepository;
         this.sshFileTreeRepository = sshFileTreeRepository;
-        this.modelProtocolFactory = modelProtocolFactory;
-        this.modelClient = modelClient;
+        this.modelServiceProvider = modelServiceProvider;
         this.promptTemplateRepository = promptTemplateRepository;
     }
 
@@ -63,7 +58,7 @@ public final class ToolExecutor {
         if (toolCall == null) {
             return new ToolResult("", "", "工具调用为空", true);
         }
-        ToolContext baseContext = context == null ? new ToolContext("") : context;
+        ToolContext baseContext = context == null ? ToolContext.builder().homePath("").build() : context;
         if (context == null || needsInjection(context)) {
             baseContext = injectDependencies(baseContext);
         }
@@ -76,7 +71,7 @@ public final class ToolExecutor {
         if (!permission.isAllowed()) {
             return new ToolResult(toolCall.getId(), tool.getName(), permission.getReason(), true);
         }
-        if (tool.requiresConfirmation() && settingsRepository.needsConfirmation(tool.getName()) && !confirmed) {
+        if (tool.needsConfirmation() && settingsRepository.needsConfirmation(tool.getName()) && !confirmed) {
             return new ToolResult(toolCall.getId(), tool.getName(), "工具需要确认后才能执行: " + tool.getName(), true);
         }
         JSONObject input;
@@ -105,24 +100,22 @@ public final class ToolExecutor {
     private boolean needsInjection(ToolContext context) {
         return context.getToolSettingsStore() == null
                 || context.getModelRepository() == null
-                || context.getModelProtocolFactory() == null;
+                || context.getModelServiceProvider() == null;
     }
 
     private ToolContext injectDependencies(ToolContext context) {
-        return new ToolContext(
-                context.getHomePath(),
-                context.getExtraWriteRoots(),
-                context.getAgentRunner(),
-                context.getToolCallId(),
-                null,
-                context.getTodoStateStore(),
-                context.getToolSettingsStore() != null ? context.getToolSettingsStore() : settingsRepository,
-                context.getModelRepository() != null ? context.getModelRepository() : modelRepository,
-                context.getSshFileTreeRepository() != null ? context.getSshFileTreeRepository() : sshFileTreeRepository,
-                context.getModelProtocolFactory() != null ? context.getModelProtocolFactory() : modelProtocolFactory,
-                context.getModelClient() != null ? context.getModelClient() : modelClient,
-                context.getPromptTemplateRepository() != null ? context.getPromptTemplateRepository() : promptTemplateRepository
-        );
+        return ToolContext.builder()
+                .homePath(context.getHomePath())
+                .extraWriteRoots(context.getExtraWriteRoots())
+                .agentRunner(context.getAgentRunner())
+                .toolCallId(context.getToolCallId())
+                .todoStateStore(context.getTodoStateStore())
+                .toolSettingsStore(context.getToolSettingsStore() != null ? context.getToolSettingsStore() : settingsRepository)
+                .modelRepository(context.getModelRepository() != null ? context.getModelRepository() : modelRepository)
+                .sshFileTreeRepository(context.getSshFileTreeRepository() != null ? context.getSshFileTreeRepository() : sshFileTreeRepository)
+                .modelServiceProvider(context.getModelServiceProvider() != null ? context.getModelServiceProvider() : modelServiceProvider)
+                .promptTemplateRepository(context.getPromptTemplateRepository() != null ? context.getPromptTemplateRepository() : promptTemplateRepository)
+                .build();
     }
 
     private ToolResult executeWithDiff(BaseTool tool, JSONObject input, ToolContext context) {
@@ -163,20 +156,10 @@ public final class ToolExecutor {
     }
 
     private static void restoreInterrupt(Exception error) {
-        if (error instanceof InterruptedException) {
-            Thread.currentThread().interrupt();
-        }
+        ExceptionUtils.restoreInterrupt(error);
     }
 
     private static String describeException(Exception error) {
-        if (error == null) {
-            return "未知错误";
-        }
-        String message = error.getMessage();
-        if (message != null && message.trim().length() > 0) {
-            return message.trim();
-        }
-        String name = error.getClass().getSimpleName();
-        return name.length() == 0 ? "未知错误" : name;
+        return ExceptionUtils.describeException(error);
     }
 }

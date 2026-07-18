@@ -11,6 +11,8 @@ json = { group = "org.json", name = "json", version.ref = "json" }
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
 commonmark-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 jsch = { group = "com.github.mwiede", name = "jsch", version.ref = "jsch" }
+android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version = "2.1.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

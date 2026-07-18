@@ -70,7 +70,7 @@ final class ProjectWorkspaceController {
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.projectStore = projectStore;
         this.toolSettingsStore = toolSettingsStore;
         this.sshFileTreeStore = sshFileTreeStore;

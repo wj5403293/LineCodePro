@@ -22,4 +22,7 @@ android {
 
 dependencies {
     implementation(libs.json)
+    configurations.all {
+        exclude(group = "org.jetbrains.kotlin")
+    }
 }

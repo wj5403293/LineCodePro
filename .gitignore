@@ -19,3 +19,16 @@ signing.properties
 问题.txt
 .trae/
 terminal-provider/release/*
+feature-ssh/release/*
+feature-share/release/*
+core-model/build/*
+core-api/build/*
+core-security/build/*
+data/build/*
+feature-ssh/build/*
+feature-share/build/*
+build-logic/build/*
+feature-model/build/*
+feature-tool/build/*
+markdown/build/*
+ui-theme/build/*

@@ -10,6 +10,7 @@ import cn.lineai.model.McpToolConfig;
 import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolCall;
@@ -422,7 +423,7 @@ public final class AgentExecutionControllerTest {
         }
 
         @Override
-        public boolean requiresConfirmation() {
+        public boolean needsConfirmation() {
             return true;
         }
 
@@ -576,7 +577,7 @@ public final class AgentExecutionControllerTest {
         }
 
         @Override
-        public Set<String> getEnabledToolNames(Collection<BaseTool> implementedTools) {
+        public Set<String> getEnabledToolNames(Collection<ToolInfo> implementedTools) {
             return getEnabledToolNames();
         }
 
@@ -601,7 +602,7 @@ public final class AgentExecutionControllerTest {
         }
 
         @Override
-        public String buildToolPrompt(Collection<BaseTool> implementedTools, boolean nativeToolProtocol) {
+        public String buildToolPrompt(Collection<ToolInfo> implementedTools, boolean nativeToolProtocol) {
             return "";
         }
     }

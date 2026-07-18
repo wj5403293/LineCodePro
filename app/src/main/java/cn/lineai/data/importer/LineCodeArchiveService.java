@@ -5,7 +5,8 @@ import android.net.Uri;
 import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.SettingsRepository;
-import cn.lineai.model.ModelRepository;
+import cn.lineai.data.repository.ModelRepository;
+import cn.lineai.model.Strings;
 import cn.lineai.workspace.WorkspacePaths;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -208,6 +209,6 @@ public final class LineCodeArchiveService {
     }
 
     private String safe(String value) {
-        return value == null ? "" : value;
+        return Strings.nullToEmpty(value);
     }
 }

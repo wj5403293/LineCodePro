@@ -144,9 +144,7 @@ public final class FileOperationController {
         }
     }
 
-    private final FileStore localFileStore;
-    private final FileStore sshFileStore;
-    private final FileStore ipcFileStore;
+    private final ExecutionModeFileStoreRegistry fileStoreRegistry;
     private final Host host;
     private final BackgroundRunner backgroundRunner;
     private final UiDispatcher uiDispatcher;
@@ -181,9 +179,10 @@ public final class FileOperationController {
             BackgroundRunner backgroundRunner,
             UiDispatcher uiDispatcher
     ) {
-        this.localFileStore = localFileStore;
-        this.sshFileStore = sshFileStore;
-        this.ipcFileStore = ipcFileStore;
+        this.fileStoreRegistry = new ExecutionModeFileStoreRegistry();
+        this.fileStoreRegistry.register(ExecutionModeFileStoreRegistry.MODE_LOCAL, localFileStore);
+        this.fileStoreRegistry.register(ExecutionModeFileStoreRegistry.MODE_SSH, sshFileStore);
+        this.fileStoreRegistry.register(ExecutionModeFileStoreRegistry.MODE_IPC, ipcFileStore);
         this.host = host;
         this.backgroundRunner = backgroundRunner;
         this.uiDispatcher = uiDispatcher;
@@ -298,13 +297,7 @@ public final class FileOperationController {
     }
 
     private FileStore currentFileStore() {
-        if (host.isTerminalProviderExecutionMode()) {
-            return ipcFileStore;
-        }
-        if (host.isSshExecutionMode()) {
-            return sshFileStore;
-        }
-        return localFileStore;
+        return fileStoreRegistry.get(ExecutionModeFileStoreRegistry.resolveMode(host));
     }
 
     private void runFileOperation(String expandedPath, FileOperation operation) {

@@ -116,6 +116,7 @@ public final class ScreenFactories {
 
     private static View newModelAddScreen(Context context, MainChatView view, MainUiController controller,
                                          ModelProviderPreset preset, boolean local, ModelConfig editingModel) {
+        final cn.lineai.ai.protocol.ModelCatalogClient catalogClient = new cn.lineai.ai.protocol.ModelCatalogClient();
         return new ModelAddScreenView(context, preset, local, editingModel, new ModelAddScreenView.Listener() {
             @Override
             public void onBack() {
@@ -130,6 +131,11 @@ public final class ScreenFactories {
             @Override
             public void onTest(ModelConfig model) {
                 controller.onModelTest(model);
+            }
+
+            @Override
+            public List<String> onFetchModelCatalog(cn.lineai.model.ModelProtocolType type, String baseUrl, String apiKey) throws Exception {
+                return catalogClient.fetch(type, baseUrl, apiKey);
             }
         });
     }

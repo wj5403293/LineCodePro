@@ -101,7 +101,8 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
         renderTools();
         new Thread(() -> {
             try {
-                List<McpToolSummary> tools = listener.onQueryTools(url, headers());
+                List<McpToolSummary> rawTools = listener.onQueryTools(url, headers());
+                final List<McpToolSummary> tools = rawTools != null ? rawTools : java.util.Collections.<McpToolSummary>emptyList();
                 mainHandler.post(() -> {
                     querying = false;
                     queried = true;
@@ -116,7 +117,7 @@ public final class McpExtensionEditScreenView extends ScreenScaffoldView {
                     queried = true;
                     renderQuery();
                     renderTools();
-                    Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(getContext(), e.getMessage() != null ? e.getMessage() : "查询失败", Toast.LENGTH_LONG).show();
                 });
             }
         }, "linecode-mcp-query").start();

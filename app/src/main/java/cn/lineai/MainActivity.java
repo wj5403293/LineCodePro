@@ -164,7 +164,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     }
 
     private void configureWindow() {
-        new ThemeSettingsRepository(this).applyCurrentTheme();
+        LineTheme.apply(new ThemeSettingsRepository(this).resolveCurrentPalette());
         Window window = getWindow();
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         window.setStatusBarColor(LineTheme.BG);

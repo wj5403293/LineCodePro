@@ -41,7 +41,7 @@ final class OverlayActionController {
             LineCodeArchiveController lineCodeArchiveController,
             Host host
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.projectWorkspaceController = projectWorkspaceController;
         this.fileOperationController = fileOperationController;
         this.permissionModeController = permissionModeController;

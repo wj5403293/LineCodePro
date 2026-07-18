@@ -225,10 +225,17 @@ tasks.matching {
 }
 
 dependencies {
+    implementation(project(":core-model"))
+    implementation(project(":core-api"))
+    implementation(project(":core-security"))
     implementation(project(":ipc"))
-    implementation(libs.commonmark)
-    implementation(libs.commonmark.gfm.tables)
-    implementation(libs.jsch)
+    implementation(project(":data"))
+    implementation(project(":feature-ssh"))
+    implementation(project(":feature-share"))
+    implementation(project(":feature-tool"))
+    implementation(project(":feature-model"))
+    implementation(project(":ui-theme"))
+    implementation(project(":markdown"))
     testImplementation(libs.junit)
     testImplementation(libs.json)
 }

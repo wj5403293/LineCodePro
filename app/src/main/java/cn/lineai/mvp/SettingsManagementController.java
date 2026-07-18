@@ -15,6 +15,7 @@ import cn.lineai.model.OutputSettings;
 import cn.lineai.model.PromptTemplateItem;
 import cn.lineai.model.ThemeSettingsState;
 import cn.lineai.model.WebSearchConfig;
+import cn.lineai.ui.theme.LineTheme;
 import java.util.List;
 import java.util.Map;
 
@@ -233,12 +234,12 @@ public final class SettingsManagementController {
 
         @Override
         public void applyThemeMode(String mode) {
-            themeSettingsRepository.applyThemeMode(mode);
+            LineTheme.apply(themeSettingsRepository.resolveThemePalette(mode));
         }
 
         @Override
         public void saveCustomThemeColors(Map<String, String> colors) {
-            themeSettingsRepository.saveCustomThemeColors(colors);
+            LineTheme.apply(themeSettingsRepository.resolveCustomPalette(colors));
         }
 
         @Override

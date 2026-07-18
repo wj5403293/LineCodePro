@@ -24,6 +24,7 @@ import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelContextParser;
 import cn.lineai.model.ModelStore;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.workspace.WorkspacePaths;
 import java.util.ArrayList;
@@ -204,13 +205,13 @@ final class ModelPromptController {
     ModelRequestOptions requestOptions(AiBehaviorSettings aiSettings, ModelConfig selectedModel, int usedToolCallCount) {
         host.syncModePermission();
         toolRegistry.reloadExtensions();
-        Set<String> enabledToolNames = toolSettingsRepository.getEnabledToolNames(toolRegistry.getAll());
+        Set<String> enabledToolNames = toolSettingsRepository.getEnabledToolNames(new ArrayList<>(toolRegistry.getAll()));
         return new ModelRequestOptions(
                 aiSettings.getReasoningEffort(),
                 aiSettings.isPreserveReasoningEnabled(),
                 hasRemainingToolCalls(selectedModel, usedToolCallCount)
-                        ? toolRegistry.getByNameSet(enabledToolNames)
-                        : new ArrayList<BaseTool>()
+                        ? toolRegistry.getToolInfoByNameSet(enabledToolNames)
+                        : new ArrayList<ToolInfo>()
         );
     }
 
@@ -249,17 +250,7 @@ final class ModelPromptController {
     }
 
     private String chatModePromptContext(String mode) {
-        String normalized = ChatMode.normalize(mode);
-        if (ChatMode.CHAT.equals(normalized)) {
-            return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_CHAT);
-        }
-        if (ChatMode.PLAN.equals(normalized)) {
-            return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_PLAN);
-        }
-        if (ChatMode.CONTROL.equals(normalized)) {
-            return ChatMode.promptContext(ChatMode.CONTROL);
-        }
-        return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_CHAT_MODE_AGENT);
+        return promptTemplateRepository.getTemplateText(ChatMode.promptTemplateId(mode));
     }
 
     private ModelMessage toModelMessage(ChatMessage message, boolean includeReasoning) {
@@ -292,7 +283,7 @@ final class ModelPromptController {
             return "## 可用工具\n当前没有可用工具。";
         }
         toolRegistry.reloadExtensions();
-        return toolSettingsRepository.buildToolPrompt(toolRegistry.getAll(), modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel));
+        return toolSettingsRepository.buildToolPrompt(new ArrayList<ToolInfo>(toolRegistry.getAll()), modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel));
     }
 
     private String buildAttachmentPrompt(List<ChatMessage> history) {

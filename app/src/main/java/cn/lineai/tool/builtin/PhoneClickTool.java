@@ -12,6 +12,18 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * Phone control tool: click at screen coordinates.
+ *
+ * <p>Module split barrier: this tool depends on the tool framework
+ * ({@link BaseTool}, {@link ToolCategory}, {@link ToolContext}, {@link ToolResult},
+ * {@link ToolDisplayCategory}) and {@link LineCodeAccessibilityService}, all of which
+ * reside in the :app module. To extract into :feature-phone, the tool framework
+ * interfaces must first be extracted into a shared :tool-framework module, and
+ * {@link ToolRegistry} registration must support external module contributions
+ * (e.g. via ServiceLoader or a registry callback). No direct dependency on
+ * {@code cn.lineai.ui.*} classes.
+ */
 public final class PhoneClickTool extends BaseTool {
     public static final String NAME = "phone_click";
     private final Context context;

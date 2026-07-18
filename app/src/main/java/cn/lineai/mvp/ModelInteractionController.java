@@ -36,7 +36,7 @@ final class ModelInteractionController {
             MainThreadDispatcher mainThread,
             Host host
     ) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.modelRepository = modelRepository;
         this.modelClient = modelClient;
         this.backgroundTasks = backgroundTasks;

@@ -26,23 +26,13 @@ import cn.lineai.tool.ToolExecutor;
 import cn.lineai.tool.ToolExecutionCoordinator;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolResult;
-import cn.lineai.tool.builtin.ShellExecuteTool;
 import cn.lineai.util.StringUtils;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
 final class GenerationFlowController {
-    private static final String SHELL_EXECUTE_TOOL = ShellExecuteTool.NAME;
-    private static final String TOOL_REVIEW_SESSION_AUTO = "session_auto";
 
     interface Host {
         String nextId();
@@ -79,8 +69,6 @@ final class GenerationFlowController {
     private final MemoryExtractionService memoryExtractionService;
     private final ExtensionStore extensionRepository;
     private final ToolRegistry toolRegistry;
-    private final ToolExecutor toolExecutor;
-    private final ToolRunController toolRunController;
     private final ToolMessageController toolMessageController;
     private final ModelPromptController modelPromptController;
     private final GenerationController generationController;
@@ -89,9 +77,8 @@ final class GenerationFlowController {
     private final MainThreadDispatcher mainThread;
     private final BackgroundTaskRunner backgroundTasks;
     private final Host host;
-    private final Set<String> sessionAutoConfirmedTools = new HashSet<>();
-    private final HashMap<String, PendingAgentToolReview> pendingAgentToolReviews = new HashMap<>();
-    private final HashMap<String, PendingAgentToolRequest> pendingAgentToolRequests = new HashMap<>();
+    private final ToolConfirmationController toolConfirmationController;
+    private final ToolExecutionScheduler toolExecutionScheduler;
     private final StreamingRenderController streamingRenderController;
     private final AgentExecutionController.Host agentHost = new AgentExecutionController.Host() {
         @Override
@@ -156,9 +143,10 @@ final class GenerationFlowController {
         @Override
         public void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult) {
             mainThread.post(() -> {
-                synchronized (pendingAgentToolRequests) {
-                    pendingAgentToolRequests.put(displayToolCallId, new PendingAgentToolRequest(call, pendingToolResult));
-                }
+                toolConfirmationController.putPendingAgentToolRequest(
+                        displayToolCallId,
+                        new ToolConfirmationController.PendingAgentToolRequest(call, pendingToolResult)
+                );
                 host.persistCurrentConversation();
                 host.render();
             });
@@ -167,16 +155,60 @@ final class GenerationFlowController {
         @Override
         public void clearAgentToolReview(String displayToolCallId) {
             mainThread.post(() -> {
-                synchronized (pendingAgentToolRequests) {
-                    pendingAgentToolRequests.remove(displayToolCallId);
-                }
+                toolConfirmationController.removePendingAgentToolRequest(displayToolCallId);
                 host.render();
             });
         }
     };
 
-    private PendingToolExecution pendingToolExecution;
-    private String sessionAutoConfirmedConversationId = "";
+    private final ToolConfirmationController.Callback reviewCallback = new ToolConfirmationController.Callback() {
+        @Override
+        public boolean isActiveGeneration(int generationId) {
+            return chatSessionStore.isActiveGeneration(generationId);
+        }
+
+        @Override
+        public void addOrReplaceToolResult(ToolResult result) {
+            GenerationFlowController.this.addOrReplaceToolResult(result);
+        }
+
+        @Override
+        public void persistCurrentConversation() {
+            host.persistCurrentConversation();
+        }
+
+        @Override
+        public void render() {
+            host.render();
+        }
+
+        @Override
+        public void continueToolExecution(
+                int generationId,
+                ModelConfig selectedModel,
+                List<ToolCall> remainingCalls,
+                int usedToolCallCount,
+                String homePath,
+                ModelCancellationToken cancellationToken
+        ) {
+            GenerationFlowController.this.continueToolExecution(
+                    generationId, selectedModel, remainingCalls,
+                    usedToolCallCount, homePath, cancellationToken
+            );
+        }
+
+        @Override
+        public void executeAcceptedPendingTool(PendingToolExecution pending) {
+            GenerationFlowController.this.executeAcceptedPendingTool(pending);
+        }
+
+        @Override
+        public String currentConversationId() {
+            return host.currentConversationId();
+        }
+    };
+
+    private final ToolExecutionScheduler.Host schedulerHost;
 
     GenerationFlowController(
             ArrayList<ChatMessage> messages,
@@ -245,8 +277,6 @@ final class GenerationFlowController {
         this.memoryExtractionService = memoryExtractionService;
         this.extensionRepository = extensionRepository;
         this.toolRegistry = toolRegistry;
-        this.toolExecutor = toolExecutor;
-        this.toolRunController = toolRunController;
         this.toolMessageController = toolMessageController;
         this.modelPromptController = modelPromptController;
         this.generationController = generationController;
@@ -255,6 +285,11 @@ final class GenerationFlowController {
         this.mainThread = mainThread;
         this.backgroundTasks = backgroundTasks;
         this.host = host;
+        this.schedulerHost = () -> host.syncModePermission();
+        this.toolConfirmationController = new ToolConfirmationController(reviewCallback);
+        this.toolExecutionScheduler = new ToolExecutionScheduler(
+                toolRunController, toolExecutor, toolRegistry, toolConfirmationController, schedulerHost
+        );
         this.streamingRenderController = new StreamingRenderController(mainThread, result -> {
             if (result == null) {
                 return;
@@ -284,12 +319,12 @@ final class GenerationFlowController {
             this.agentExecutionController.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
                 @Override
                 public String awaitReview(String displayToolCallId, ToolCall call, ModelCancellationToken cancellationToken) throws InterruptedException {
-                    return awaitAgentToolReview(displayToolCallId, call, cancellationToken);
+                    return toolConfirmationController.awaitAgentToolReview(displayToolCallId, call, cancellationToken);
                 }
 
                 @Override
                 public boolean isAutoConfirmed(ToolCall call) {
-                    return isSessionAutoConfirmed(call);
+                    return toolConfirmationController.isSessionAutoConfirmed(call);
                 }
             });
         }
@@ -334,113 +369,23 @@ final class GenerationFlowController {
     }
 
     void handleToolReview(String state) {
-        PendingToolExecution pending = pendingToolExecution;
-        if (pending == null) {
-            return;
-        }
-        handlePendingToolReview(pending, state);
+        toolConfirmationController.handleToolReview(state);
     }
 
     boolean handleAgentToolReview(String toolCallId, String state) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return false;
-        }
-        PendingAgentToolReview pending;
-        synchronized (pendingAgentToolReviews) {
-            pending = pendingAgentToolReviews.get(toolCallId);
-        }
-        if (pending == null) {
-            return false;
-        }
-        pending.resolve(state);
-        if (isSessionAutoReview(state, pending.toolCall())) {
-            rememberSessionAutoConfirmation(pending.toolCall());
-        }
-        return true;
+        return toolConfirmationController.handleAgentToolReview(toolCallId, state);
     }
 
     boolean isPendingAgentToolReview(String toolCallId) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return false;
-        }
-        synchronized (pendingAgentToolRequests) {
-            return pendingAgentToolRequests.containsKey(toolCallId);
-        }
+        return toolConfirmationController.isPendingAgentToolReview(toolCallId);
     }
 
     void acceptAgentToolReview(String toolCallId, String state) {
-        if (toolCallId == null || toolCallId.length() == 0) {
-            return;
-        }
-        PendingAgentToolRequest request;
-        synchronized (pendingAgentToolRequests) {
-            request = pendingAgentToolRequests.remove(toolCallId);
-        }
-        if (request == null) {
-            return;
-        }
-        handleAgentToolReview(toolCallId, state);
-    }
-
-    private void handlePendingToolReview(PendingToolExecution pending, String state) {
-        if (pending == null || pending.getToolCall() == null) {
-            return;
-        }
-        if (!chatSessionStore.isActiveGeneration(pending.getGenerationId())) {
-            pendingToolExecution = null;
-            return;
-        }
-        boolean sessionAutoAccepted = isSessionAutoReview(state, pending.getToolCall());
-        String normalizedState = "rejected".equals(state) ? "rejected" : "accepted";
-        pendingToolExecution = null;
-        if ("rejected".equals(normalizedState)) {
-            ToolResult rejected = new ToolResult(
-                    pending.getToolCall().getId(),
-                    pending.getToolCall().getName(),
-                    rejectedToolMessage(pending.getToolCall()),
-                    true,
-                    "",
-                    "rejected",
-                    ""
-            );
-            addOrReplaceToolResult(rejected);
-            host.persistCurrentConversation();
-            host.render();
-            continueToolExecution(
-                    pending.getGenerationId(),
-                    pending.getSelectedModel(),
-                    pending.getRemainingCalls(),
-                    pending.getUsedToolCallCount(),
-                    pending.getHomePath(),
-                    pending.getCancellationToken()
-            );
-            return;
-        }
-        if (sessionAutoAccepted) {
-            rememberSessionAutoConfirmation(pending.getToolCall());
-        }
-
-        ToolResult accepted = new ToolResult(
-                pending.getToolCall().getId(),
-                pending.getToolCall().getName(),
-                "",
-                false,
-                "",
-                "accepted",
-                ""
-        );
-        addOrReplaceToolResult(accepted);
-        host.persistCurrentConversation();
-        host.render();
-        executeAcceptedPendingTool(pending);
+        toolConfirmationController.acceptAgentToolReview(toolCallId, state);
     }
 
     boolean isPendingToolReview(String toolCallId) {
-        return toolCallId != null
-                && toolCallId.length() > 0
-                && pendingToolExecution != null
-                && pendingToolExecution.getToolCall() != null
-                && toolCallId.equals(pendingToolExecution.getToolCall().getId());
+        return toolConfirmationController.isPendingToolReview(toolCallId);
     }
 
     void postToolProgress(
@@ -462,8 +407,6 @@ final class GenerationFlowController {
                 return;
             }
             String reviewState = resolveProgressReviewState(content, error);
-            // 不回退保护：若该工具已有"完成/失败"等终态结果，进度发布不应把它拉回运行中，
-            // 否则异步进度会覆盖同步的最终结果，导致进度圈永不消失。
             String existing = toolMessageController.currentReviewState(toolCallId);
             boolean existingIsFinal = existing.length() > 0
                     && !"running".equals(existing)
@@ -498,7 +441,6 @@ final class GenerationFlowController {
                 }
             }
         } catch (Exception ignored) {
-            // 非 JSON 进度内容（如 shell/image 的纯文本进度），保持 running
         }
         return error ? "error" : "running";
     }
@@ -508,11 +450,7 @@ final class GenerationFlowController {
     }
 
     void cancelActiveGeneration() {
-        pendingToolExecution = null;
-        rejectPendingAgentToolReviews();
-        synchronized (pendingAgentToolRequests) {
-            pendingAgentToolRequests.clear();
-        }
+        toolConfirmationController.cancelPendingReviews();
         streamingRenderController.clear();
     }
 
@@ -521,10 +459,7 @@ final class GenerationFlowController {
     }
 
     void clearSessionAutoToolConfirmations() {
-        synchronized (sessionAutoConfirmedTools) {
-            sessionAutoConfirmedTools.clear();
-            sessionAutoConfirmedConversationId = host.currentConversationId();
-        }
+        toolConfirmationController.clearSessionAutoToolConfirmations();
     }
 
     void scheduleAgentProgressRender(AgentProgressSession session) {
@@ -655,7 +590,10 @@ final class GenerationFlowController {
             ModelCancellationToken cancellationToken
     ) {
         backgroundTasks.execute("linecode-tool-execute", () -> {
-            ToolExecutionBatch batch = executeToolCallsUntilPending(toolCalls, homePath, selectedModel, cancellationToken, generationId, usedToolCallCount);
+            ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId, usedToolCallCount);
+            ToolExecutionBatch batch = toolExecutionScheduler.executeToolCallsUntilPending(
+                    toolCalls, context, cancellationToken
+            );
             if (cancellationToken != null && cancellationToken.isCancelled()) {
                 return;
             }
@@ -666,63 +604,6 @@ final class GenerationFlowController {
                 handleToolExecutionBatch(generationId, selectedModel, usedToolCallCount, homePath, cancellationToken, batch);
             });
         });
-    }
-
-    private ToolExecutionBatch executeToolCallsUntilPending(
-            List<ToolCall> toolCalls,
-            String homePath,
-            ModelConfig selectedModel,
-            ModelCancellationToken cancellationToken,
-            int generationId,
-            int usedToolCallCount
-    ) {
-        host.syncModePermission();
-        toolRegistry.reloadExtensions();
-        ToolExecutionCoordinator.ToolExecutionPlan plan = toolRunController.createPlan(toolCalls);
-        HashMap<String, ToolResult> resultById = new HashMap<>();
-        ToolContext context = toolContext(homePath, selectedModel, cancellationToken, generationId, usedToolCallCount);
-
-        if (!plan.getConcurrentTasks().isEmpty()) {
-            ExecutorService executor = Executors.newFixedThreadPool(Math.min(4, plan.getConcurrentTasks().size()));
-            ArrayList<ToolCall> concurrentCalls = new ArrayList<>(plan.getConcurrentTasks());
-            ArrayList<Future<ToolResult>> futures = new ArrayList<>();
-            for (ToolCall call : concurrentCalls) {
-                futures.add(executor.submit(() -> toolExecutor.execute(call, context)));
-            }
-            for (int i = 0; i < futures.size(); i++) {
-                ToolCall call = concurrentCalls.get(i);
-                if (cancellationToken != null && cancellationToken.isCancelled()) {
-                    executor.shutdownNow();
-                    return new ToolExecutionBatch(new ArrayList<>(), null, new ArrayList<>());
-                }
-                try {
-                    ToolResult result = futures.get(i).get();
-                    resultById.put(call.getId(), result);
-                } catch (Exception e) {
-                    restoreInterrupt(e);
-                    resultById.put(call.getId(), new ToolResult(call.getId(), call.getName(), "执行失败: " + describeException(e), true));
-                }
-            }
-            executor.shutdownNow();
-        }
-
-        List<ToolCall> sequentialTasks = plan.getSequentialTasks();
-        for (int i = 0; i < sequentialTasks.size(); i++) {
-            ToolCall call = sequentialTasks.get(i);
-            if (cancellationToken != null && cancellationToken.isCancelled()) {
-                return new ToolExecutionBatch(new ArrayList<>(), null, new ArrayList<>());
-            }
-            if (shouldPauseForConfirmation(call)) {
-                return new ToolExecutionBatch(
-                        toolRunController.orderedResults(toolCalls, resultById),
-                        call,
-                        toolRunController.remainingCalls(sequentialTasks, i + 1)
-                );
-            }
-            resultById.put(call.getId(), executeToolCallWithSessionPolicy(call, context));
-        }
-
-        return new ToolExecutionBatch(toolRunController.orderedResults(toolCalls, resultById), null, new ArrayList<>());
     }
 
     private void handleToolExecutionBatch(
@@ -745,7 +626,7 @@ final class GenerationFlowController {
                     ""
             );
             addOrReplaceToolResult(pendingResult);
-            pendingToolExecution = new PendingToolExecution(
+            toolConfirmationController.setPendingToolExecution(new PendingToolExecution(
                     generationId,
                     selectedModel,
                     batch.getPendingCall(),
@@ -753,7 +634,7 @@ final class GenerationFlowController {
                     usedToolCallCount,
                     homePath,
                     cancellationToken
-            );
+            ));
             host.persistCurrentConversation();
             host.render();
             return;
@@ -803,56 +684,32 @@ final class GenerationFlowController {
             int usedToolCallCount
     ) {
         final int[] counter = new int[]{Math.max(0, usedToolCallCount)};
-        return new ToolContext(homePath, extensionRepository.skillWriteRoots(homePath), new ToolContext.AgentRunner() {
-            @Override
-            public ToolResult runAgent(JSONObject input, ToolContext context) {
-                return agentExecutionController.runAgentTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
-            }
+        return ToolContext.builder()
+                .homePath(homePath)
+                .extraWriteRoots(extensionRepository.skillWriteRoots(homePath))
+                .agentRunner(new ToolContext.AgentRunner() {
+                    @Override
+                    public ToolResult runAgent(JSONObject input, ToolContext context) {
+                        return agentExecutionController.runAgentTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
+                    }
 
-            @Override
-            public ToolResult runAgentPipeline(JSONObject input, ToolContext context) {
-                return agentExecutionController.runAgentPipelineTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
-            }
-        }, "", (toolCallId, toolName, content, error) ->
-                postToolProgress(generationId, cancellationToken, toolCallId, toolName, content, error),
-                todoStateStore);
-    }
-
-    private String awaitAgentToolReview(
-            String displayToolCallId,
-            ToolCall call,
-            ModelCancellationToken cancellationToken
-    ) throws InterruptedException {
-        if (displayToolCallId == null || displayToolCallId.length() == 0) {
-            return "accepted";
-        }
-        PendingAgentToolReview pending = new PendingAgentToolReview(call);
-        synchronized (pendingAgentToolReviews) {
-            pendingAgentToolReviews.put(displayToolCallId, pending);
-        }
-        try {
-            while (true) {
-                if (cancellationToken != null && cancellationToken.isCancelled()) {
-                    return "rejected";
-                }
-                if (pending.await(250L)) {
-                    return pending.state();
-                }
-            }
-        } finally {
-            synchronized (pendingAgentToolReviews) {
-                pendingAgentToolReviews.remove(displayToolCallId);
-            }
-        }
+                    @Override
+                    public ToolResult runAgentPipeline(JSONObject input, ToolContext context) {
+                        return agentExecutionController.runAgentPipelineTool(input, context, selectedModel, cancellationToken, generationId, agentHost, counter[0]);
+                    }
+                })
+                .toolCallId("")
+                .progressListener((toolCallId, toolName, content, error) ->
+                        postToolProgress(generationId, cancellationToken, toolCallId, toolName, content, error))
+                .todoStateStore(todoStateStore)
+                .build();
     }
 
     private void executeAcceptedPendingTool(PendingToolExecution pending) {
         backgroundTasks.execute("linecode-tool-confirmed", () -> {
             ToolResult result;
             try {
-                host.syncModePermission();
-                toolRegistry.reloadExtensions();
-                result = toolExecutor
+                result = toolExecutionScheduler
                         .executeConfirmed(pending.getToolCall(), toolContext(
                                 pending.getHomePath(),
                                 pending.getSelectedModel(),
@@ -894,55 +751,6 @@ final class GenerationFlowController {
                 );
             });
         });
-    }
-
-    private ToolResult executeToolCallWithSessionPolicy(ToolCall call, ToolContext context) {
-        if (isSessionAutoConfirmed(call)) {
-            return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
-        }
-        return toolExecutor.execute(call, context);
-    }
-
-    private boolean shouldPauseForConfirmation(ToolCall call) {
-        host.syncModePermission();
-        if (isSessionAutoConfirmed(call)) {
-            return false;
-        }
-        return toolRunController.shouldPauseForConfirmation(call);
-    }
-
-    private boolean isSessionAutoReview(String state, ToolCall call) {
-        return TOOL_REVIEW_SESSION_AUTO.equals(state)
-                && call != null
-                && SHELL_EXECUTE_TOOL.equals(call.getName());
-    }
-
-    private void rememberSessionAutoConfirmation(ToolCall call) {
-        if (call == null || !SHELL_EXECUTE_TOOL.equals(call.getName())) {
-            return;
-        }
-        synchronized (sessionAutoConfirmedTools) {
-            syncSessionAutoToolConfirmationsLocked();
-            sessionAutoConfirmedTools.add(call.getName());
-        }
-    }
-
-    private boolean isSessionAutoConfirmed(ToolCall call) {
-        if (call == null) {
-            return false;
-        }
-        synchronized (sessionAutoConfirmedTools) {
-            syncSessionAutoToolConfirmationsLocked();
-            return sessionAutoConfirmedTools.contains(call.getName());
-        }
-    }
-
-    private void syncSessionAutoToolConfirmationsLocked() {
-        String conversationId = host.currentConversationId();
-        if (!conversationId.equals(sessionAutoConfirmedConversationId)) {
-            sessionAutoConfirmedTools.clear();
-            sessionAutoConfirmedConversationId = conversationId;
-        }
     }
 
     private void failGeneration(int generationId, String assistantId, String text) {
@@ -1091,35 +899,8 @@ final class GenerationFlowController {
         toolMessageController.addTerminatedResultsForUnfinishedToolCalls(terminatedMessage);
     }
 
-    private void rejectPendingAgentToolReviews() {
-        synchronized (pendingAgentToolReviews) {
-            for (PendingAgentToolReview pending : pendingAgentToolReviews.values()) {
-                if (pending != null) {
-                    pending.resolve("rejected");
-                }
-            }
-            pendingAgentToolReviews.clear();
-        }
-    }
-
     private void addOrReplaceToolResult(ToolResult result) {
         toolMessageController.addOrReplaceToolResult(result);
-    }
-
-    private String rejectedToolMessage(ToolCall call) {
-        String reason = "";
-        try {
-            JSONObject input = call.getArguments().trim().length() == 0
-                    ? new JSONObject()
-                    : new JSONObject(call.getArguments());
-            reason = input.optString("reason").trim();
-        } catch (Exception ignored) {
-            reason = "";
-        }
-        if (reason.length() == 0) {
-            return "用户拒绝执行此工具。";
-        }
-        return "用户拒绝删除：" + reason;
     }
 
     private static void restoreInterrupt(Exception error) {
@@ -1142,43 +923,6 @@ final class GenerationFlowController {
         }
         String name = error.getClass().getSimpleName();
         return name.length() == 0 ? "未知错误" : name;
-    }
-
-    private static final class PendingAgentToolReview {
-        private final CountDownLatch latch = new CountDownLatch(1);
-        private final ToolCall toolCall;
-        private String state = "accepted";
-
-        PendingAgentToolReview(ToolCall toolCall) {
-            this.toolCall = toolCall;
-        }
-
-        boolean await(long timeoutMs) throws InterruptedException {
-            return latch.await(Math.max(1L, timeoutMs), TimeUnit.MILLISECONDS);
-        }
-
-        void resolve(String nextState) {
-            state = "rejected".equals(nextState) ? "rejected" : "accepted";
-            latch.countDown();
-        }
-
-        String state() {
-            return state;
-        }
-
-        ToolCall toolCall() {
-            return toolCall;
-        }
-    }
-
-    private static final class PendingAgentToolRequest {
-        final ToolCall call;
-        final ToolResult pending;
-
-        PendingAgentToolRequest(ToolCall call, ToolResult pending) {
-            this.call = call;
-            this.pending = pending;
-        }
     }
 
     private int findMessageIndex(String id) {

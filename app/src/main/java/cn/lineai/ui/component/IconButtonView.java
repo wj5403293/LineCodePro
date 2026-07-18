@@ -3,6 +3,7 @@ package cn.lineai.ui.component;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.util.SparseArray;
 import android.widget.ImageButton;
 import cn.lineai.R;
 
@@ -91,6 +92,93 @@ public final class IconButtonView extends ImageButton {
     public static final int TEXT_CURSOR = 82;
     public static final int CHECK_SQUARE = 83;
 
+    private static final SparseArray<Integer> ICON_MAP = new SparseArray<>();
+    static {
+        ICON_MAP.put(MENU, R.drawable.ic_lucide_menu);
+        ICON_MAP.put(PLUS, R.drawable.ic_lucide_plus);
+        ICON_MAP.put(SHIELD, R.drawable.ic_lucide_shield);
+        ICON_MAP.put(MORE, R.drawable.ic_lucide_ellipsis_vertical);
+        ICON_MAP.put(ARROW_UP, R.drawable.ic_lucide_arrow_up);
+        ICON_MAP.put(STOP, R.drawable.ic_lucide_square);
+        ICON_MAP.put(CHEVRON_DOWN, R.drawable.ic_lucide_chevron_down);
+        ICON_MAP.put(CLOSE, R.drawable.ic_lucide_x);
+        ICON_MAP.put(FOLDER_OPEN, R.drawable.ic_lucide_folder_open);
+        ICON_MAP.put(FOLDER_PLUS, R.drawable.ic_lucide_folder_plus);
+        ICON_MAP.put(ARCHIVE, R.drawable.ic_lucide_archive);
+        ICON_MAP.put(MESSAGE_SQUARE, R.drawable.ic_lucide_message_square);
+        ICON_MAP.put(TRASH_2, R.drawable.ic_lucide_trash_2);
+        ICON_MAP.put(CHECK, R.drawable.ic_lucide_check);
+        ICON_MAP.put(FILE_PLUS, R.drawable.ic_lucide_file_plus);
+        ICON_MAP.put(COPY, R.drawable.ic_lucide_copy);
+        ICON_MAP.put(ROTATE_CCW, R.drawable.ic_lucide_rotate_ccw);
+        ICON_MAP.put(FOLDER, R.drawable.ic_lucide_folder);
+        ICON_MAP.put(FILE, R.drawable.ic_lucide_file);
+        ICON_MAP.put(FILE_TEXT, R.drawable.ic_lucide_file_text);
+        ICON_MAP.put(FILE_CODE, R.drawable.ic_lucide_file_code);
+        ICON_MAP.put(CHEVRON_LEFT, R.drawable.ic_lucide_chevron_left);
+        ICON_MAP.put(CHEVRON_RIGHT, R.drawable.ic_lucide_chevron_right);
+        ICON_MAP.put(BOX, R.drawable.ic_lucide_box);
+        ICON_MAP.put(MONITOR, R.drawable.ic_lucide_monitor);
+        ICON_MAP.put(BRAIN, R.drawable.ic_lucide_brain);
+        ICON_MAP.put(PACKAGE, R.drawable.ic_lucide_package);
+        ICON_MAP.put(PALETTE, R.drawable.ic_lucide_palette);
+        ICON_MAP.put(DATABASE, R.drawable.ic_lucide_database);
+        ICON_MAP.put(BOOK_OPEN, R.drawable.ic_lucide_book_open);
+        ICON_MAP.put(BATTERY_CHARGING, R.drawable.ic_lucide_battery_charging);
+        ICON_MAP.put(FLASK_CONICAL, R.drawable.ic_lucide_flask_conical);
+        ICON_MAP.put(CPU, R.drawable.ic_lucide_cpu);
+        ICON_MAP.put(ZAP, R.drawable.ic_lucide_zap);
+        ICON_MAP.put(SMILE, R.drawable.ic_lucide_smile);
+        ICON_MAP.put(EXPAND, R.drawable.ic_lucide_expand);
+        ICON_MAP.put(SCROLL_TEXT, R.drawable.ic_lucide_scroll_text);
+        ICON_MAP.put(SPARKLES, R.drawable.ic_lucide_sparkles);
+        ICON_MAP.put(GLOBE, R.drawable.ic_lucide_globe);
+        ICON_MAP.put(EXTERNAL_LINK, R.drawable.ic_lucide_external_link);
+        ICON_MAP.put(MESSAGE_CIRCLE, R.drawable.ic_lucide_message_circle);
+        ICON_MAP.put(SUN, R.drawable.ic_lucide_sun);
+        ICON_MAP.put(MOON, R.drawable.ic_lucide_moon);
+        ICON_MAP.put(COFFEE, R.drawable.ic_lucide_coffee);
+        ICON_MAP.put(CODE, R.drawable.ic_lucide_code);
+        ICON_MAP.put(CONTRAST, R.drawable.ic_lucide_contrast);
+        ICON_MAP.put(GIT_BRANCH, R.drawable.ic_lucide_git_branch);
+        ICON_MAP.put(PAINTBRUSH, R.drawable.ic_lucide_paintbrush);
+        ICON_MAP.put(SAVE, R.drawable.ic_lucide_save);
+        ICON_MAP.put(REFRESH_CW, R.drawable.ic_lucide_refresh_cw);
+        ICON_MAP.put(UPLOAD, R.drawable.ic_lucide_upload);
+        ICON_MAP.put(POWER, R.drawable.ic_lucide_power);
+        ICON_MAP.put(SETTINGS, R.drawable.ic_lucide_settings);
+        ICON_MAP.put(GIT_COMPARE, R.drawable.ic_lucide_git_compare);
+        ICON_MAP.put(BELL, R.drawable.ic_lucide_bell);
+        ICON_MAP.put(MUSIC, R.drawable.ic_lucide_music);
+        ICON_MAP.put(SMARTPHONE, R.drawable.ic_lucide_smartphone);
+        ICON_MAP.put(SQUARE_FUNCTION, R.drawable.ic_lucide_square_function);
+        ICON_MAP.put(USER, R.drawable.ic_lucide_user);
+        ICON_MAP.put(BUG, R.drawable.ic_lucide_bug);
+        ICON_MAP.put(DOWNLOAD, R.drawable.ic_lucide_download);
+        ICON_MAP.put(BOXES, R.drawable.ic_lucide_boxes);
+        ICON_MAP.put(SLIDERS_HORIZONTAL, R.drawable.ic_lucide_sliders_horizontal);
+        ICON_MAP.put(FILE_UP, R.drawable.ic_lucide_file_up);
+        ICON_MAP.put(SEARCH, R.drawable.ic_lucide_search);
+        ICON_MAP.put(SERVER, R.drawable.ic_lucide_server);
+        ICON_MAP.put(TERMINAL, R.drawable.ic_lucide_terminal);
+        ICON_MAP.put(SHIELD_CHECK, R.drawable.ic_lucide_shield_check);
+        ICON_MAP.put(CLOCK_3, R.drawable.ic_lucide_clock_3);
+        ICON_MAP.put(MESSAGE_SQUARE_TEXT, R.drawable.ic_lucide_message_square_text);
+        ICON_MAP.put(BOT, R.drawable.ic_lucide_bot);
+        ICON_MAP.put(CIRCLE_CHECK, R.drawable.ic_lucide_circle_check);
+        ICON_MAP.put(CIRCLE_X, R.drawable.ic_lucide_circle_x);
+        ICON_MAP.put(LOADER, R.drawable.ic_lucide_loader);
+        ICON_MAP.put(FILE_PEN_LINE, R.drawable.ic_lucide_file_pen_line);
+        ICON_MAP.put(WRENCH, R.drawable.ic_lucide_wrench);
+        ICON_MAP.put(PLAY, R.drawable.ic_lucide_play);
+        ICON_MAP.put(CIRCLE_ALERT, R.drawable.ic_lucide_circle_alert);
+        ICON_MAP.put(MCP, R.drawable.ic_lineai_mcp);
+        ICON_MAP.put(SHARE, R.drawable.ic_lucide_share_2);
+        ICON_MAP.put(QUOTE, R.drawable.ic_lucide_quote);
+        ICON_MAP.put(TEXT_CURSOR, R.drawable.ic_lucide_text_cursor);
+        ICON_MAP.put(CHECK_SQUARE, R.drawable.ic_lucide_check_square);
+    }
+
     private int iconType;
     private int iconColor = Color.WHITE;
 
@@ -140,175 +228,7 @@ public final class IconButtonView extends ImageButton {
     }
 
     private int drawableFor(int type) {
-        switch (type) {
-            case MENU:
-                return R.drawable.ic_lucide_menu;
-            case PLUS:
-                return R.drawable.ic_lucide_plus;
-            case SHIELD:
-                return R.drawable.ic_lucide_shield;
-            case MORE:
-                return R.drawable.ic_lucide_ellipsis_vertical;
-            case ARROW_UP:
-                return R.drawable.ic_lucide_arrow_up;
-            case STOP:
-                return R.drawable.ic_lucide_square;
-            case CHEVRON_DOWN:
-                return R.drawable.ic_lucide_chevron_down;
-            case CLOSE:
-                return R.drawable.ic_lucide_x;
-            case FOLDER_OPEN:
-                return R.drawable.ic_lucide_folder_open;
-            case FOLDER_PLUS:
-                return R.drawable.ic_lucide_folder_plus;
-            case ARCHIVE:
-                return R.drawable.ic_lucide_archive;
-            case MESSAGE_SQUARE:
-                return R.drawable.ic_lucide_message_square;
-            case TRASH_2:
-                return R.drawable.ic_lucide_trash_2;
-            case CHECK:
-                return R.drawable.ic_lucide_check;
-            case FILE_PLUS:
-                return R.drawable.ic_lucide_file_plus;
-            case COPY:
-                return R.drawable.ic_lucide_copy;
-            case ROTATE_CCW:
-                return R.drawable.ic_lucide_rotate_ccw;
-            case FOLDER:
-                return R.drawable.ic_lucide_folder;
-            case FILE:
-                return R.drawable.ic_lucide_file;
-            case FILE_TEXT:
-                return R.drawable.ic_lucide_file_text;
-            case FILE_CODE:
-                return R.drawable.ic_lucide_file_code;
-            case CHEVRON_LEFT:
-                return R.drawable.ic_lucide_chevron_left;
-            case CHEVRON_RIGHT:
-                return R.drawable.ic_lucide_chevron_right;
-            case BOX:
-                return R.drawable.ic_lucide_box;
-            case MONITOR:
-                return R.drawable.ic_lucide_monitor;
-            case BRAIN:
-                return R.drawable.ic_lucide_brain;
-            case PACKAGE:
-                return R.drawable.ic_lucide_package;
-            case PALETTE:
-                return R.drawable.ic_lucide_palette;
-            case DATABASE:
-                return R.drawable.ic_lucide_database;
-            case BOOK_OPEN:
-                return R.drawable.ic_lucide_book_open;
-            case BATTERY_CHARGING:
-                return R.drawable.ic_lucide_battery_charging;
-            case FLASK_CONICAL:
-                return R.drawable.ic_lucide_flask_conical;
-            case CPU:
-                return R.drawable.ic_lucide_cpu;
-            case ZAP:
-                return R.drawable.ic_lucide_zap;
-            case SMILE:
-                return R.drawable.ic_lucide_smile;
-            case EXPAND:
-                return R.drawable.ic_lucide_expand;
-            case SCROLL_TEXT:
-                return R.drawable.ic_lucide_scroll_text;
-            case SPARKLES:
-                return R.drawable.ic_lucide_sparkles;
-            case GLOBE:
-                return R.drawable.ic_lucide_globe;
-            case EXTERNAL_LINK:
-                return R.drawable.ic_lucide_external_link;
-            case MESSAGE_CIRCLE:
-                return R.drawable.ic_lucide_message_circle;
-            case SUN:
-                return R.drawable.ic_lucide_sun;
-            case MOON:
-                return R.drawable.ic_lucide_moon;
-            case COFFEE:
-                return R.drawable.ic_lucide_coffee;
-            case CODE:
-                return R.drawable.ic_lucide_code;
-            case CONTRAST:
-                return R.drawable.ic_lucide_contrast;
-            case GIT_BRANCH:
-                return R.drawable.ic_lucide_git_branch;
-            case PAINTBRUSH:
-                return R.drawable.ic_lucide_paintbrush;
-            case SAVE:
-                return R.drawable.ic_lucide_save;
-            case REFRESH_CW:
-                return R.drawable.ic_lucide_refresh_cw;
-            case UPLOAD:
-                return R.drawable.ic_lucide_upload;
-            case POWER:
-                return R.drawable.ic_lucide_power;
-            case SETTINGS:
-                return R.drawable.ic_lucide_settings;
-            case GIT_COMPARE:
-                return R.drawable.ic_lucide_git_compare;
-            case BELL:
-                return R.drawable.ic_lucide_bell;
-            case MUSIC:
-                return R.drawable.ic_lucide_music;
-            case SMARTPHONE:
-                return R.drawable.ic_lucide_smartphone;
-            case SQUARE_FUNCTION:
-                return R.drawable.ic_lucide_square_function;
-            case USER:
-                return R.drawable.ic_lucide_user;
-            case BUG:
-                return R.drawable.ic_lucide_bug;
-            case DOWNLOAD:
-                return R.drawable.ic_lucide_download;
-            case BOXES:
-                return R.drawable.ic_lucide_boxes;
-            case SLIDERS_HORIZONTAL:
-                return R.drawable.ic_lucide_sliders_horizontal;
-            case FILE_UP:
-                return R.drawable.ic_lucide_file_up;
-            case SEARCH:
-                return R.drawable.ic_lucide_search;
-            case SERVER:
-                return R.drawable.ic_lucide_server;
-            case TERMINAL:
-                return R.drawable.ic_lucide_terminal;
-            case SHIELD_CHECK:
-                return R.drawable.ic_lucide_shield_check;
-            case CLOCK_3:
-                return R.drawable.ic_lucide_clock_3;
-            case MESSAGE_SQUARE_TEXT:
-                return R.drawable.ic_lucide_message_square_text;
-            case BOT:
-                return R.drawable.ic_lucide_bot;
-            case CIRCLE_CHECK:
-                return R.drawable.ic_lucide_circle_check;
-            case CIRCLE_X:
-                return R.drawable.ic_lucide_circle_x;
-            case LOADER:
-                return R.drawable.ic_lucide_loader;
-            case FILE_PEN_LINE:
-                return R.drawable.ic_lucide_file_pen_line;
-            case WRENCH:
-                return R.drawable.ic_lucide_wrench;
-            case PLAY:
-                return R.drawable.ic_lucide_play;
-            case CIRCLE_ALERT:
-                return R.drawable.ic_lucide_circle_alert;
-            case MCP:
-                return R.drawable.ic_lineai_mcp;
-            case SHARE:
-                return R.drawable.ic_lucide_share_2;
-            case QUOTE:
-                return R.drawable.ic_lucide_quote;
-            case TEXT_CURSOR:
-                return R.drawable.ic_lucide_text_cursor;
-            case CHECK_SQUARE:
-                return R.drawable.ic_lucide_check_square;
-            default:
-                return R.drawable.ic_lucide_plus;
-        }
+        Integer resId = ICON_MAP.get(type);
+        return resId != null ? resId : R.drawable.ic_lucide_plus;
     }
 }

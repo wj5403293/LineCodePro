@@ -4,7 +4,6 @@ import android.content.Context;
 import android.content.res.Configuration;
 import cn.lineai.model.ThemePalette;
 import cn.lineai.model.ThemeSettingsState;
-import cn.lineai.ui.theme.LineTheme;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.json.JSONObject;
@@ -73,21 +72,19 @@ public final class ThemeSettingsRepository {
         settingsRepository.setString(KEY_CUSTOM_THEME_COLORS, object.toString());
     }
 
-    public synchronized ThemePalette applyCurrentTheme() {
-        ThemePalette palette = getState().getPalette();
-        LineTheme.apply(palette);
-        return palette;
+    public synchronized ThemePalette resolveCurrentPalette() {
+        return getState().getPalette();
     }
 
-    public synchronized ThemePalette applyThemeMode(String mode) {
+    public synchronized ThemePalette resolveThemePalette(String mode) {
         setThemeMode(mode);
-        return applyCurrentTheme();
+        return resolveCurrentPalette();
     }
 
-    public synchronized ThemePalette saveCustomThemeColors(Map<String, String> colors) {
+    public synchronized ThemePalette resolveCustomPalette(Map<String, String> colors) {
         setCustomThemeColors(colors);
         setThemeMode(ThemePalette.MODE_CUSTOM);
-        return applyCurrentTheme();
+        return resolveCurrentPalette();
     }
 
     private ThemePalette paletteFor(String resolvedMode, Map<String, String> customColors) {

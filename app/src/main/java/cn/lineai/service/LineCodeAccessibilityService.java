@@ -22,6 +22,14 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Accessibility service for phone control tools (click, swipe, screenshot, etc.).
+ *
+ * <p>This class has no dependency on :app internal classes (only Android SDK).
+ * It can be extracted into :feature-phone once the tool framework is extracted
+ * into a shared module, since Phone*Tool classes depend on this service.
+ * See {@code cn.lineai.tool.builtin.PhoneClickTool} for full module split barrier notes.
+ */
 public final class LineCodeAccessibilityService extends AccessibilityService {
 
     private static volatile LineCodeAccessibilityService instance;

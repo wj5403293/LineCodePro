@@ -66,7 +66,7 @@ public final class ToolRunController {
             return false;
         }
         BaseTool tool = toolRegistry.get(call.getName());
-        if (tool == null || !tool.requiresConfirmation()) {
+        if (tool == null || !tool.needsConfirmation()) {
             return false;
         }
         PermissionResult permission = toolSettingsRepository.canExecuteTool(tool.getName(), tool.getCategory());

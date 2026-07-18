@@ -2,6 +2,7 @@ package cn.lineai.data.repository;
 
 import cn.lineai.model.McpToolConfig;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.ToolRegistry;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
@@ -18,7 +19,7 @@ public final class ToolSettingsRepositoryTest {
     @Test
     public void toolPromptUsesRegisteredToolMetadata() {
         ToolRegistry registry = new ToolRegistry();
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         for (BaseTool tool : registry.getAll()) {
             toolByName.put(tool.getName(), tool);
         }
@@ -88,7 +89,7 @@ public final class ToolSettingsRepositoryTest {
     @Test
     public void nativeToolPromptForbidsInlineToolMarkup() {
         ToolRegistry registry = new ToolRegistry();
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         for (BaseTool tool : registry.getAll()) {
             toolByName.put(tool.getName(), tool);
         }
@@ -115,7 +116,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void sshToolPromptIncludesCustomMcpTools() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         ToolRegistry registry = new ToolRegistry();
         BaseTool customMcp = new DummyCustomMcpTool();
         toolByName.put("shell_execute", registry.get("shell_execute"));
@@ -211,7 +212,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void terminalProviderToolPromptIncludesShellAndImageTools() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         ToolRegistry registry = new ToolRegistry();
         toolByName.put("shell_execute", registry.get("shell_execute"));
         toolByName.put("image_understanding", registry.get("image_understanding"));
@@ -263,7 +264,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void terminalProviderToolPromptIncludesCustomMcpTools() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         ToolRegistry registry = new ToolRegistry();
         BaseTool customMcp = new DummyCustomMcpTool();
         toolByName.put("shell_execute", registry.get("shell_execute"));
@@ -294,7 +295,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void terminalProviderToolPromptUsesNativeToolProtocolNotice() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         ToolRegistry registry = new ToolRegistry();
         toolByName.put("shell_execute", registry.get("shell_execute"));
         Set<String> enabled = new LinkedHashSet<>();
@@ -320,7 +321,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void terminalProviderToolPromptUsesToolCallsMarkupWhenNotNative() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         ToolRegistry registry = new ToolRegistry();
         toolByName.put("shell_execute", registry.get("shell_execute"));
         Set<String> enabled = new LinkedHashSet<>();
@@ -346,7 +347,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void extensionToolsAreRenderedInStableNameOrder() {
-        Map<String, BaseTool> toolByName = new LinkedHashMap<>();
+        Map<String, ToolInfo> toolByName = new LinkedHashMap<>();
         BaseTool beta = new NamedDummyCustomMcpTool("mcpx_beta_lookup");
         BaseTool alpha = new NamedDummyCustomMcpTool("mcpx_alpha_lookup");
         toolByName.put(beta.getName(), beta);

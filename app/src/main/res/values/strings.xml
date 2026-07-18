@@ -636,8 +636,6 @@
     <string name="tool_call_output">Output</string>
     <string name="tool_call_diff_truncated">… (diff truncated, total %1$d lines)</string>
 
-    <string name="markdown_image_label">[Image]</string>
-
     <string name="screen_about_title">About</string>
     <string name="screen_about_section_version">Version</string>
     <string name="screen_about_section_developer">Developer</string>
@@ -1077,25 +1075,6 @@
     <string name="phone_tool_global_action_missing">Missing action</string>
     <string name="phone_tool_global_action_success">System action succeeded: %1$s</string>
     <string name="phone_tool_global_action_failed">System action failed or is unsupported: %1$s</string>
-
-    <string name="markdown_code_copy_desc">Copy code</string>
-    <string name="markdown_code_copied">Copied</string>
-
-    <!-- SshService user-visible messages -->
-    <string name="ssh_error_command_empty">Command cannot be empty</string>
-    <string name="ssh_error_not_configured">SSH is not fully configured. Please fill in host, port, username, and either password or private key.</string>
-    <string name="ssh_error_sftp_empty">SFTP operation cannot be empty</string>
-    <string name="ssh_error_termux_permission">LineCode has not been granted the Termux RUN_COMMAND permission. Please allow \"Run commands in Termux environment\" in app permissions.</string>
-    <string name="ssh_error_termux_no_result">Termux returned no execution result. Please ensure Termux version &gt;= 0.109.</string>
-    <string name="ssh_error_termux_command_failed">Termux failed to start command: %1$d</string>
-    <string name="ssh_error_termux_setup_timeout">Timed out waiting for Termux to configure OpenSSH. Please ensure Termux has run the authorization command and enabled allow-external-apps=true.</string>
-    <string name="ssh_error_command_timeout">Command execution timed out</string>
-    <string name="ssh_error_create_config_dir">Unable to create SSH config directory: %1$s</string>
-    <string name="ssh_error_create_known_hosts">Unable to create known_hosts file: %1$s</string>
-    <string name="ssh_error_termux_parse_failed">Termux returned a result, but no username or private key was parsed.\n%1$s</string>
-    <string name="ssh_error_termux_not_installed">Termux is not detected. Please install Termux first.</string>
-    <string name="ssh_redact_private_key">LINEAI_PRIVATE_KEY=[saved to SSH Private key]</string>
-    <string name="ssh_error_read_termux_script">Unable to read Termux setup script: %1$s</string>
 
     <!-- MainCoordinator agent messages -->
     <string name="message_generation_interrupted">Previous generation was interrupted.</string>

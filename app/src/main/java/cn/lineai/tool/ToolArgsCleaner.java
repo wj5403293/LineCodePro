@@ -27,6 +27,7 @@ public final class ToolArgsCleaner {
         s = removeCommentsAndControlChars(s);
         s = removeTrailingCommas(s);
         s = normalizeSingleQuotes(s);
+        s = balanceBraces(s);
 
         if (s.trim().length() == 0) {
             return "{}";
@@ -285,5 +286,66 @@ public final class ToolArgsCleaner {
             }
         }
         return true;
+    }
+
+    /**
+     * 修复因模型输出截断导致的未闭合 JSON 结构符号。
+     * 只追加缺失的闭合符号，不补全字段值。
+     */
+    private static String balanceBraces(String s) {
+        if (s == null || s.length() == 0) {
+            return s;
+        }
+        StringBuilder out = new StringBuilder(s.length());
+        char[] stack = new char[s.length()];
+        int stackSize = 0;
+        boolean inString = false;
+        boolean escape = false;
+
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (escape) {
+                out.append(c);
+                escape = false;
+                continue;
+            }
+            if (c == '\\') {
+                out.append(c);
+                escape = true;
+                continue;
+            }
+            if (c == '"') {
+                inString = !inString;
+                out.append(c);
+                continue;
+            }
+            if (inString) {
+                out.append(c);
+                continue;
+            }
+            if (c == '{' || c == '[') {
+                stack[stackSize++] = c;
+                out.append(c);
+                continue;
+            }
+            if (c == '}' || c == ']') {
+                char expectedOpen = c == '}' ? '{' : '[';
+                if (stackSize > 0 && stack[stackSize - 1] == expectedOpen) {
+                    stackSize--;
+                }
+                out.append(c);
+                continue;
+            }
+            out.append(c);
+        }
+
+        if (inString) {
+            out.append('"');
+        }
+        while (stackSize > 0) {
+            char open = stack[--stackSize];
+            out.append(open == '{' ? '}' : ']');
+        }
+        return out.toString();
     }
 }

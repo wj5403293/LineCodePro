@@ -30,7 +30,7 @@ public final class ToolCallBlockView extends LinearLayout {
         }
         lastSignature = signature;
         String name = toolCall == null ? "" : toolCall.getName();
-        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
+        ToolDisplayCategory category = resolveDisplayCategory(name);
         ToolCallCardView childView = registry.createView(getContext(), category);
         if (childView != null) {
             removeAllViews();
@@ -53,6 +53,16 @@ public final class ToolCallBlockView extends LinearLayout {
         if (getChildCount() > 0 && getChildAt(0) instanceof ToolCallCardView) {
             ((ToolCallCardView) getChildAt(0)).setProjectPath(this.projectPath);
         }
+    }
+
+    private ToolDisplayCategory resolveDisplayCategory(String name) {
+        if ("agent".equals(name)) {
+            return ToolDisplayCategory.AGENT;
+        }
+        if ("agent_pipeline".equals(name)) {
+            return ToolDisplayCategory.AGENT_PIPELINE;
+        }
+        return ToolCallUtils.getDisplayCategory(name);
     }
 
     private String signature(ToolCall toolCall, ToolResult result) {

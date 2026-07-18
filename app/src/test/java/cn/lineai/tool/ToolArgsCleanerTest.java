@@ -121,4 +121,55 @@ public final class ToolArgsCleanerTest {
         String cleaned = ToolArgsCleaner.clean(raw);
         Assert.assertEquals("[1, [2]]", cleaned);
     }
+
+    @Test
+    public void truncatedObjectGetsClosingBrace() throws JSONException {
+        String raw = "{\"agents\": [{\"id\": \"a\", \"type\": \"sub-coding\", \"description\": \"d\", \"prompt\": \"p\"}]";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        Assert.assertEquals("{\"agents\": [{\"id\": \"a\", \"type\": \"sub-coding\", \"description\": \"d\", \"prompt\": \"p\"}]}", cleaned);
+        JSONObject obj = new JSONObject(cleaned);
+        Assert.assertEquals(1, obj.optJSONArray("agents").length());
+    }
+
+    @Test
+    public void truncatedArrayGetsClosingBracket() throws JSONException {
+        String raw = "{\"items\": [1, 2";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        Assert.assertEquals("{\"items\": [1, 2]}", cleaned);
+        Assert.assertEquals(2, new JSONObject(cleaned).optJSONArray("items").length());
+    }
+
+    @Test
+    public void truncatedStringGetsClosingQuote() throws JSONException {
+        String raw = "{\"name\": \"abc";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        Assert.assertEquals("{\"name\": \"abc\"}", cleaned);
+        Assert.assertEquals("abc", new JSONObject(cleaned).optString("name"));
+    }
+
+    @Test
+    public void truncatedNestedStructuresAreBalanced() throws JSONException {
+        String raw = "{\"outer\": {\"inner\": [1";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        Assert.assertEquals("{\"outer\": {\"inner\": [1]}}", cleaned);
+        Assert.assertEquals(1, new JSONObject(cleaned).optJSONObject("outer").optJSONArray("inner").getInt(0));
+    }
+
+    @Test
+    public void truncatedAgentPipelineFromLog() throws JSONException {
+        String raw = "{\"agents\": [{\"id\": \"prove_pythagoras\", \"type\": \"sub-coding\", \"description\": \"证明勾股定理\", \"prompt\": \"p\"}, {" +
+                "\"id\": \"prove_primes_infinite\", \"type\": \"sub-coding\", \"description\": \"证明质数无穷\", \"prompt\": \"p\"}, {" +
+                "\"id\": \"verify_proofs\", \"type\": \"sub-coding\", \"description\": \"验证两个证明\", \"prompt\": \"p\", \"read_scope\": [\"a.txt\"], \"write_scope\": [\"b.txt\"], \"depends_on\": [\"prove_pythagoras\", \"prove_primes_infinite\"]}";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        JSONObject obj = new JSONObject(cleaned);
+        Assert.assertEquals(3, obj.optJSONArray("agents").length());
+        Assert.assertEquals("verify_proofs", obj.optJSONArray("agents").optJSONObject(2).optString("id"));
+    }
+
+    @Test
+    public void validJsonUnchangedByBalancing() throws JSONException {
+        String raw = "{\"name\":\"test\",\"count\":42,\"items\":[\"x\",\"y\"]}";
+        String cleaned = ToolArgsCleaner.clean(raw);
+        Assert.assertEquals(raw, cleaned);
+    }
 }

@@ -332,7 +332,11 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView implements
         LinearLayout header = new LinearLayout(getContext());
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setClickable(false);
+        header.setClickable(true);
+        header.setOnClickListener(v -> {
+            expanded = !expanded;
+            bind(lastToolCall, lastResult);
+        });
         LineTheme.padding(header, LineTheme.MD, LineTheme.SM, LineTheme.MD, LineTheme.SM);
 
         IconButtonView icon = new IconButtonView(getContext(), IconButtonView.GIT_BRANCH);
@@ -364,12 +368,29 @@ public final class ToolCallAgentPipelineView extends BaseToolCallView implements
         statusIcon.setClickable(false);
         header.addView(statusIcon, new LayoutParams(LineTheme.dp(getContext(), 16), LineTheme.dp(getContext(), 16)));
 
+        IconButtonView chevron = new IconButtonView(getContext(), expanded ? IconButtonView.CHEVRON_DOWN : IconButtonView.CHEVRON_RIGHT);
+        chevron.setIconColor(LineTheme.TEXT_TERTIARY);
+        chevron.setIconSizeDp(16, 12);
+        chevron.setClickable(false);
+        LayoutParams chevronParams = new LayoutParams(LineTheme.dp(getContext(), 16), LineTheme.dp(getContext(), 16));
+        chevronParams.leftMargin = LineTheme.dp(getContext(), LineTheme.XS);
+        header.addView(chevron, chevronParams);
+
         addView(header, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        if (!expanded) {
+            return;
+        }
+
+        View divider = new View(getContext());
+        divider.setBackgroundColor(LineTheme.CODE_BORDER);
+        addView(divider, new LayoutParams(LayoutParams.MATCH_PARENT, 1));
 
         LinearLayout list = new LinearLayout(getContext());
         list.setOrientation(VERTICAL);
         LineTheme.padding(list, LineTheme.SM, LineTheme.SM, LineTheme.SM, LineTheme.SM);
-        TextView errorView = LineTheme.text(getContext(), parseError, LineTheme.FONT_XS, LineTheme.DANGER, Typeface.NORMAL);
+        MarkdownView errorView = new MarkdownView(getContext());
+        errorView.setMarkdown(parseError);
         list.addView(errorView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }

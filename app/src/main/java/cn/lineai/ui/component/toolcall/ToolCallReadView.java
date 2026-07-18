@@ -81,7 +81,7 @@ public final class ToolCallReadView extends BaseToolCallView implements ToolCall
         HorizontalScrollView pathScroll = horizontalPathScroll(path);
         textBlock.addView(pathScroll, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        View statusViewInstance = statusView(complete);
+        View statusViewInstance = statusView(running);
         if (complete && statusViewInstance instanceof IconButtonView) {
             IconButtonView statusIcon = (IconButtonView) statusViewInstance;
             if (error) {

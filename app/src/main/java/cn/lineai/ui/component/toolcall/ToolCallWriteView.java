@@ -120,7 +120,7 @@ public final class ToolCallWriteView extends BaseToolCallView implements ToolCal
         HorizontalScrollView pathScroll = horizontalPathScroll(path);
         meta.addView(pathScroll, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
-        View status = statusView(complete);
+        View status = statusView(!complete);
         if (status instanceof IconButtonView) {
             IconButtonView statusIcon = (IconButtonView) status;
             statusIcon.setIconSizeDp(28, 14);

@@ -1,5 +1,6 @@
 package cn.lineai.tool.builtin;
 
+import android.content.Context;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
@@ -30,6 +31,16 @@ public final class WebFetchTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.READ;
+    }
+
+    @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_fetch);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_GLOBE;
     }
 
     @Override

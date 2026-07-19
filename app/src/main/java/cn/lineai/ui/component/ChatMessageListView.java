@@ -417,7 +417,7 @@ public final class ChatMessageListView extends FrameLayout {
                 HashMap<String, ToolResult> toolResults = new HashMap<>();
                 for (ChatMessage message : messages) {
                     if (message.getRole() == ChatMessage.Role.TOOL && message.getToolCallId().length() > 0) {
-                        toolResults.put(message.getToolCallId(), new ToolResult(
+                        toolResults.put(message.getToolCallId(), ToolResult.withReview(
                                 message.getToolCallId(),
                                 message.getToolName(),
                                 message.getContent(),

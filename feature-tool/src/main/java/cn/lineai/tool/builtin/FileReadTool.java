@@ -37,6 +37,11 @@ public final class FileReadTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_read);
+    }
+
+    @Override
     public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
         String filePath = input.optString("file_path");
         if (filePath.length() > 0) {

@@ -10,7 +10,7 @@ import java.util.Locale;
 /**
  * BM25 排序与相关性评分算法。纯算法实现，不依赖数据库。
  */
-final class MemoryRanker {
+public final class MemoryRanker {
     static final double RECENCY_WEIGHT = 0.15;
     private static final double BM25_K = 1.2;
     private static final double BM25_B = 0.75;
@@ -18,11 +18,11 @@ final class MemoryRanker {
     private MemoryRanker() {
     }
 
-    static List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback) {
+    public static List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback) {
         return rank(candidates, userInput, limit, allowRecentFallback, 0.0);
     }
 
-    static List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback, double boost) {
+    public static List<Candidate> rank(List<Candidate> candidates, String userInput, int limit, boolean allowRecentFallback, double boost) {
         long now = System.currentTimeMillis();
         boolean hasMatches = false;
         for (Candidate candidate : candidates) {
@@ -98,15 +98,15 @@ final class MemoryRanker {
         return 1.0 / (1.0 + ageDays / 30.0);
     }
 
-    static final class Candidate {
-        final String id;
-        final String searchText;
-        final long updatedAt;
-        final String formatted;
-        double relevanceScore;
-        double score;
+    public static final class Candidate {
+        public final String id;
+        public final String searchText;
+        public final long updatedAt;
+        public final String formatted;
+        public double relevanceScore;
+        public double score;
 
-        Candidate(String id, String searchText, long updatedAt, String formatted) {
+        public Candidate(String id, String searchText, long updatedAt, String formatted) {
             this.id = id == null ? "" : id;
             this.searchText = searchText == null ? "" : searchText;
             this.updatedAt = updatedAt;

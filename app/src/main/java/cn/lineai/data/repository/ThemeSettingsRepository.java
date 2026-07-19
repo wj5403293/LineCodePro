@@ -1,9 +1,8 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
-import android.content.res.Configuration;
 import cn.lineai.model.ThemePalette;
 import cn.lineai.model.ThemeSettingsState;
+import cn.lineai.resource.SystemConfigProvider;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.json.JSONObject;
@@ -12,12 +11,12 @@ public final class ThemeSettingsRepository {
     public static final String KEY_THEME_MODE = "@lineai_theme_mode";
     public static final String KEY_CUSTOM_THEME_COLORS = "@lineai_custom_theme_colors";
 
-    private final Context context;
+    private final SystemConfigProvider systemConfigProvider;
     private final SettingsRepository settingsRepository;
 
-    public ThemeSettingsRepository(Context context) {
-        this.context = context.getApplicationContext();
-        settingsRepository = new SettingsRepository(this.context);
+    public ThemeSettingsRepository(SystemConfigProvider systemConfigProvider, SettingsRepository settingsRepository) {
+        this.systemConfigProvider = systemConfigProvider;
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized ThemeSettingsState getState() {
@@ -100,7 +99,6 @@ public final class ThemeSettingsRepository {
         if (!ThemePalette.MODE_SYSTEM.equals(normalized)) {
             return normalized;
         }
-        int nightMode = context.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
-        return nightMode == Configuration.UI_MODE_NIGHT_YES ? ThemePalette.MODE_DARK : ThemePalette.MODE_LIGHT;
+        return systemConfigProvider.isDarkModeEnabled() ? ThemePalette.MODE_DARK : ThemePalette.MODE_LIGHT;
     }
 }

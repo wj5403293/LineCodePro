@@ -1,6 +1,5 @@
 package cn.lineai.context;
 
-import android.content.Context;
 import cn.lineai.R;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionResponse;
@@ -8,13 +7,12 @@ import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.ai.message.SystemModelMessage;
 import cn.lineai.ai.message.UserModelMessage;
 import cn.lineai.ai.prompt.StringTemplate;
-import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.ExtensionStore;
-import cn.lineai.data.repository.LearningContextRepository;
 import cn.lineai.data.repository.LearningContextStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.model.ModelConfig;
+import cn.lineai.resource.ResourceProvider;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -30,17 +28,17 @@ public final class MemoryExtractionService {
     private static final int MAX_SKILLS = 2;
     private static final int MAX_SKILL_CONTENT_CHARS = 8000;
 
-    private final Context context;
+    private final ResourceProvider resourceProvider;
     private final LearningContextStore repository;
     private final ExtensionStore extensionRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final ModelClient modelClient = new ModelClient();
 
-    public MemoryExtractionService(Context context, LearningContextStore repository) {
-        this.context = context.getApplicationContext();
+    public MemoryExtractionService(ResourceProvider resourceProvider, LearningContextStore repository, ExtensionStore extensionRepository, PromptTemplateRepository promptTemplateRepository) {
+        this.resourceProvider = resourceProvider;
         this.repository = repository;
-        this.extensionRepository = new ExtensionRepository(this.context);
-        this.promptTemplateRepository = new PromptTemplateRepository(this.context);
+        this.extensionRepository = extensionRepository;
+        this.promptTemplateRepository = promptTemplateRepository;
     }
 
     public void extractAndStore(ModelConfig selectedModel, String projectId, String userInput, String transcript) {
@@ -71,7 +69,7 @@ public final class MemoryExtractionService {
         String prompt = template().render(values);
         ArrayList<ModelMessage> messages = new ArrayList<>();
         messages.add(new SystemModelMessage(prompt));
-        messages.add(new UserModelMessage(context.getString(R.string.memory_extraction_json_only)));
+        messages.add(new UserModelMessage(resourceProvider.getString(R.string.memory_extraction_json_only)));
         ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
         return parseCandidates(response.getText(), userInput);
     }
@@ -87,7 +85,7 @@ public final class MemoryExtractionService {
             values.put("TRANSCRIPT", trimForPrompt(transcript, MAX_TRANSCRIPT_CHARS));
             ArrayList<ModelMessage> messages = new ArrayList<>();
             messages.add(new SystemModelMessage(skillTemplate().render(values)));
-            messages.add(new UserModelMessage(context.getString(R.string.memory_extraction_json_only)));
+            messages.add(new UserModelMessage(resourceProvider.getString(R.string.memory_extraction_json_only)));
         ModelCompletionResponse response = modelClient.complete(selectedModel, messages);
         for (ExtractedSkill skill : parseSkills(response.getText())) {
                 if (skillExists(projectId, skill.name)) {

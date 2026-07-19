@@ -1,9 +1,9 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -13,9 +13,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.)
- * and LineCodeAccessibilityService in :app. See PhoneClickTool for full barrier notes.
- * No direct dependency on cn.lineai.ui.* classes.
+ * Phone control tool: run a system global action.
  */
 public final class PhoneGlobalActionTool extends BaseTool {
     public static final String NAME = "phone_global_action";
@@ -43,6 +41,11 @@ public final class PhoneGlobalActionTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
     }
 
     @Override
@@ -94,7 +97,7 @@ public final class PhoneGlobalActionTool extends BaseTool {
 
     @Override
     public ToolResult execute(JSONObject input, ToolContext toolContext) {
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(context);
+        PhoneControlService service = PhoneControlToolSupport.service(context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, context);
         }

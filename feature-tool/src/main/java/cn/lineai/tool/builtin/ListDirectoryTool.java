@@ -35,6 +35,16 @@ public final class ListDirectoryTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_list_dir);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_FOLDER_OPEN;
+    }
+
+    @Override
     public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
         String path = input.optString("path");
         if (path.length() > 0) {

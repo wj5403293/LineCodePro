@@ -19,7 +19,7 @@ public final class ToolExecutorTest {
     public void toolExceptionWithoutMessageDoesNotRenderNull() {
         ToolRegistry registry = new ToolRegistry();
         registry.register(new ThrowingTool());
-        ToolExecutor executor = new ToolExecutor(registry, new AllowAllToolSettingsStore());
+        ToolExecutor executor = new ToolExecutor(registry, new AllowAllToolSettingsStore(), null, null, null, null, null);
 
         ToolResult result = executor.execute(new ToolCall("call_1", "throwing_tool", "{}"), ToolContext.builder().homePath("").build());
 

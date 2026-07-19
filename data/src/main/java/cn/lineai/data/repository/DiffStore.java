@@ -13,4 +13,6 @@ public interface DiffStore {
     List<DiffRecord> getDiffChain(String filePath);
 
     DiffRepository.RevertResult revertDiff(String diffId);
+
+    void markReverted(String diffId);
 }

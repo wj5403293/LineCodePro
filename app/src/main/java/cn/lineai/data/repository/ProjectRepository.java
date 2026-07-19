@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
@@ -15,16 +14,14 @@ public final class ProjectRepository extends BaseRepository implements ProjectSt
     private static final String KEY_SELECTED_LOCAL_PROJECT = "@linecode_selected_project_local";
     private static final String KEY_SELECTED_SSH_PROJECT = "@linecode_selected_project_ssh";
 
-    private final Context context;
     private final SettingsRepository settingsRepository;
     private final WorkspacePaths workspacePaths;
 
-    public ProjectRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context));
-        this.context = context.getApplicationContext();
-        settingsRepository = new SettingsRepository(this.context);
-        workspacePaths = new WorkspacePaths(this.context);
-        workspacePaths.ensurePrivateRoots();
+    public ProjectRepository(LineCodeDatabase database, SettingsRepository settingsRepository, WorkspacePaths workspacePaths) {
+        super(database);
+        this.settingsRepository = settingsRepository;
+        this.workspacePaths = workspacePaths;
+        this.workspacePaths.ensurePrivateRoots();
         ensureDefaultProject();
     }
 

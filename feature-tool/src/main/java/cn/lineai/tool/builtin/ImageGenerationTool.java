@@ -59,6 +59,16 @@ public final class ImageGenerationTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_image_generation);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SPARKLES;
+    }
+
+    @Override
     public boolean shouldHideOnSuccess() {
         return true;
     }

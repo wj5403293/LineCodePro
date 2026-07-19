@@ -1,27 +1,25 @@
 package cn.lineai.ai.prompt;
 
 import android.content.Context;
+import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.data.repository.PromptTemplateRepository;
+import cn.lineai.data.repository.SettingsRepository;
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelProtocolType;
+import cn.lineai.resource.ResourceProvider;
 import cn.lineai.workspace.WorkspacePaths;
+import java.io.InputStream;
 import java.util.HashMap;
 
 public final class SystemPromptProvider {
     private final WorkspacePaths workspacePaths;
     private final PromptTemplateRepository promptTemplateRepository;
 
-    public SystemPromptProvider(Context context) {
-        this(context, new PromptTemplateRepository(context));
-    }
-
     public SystemPromptProvider(Context context, PromptTemplateRepository promptTemplateRepository) {
         Context appContext = context.getApplicationContext();
         this.workspacePaths = new WorkspacePaths(appContext);
-        this.promptTemplateRepository = promptTemplateRepository == null
-                ? new PromptTemplateRepository(appContext)
-                : promptTemplateRepository;
+        this.promptTemplateRepository = promptTemplateRepository;
     }
 
     public String build(String homePath) {

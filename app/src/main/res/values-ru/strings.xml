@@ -1080,59 +1080,7 @@
 
     <string name="tool_call_generic_mcp">MCP вызов</string>
 
-    <string name="tool_call_phone_action_screenshot">Снимок экрана</string>
-    <string name="tool_call_phone_action_click">Нажатие</string>
-    <string name="tool_call_phone_action_swipe">Свайп</string>
-    <string name="tool_call_phone_action_long_press">Долгое нажатие</string>
-    <string name="tool_call_phone_action_view_hierarchy">Иерархия View</string>
-    <string name="tool_call_phone_action_click_view">Нажатие View</string>
-    <string name="tool_call_phone_action_global_action">Системное действие</string>
     <string name="tool_call_phone_action_default">Действие с телефоном</string>
-    <string name="tool_call_phone_summary_screenshot">Сохранить снимок текущего экрана</string>
-    <string name="tool_call_phone_summary_view_hierarchy">Прочитать иерархию View текущего окна</string>
-    <string name="tool_call_phone_summary_global_action">Выполнить системное действие</string>
-    <string name="tool_call_phone_summary_click_view">Нажать View: %1$s</string>
-    <string name="tool_call_phone_summary_click_text">Нажать текст: %1$s</string>
-    <string name="tool_call_phone_summary_swipe">Свайп от (%1$d, %2$d) до (%3$d, %4$d)</string>
-    <string name="tool_call_phone_summary_point">Точка (%1$d, %2$d)</string>
-    <string name="tool_call_phone_global_back">Назад</string>
-    <string name="tool_call_phone_global_home">Главный экран</string>
-    <string name="tool_call_phone_global_exit_app">Выйти из текущего приложения</string>
-    <string name="tool_call_phone_global_recents">Недавние приложения</string>
-    <string name="tool_call_phone_global_notifications">Уведомления</string>
-    <string name="tool_call_phone_global_quick_settings">Быстрые настройки</string>
-    <string name="tool_call_phone_global_power_dialog">Меню питания</string>
-    <string name="tool_call_phone_global_lock_screen">Блокировка экрана</string>
-    <string name="tool_call_phone_global_unknown">Системное действие: %1$s</string>
-    <string name="phone_tool_accessibility_not_ready">Спецвозможности включены, но подключение службы не готово. Вернитесь в LineCode и повторите, или отключите и снова включите службу спецвозможностей LineCode.</string>
-    <string name="phone_tool_accessibility_disabled">Спецвозможности не включены. Включите LineCode в системных настройках спецвозможностей.</string>
-    <string name="phone_tool_screenshot_description">Сделать снимок текущего экрана, сохранить в каталог кэша приложения и вернуть путь к файлу изображения. Необходимы включённые спецвозможности.</string>
-    <string name="phone_tool_screenshot_missing_context">Инструмент скриншота не подключён к контексту приложения</string>
-    <string name="phone_tool_screenshot_failed">Сбой скриншота</string>
-    <string name="phone_tool_screenshot_cache_dir_failed">Не удалось создать каталог кэша скриншотов</string>
-    <string name="phone_tool_screenshot_save_failed">Не удалось сохранить скриншот</string>
-    <string name="phone_tool_screenshot_save_failed_with_reason">Не удалось сохранить скриншот: %1$s</string>
-    <string name="phone_tool_click_description">Нажать на указанные координаты экрана. x и y — пиксельные координаты экрана.</string>
-    <string name="phone_tool_click_success">Нажатие выполнено: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_failed">Сбой нажатия</string>
-    <string name="phone_tool_swipe_description">Свайп от начальных координат к конечным. x1/y1 — начальная точка, x2/y2 — конечная точка, duration_ms опционально, по умолчанию 300.</string>
-    <string name="phone_tool_swipe_success">Свайп выполнен: (%1$d, %2$d) -&gt; (%3$d, %4$d)</string>
-    <string name="phone_tool_swipe_failed">Сбой свайпа</string>
-    <string name="phone_tool_long_press_description">Долгое нажатие на указанные координаты экрана. x и y — пиксельные координаты экрана, duration_ms опционально, по умолчанию 800.</string>
-    <string name="phone_tool_long_press_success">Долгое нажатие выполнено: (%1$d, %2$d)</string>
-    <string name="phone_tool_long_press_failed">Сбой долгого нажатия</string>
-    <string name="phone_tool_view_hierarchy_description">Получить иерархию View текущего окна, включая имена классов, resource id, текст, content description и границы экрана.</string>
-    <string name="phone_tool_click_view_description">Нажать View в текущем окне. Поддерживает поиск по resource id, видимому тексту или координатам экрана. Необходимы включённые спецвозможности.</string>
-    <string name="phone_tool_click_view_success">Нажатие View выполнено: %1$s</string>
-    <string name="phone_tool_click_view_failed">Сбой нажатия View: %1$s</string>
-    <string name="phone_tool_click_point_success">Нажатие по координатам выполнено: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_point_failed">Сбой нажатия по координатам: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_view_missing_target">Отсутствует цель. Укажите resource_id, text или координаты x,y.</string>
-    <string name="phone_tool_global_action_description">Выполнить системное глобальное действие. action может быть back, home, exit_app, recents, notifications, quick_settings, power_dialog или lock_screen.</string>
-    <string name="phone_tool_global_action_param_desc">Системное действие для выполнения</string>
-    <string name="phone_tool_global_action_missing">Отсутствует action</string>
-    <string name="phone_tool_global_action_success">Системное действие выполнено: %1$s</string>
-    <string name="phone_tool_global_action_failed">Сбой системного действия или не поддерживается: %1$s</string>
 
     <!-- MainCoordinator agent messages -->
     <string name="message_generation_interrupted">Предыдущая генерация была прервана.</string>
@@ -1248,4 +1196,10 @@
     <string name="prompt_attachment_files_description">Эти пути из файлов, выбранных через кнопку слева от поля ввода; не повторяйте их в ответе, если пользователь явно не просит.</string>
     <string name="prompt_tools_unavailable">## Доступные инструменты\nВ данный момент нет доступных инструментов.</string>
     <string name="prompt_user_message_label">Сообщение пользователя </string>
+
+    <!-- AgentPromptBuilder fallback role prompts -->
+    <string name="agent_fallback_role_explore_remote">Вы — Agent исследования в удалённой среде Shell. Вы можете использовать shell_execute для выполнения команд только для чтения.\nПравила:\n- Только чтение кода, не вносите никаких изменений.\n- Предпочитайте инструменты только для чтения для поиска и чтения ключевых файлов; вы можете использовать shell_execute для выполнения команд только для чтения.</string>
+    <string name="agent_fallback_role_coding_remote">Вы — Agent программирования в удалённой среде Shell (текущая рабочая область находится на удалённом SSH или в контейнере терминального провайдера; локальные file_read / file_write / file_edit / glob / list_dir могут быть недоступны).\nПравила:\n- Большинство работы должно выполняться через shell_execute: чтение через cat/ls/grep, запись через sed/awk/python heredoc или tee, проверка через cat.\n- Изменяйте только файлы или каталоги, указанные в write_scope; при отсутствии write_scope запись в файлы запрещена.</string>
+    <string name="agent_fallback_role_explore_local">Вы — Agent исследования кода. Ваша задача — быстро находить и анализировать код.\nПравила:\n- Только чтение кода, не вносите никаких изменений и не вызывайте инструменты записи.\n- Предпочитайте инструменты только для чтения для поиска и чтения ключевых файлов; вы можете использовать shell_execute для выполнения команд только для чтения.\n- Давайте краткие и точные ответы.</string>
+    <string name="agent_fallback_role_coding_local">Вы — Agent программирования. Ваша задача — выполнение чётко ограниченных подзадач программирования.\nПравила:\n- Изменяйте только файлы или каталоги, указанные в write_scope; при отсутствии write_scope запись в файлы запрещена.\n- Предпочитайте file_read / file_write / file_edit / glob / list_dir для выполнения работы; используйте shell_execute только когда файловые инструменты действительно не могут справиться.</string>
 </resources>

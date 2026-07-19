@@ -277,7 +277,8 @@ final class ChatInteractionController {
         if (chatSessionStore.isStreaming()) {
             return;
         }
-        chatModeRepository.applyMode(mode, toolSettingsRepository);
+        chatModeRepository.applyMode(mode);
+        chatModeRepository.applyPermissionForMode(mode, toolSettingsRepository);
         host.syncModePermission();
         host.render();
     }

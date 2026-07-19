@@ -1,5 +1,6 @@
 package cn.lineai.tool.builtin;
 
+import android.content.Context;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.R;
 import cn.lineai.tool.ToolArgs;
@@ -35,6 +36,16 @@ public final class GlobTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.READ;
+    }
+
+    @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_match);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SEARCH;
     }
 
     @Override

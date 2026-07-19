@@ -39,7 +39,7 @@ public final class ErrorLogFileProvider extends ContentProvider {
         if (context == null) {
             throw new FileNotFoundException("No context");
         }
-        File dir = new ErrorLogRepository(context).directory();
+        File dir = new ErrorLogRepository(context.getFilesDir().getAbsolutePath()).directory();
         File file = new File(dir, uri.getLastPathSegment() == null ? "" : uri.getLastPathSegment());
         try {
             String canonicalDir = dir.getCanonicalPath();

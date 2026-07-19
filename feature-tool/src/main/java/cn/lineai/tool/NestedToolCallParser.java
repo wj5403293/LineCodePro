@@ -35,7 +35,7 @@ public final class NestedToolCallParser {
             ToolResult result = null;
             JSONObject resultObject = item.optJSONObject("result");
             if (resultObject != null) {
-                result = new ToolResult(
+                result = ToolResult.withReview(
                         call.getId(),
                         call.getName(),
                         resultObject.optString("content"),

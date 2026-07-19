@@ -38,15 +38,14 @@ public final class LineCodeArchiveCodecTest {
         LinkedHashMap<String, String> settings = new LinkedHashMap<>();
         settings.put("@linecode_chat_mode", "agent");
         ImportedLineCodeData data = new ImportedLineCodeData(
-                Collections.singletonList(new ModelConfig(
+                Collections.singletonList(ModelConfig.builder(
                         "m1",
                         "OpenAI",
                         ModelProtocolType.OPENAI_COMPATIBLE,
                         "OpenAI",
                         "https://api.example.test",
                         "sk-test",
-                        "gpt-test"
-                )),
+                        "gpt-test").build()),
                 "m1",
                 Collections.singletonList(new ConversationRecord(
                         "c1",

@@ -1,19 +1,26 @@
 package cn.lineai.model;
 
 public enum ModelProtocolType {
-    OPENAI_COMPATIBLE("OpenAI"),
-    CODEX_RESPONSES("Codex"),
-    ANTHROPIC_MESSAGES("Anthropic"),
-    LOCAL_GGUF("Local");
+    OPENAI_COMPATIBLE("OpenAI", true),
+    CODEX_RESPONSES("Codex", true),
+    ANTHROPIC_MESSAGES("Anthropic", false),
+    LOCAL_GGUF("Local", false);
 
     private final String label;
+    private final boolean dedicatedCompression;
 
-    ModelProtocolType(String label) {
+    ModelProtocolType(String label, boolean dedicatedCompression) {
         this.label = label;
+        this.dedicatedCompression = dedicatedCompression;
     }
 
     public String getLabel() {
         return label;
+    }
+
+    /** 该协议类型是否支持独立压缩模型。 */
+    public boolean supportsDedicatedCompression() {
+        return dedicatedCompression;
     }
 
     public static ModelProtocolType fromStorage(String value) {

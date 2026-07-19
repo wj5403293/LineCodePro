@@ -171,8 +171,8 @@ public final class AgentExecutionControllerTest {
         String prompt = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE);
 
         assertTrue(prompt.contains("shell_execute"));
-        assertTrue(prompt.contains("只读命令"));
-        assertTrue(prompt.contains("只读取代码"));
+        assertTrue(prompt.contains("read-only commands"));
+        assertTrue(prompt.contains("Only read code"));
     }
 
     @Test
@@ -181,7 +181,7 @@ public final class AgentExecutionControllerTest {
         ConfirmTool shell = new ConfirmTool("shell_execute");
         registry.register(shell);
         ConfirmingSettings settings = new ConfirmingSettings();
-        ToolExecutor executor = new ToolExecutor(registry, settings);
+        ToolExecutor executor = new ToolExecutor(registry, settings, null, null, null, null, null);
         AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> {
@@ -211,7 +211,7 @@ public final class AgentExecutionControllerTest {
         ConfirmTool shell = new ConfirmTool("shell_execute");
         registry.register(shell);
         ConfirmingSettings settings = new ConfirmingSettings();
-        ToolExecutor executor = new ToolExecutor(registry, settings);
+        ToolExecutor executor = new ToolExecutor(registry, settings, null, null, null, null, null);
         AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter(new AgentExecutionController.ToolReviewAwaiter() {
@@ -249,17 +249,17 @@ public final class AgentExecutionControllerTest {
         String localRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, false);
         String remoteRole = controller.agentRolePrompt(AgentTool.TYPE_SUB_CODING, true);
         assertTrue("local role should mention file tools", localRole.contains("file_read"));
-        assertFalse("local role should not advertise remote-only mode", localRole.contains("远程 Shell"));
-        assertTrue("remote role should advertise remote mode", remoteRole.contains("远程 Shell"));
+        assertFalse("local role should not advertise remote-only mode", localRole.contains("remote Shell"));
+        assertTrue("remote role should advertise remote mode", remoteRole.contains("remote Shell"));
         assertTrue("remote role should recommend shell_execute first", remoteRole.contains("shell_execute"));
-        assertTrue("remote role should mark file tools as unavailable", remoteRole.contains("不一定可用"));
+        assertTrue("remote role should mark file tools as unavailable", remoteRole.contains("may not be available"));
     }
 
     @Test
     public void agentRolePromptExploreInRemoteModeRecommendsShell() {
         AgentExecutionController controller = new AgentExecutionController(null, null, null, null, null, null, null);
         String remoteExplore = controller.agentRolePrompt(AgentTool.TYPE_EXPLORE, true);
-        assertTrue(remoteExplore.contains("远程 Shell"));
+        assertTrue(remoteExplore.contains("remote Shell"));
         assertTrue(remoteExplore.contains("shell_execute"));
     }
 
@@ -268,7 +268,7 @@ public final class AgentExecutionControllerTest {
         ToolRegistry registry = new ToolRegistry();
         registry.register(new ConfirmTool("shell_execute"));
         ConfirmingSettings settings = new ConfirmingSettings();
-        ToolExecutor executor = new ToolExecutor(registry, settings);
+        ToolExecutor executor = new ToolExecutor(registry, settings, null, null, null, null, null);
         AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "accepted");
@@ -296,7 +296,7 @@ public final class AgentExecutionControllerTest {
         ToolRegistry registry = new ToolRegistry();
         registry.register(new ConfirmTool("shell_execute"));
         ConfirmingSettings settings = new ConfirmingSettings();
-        ToolExecutor executor = new ToolExecutor(registry, settings);
+        ToolExecutor executor = new ToolExecutor(registry, settings, null, null, null, null, null);
         AgentExecutionController controller = new AgentExecutionController(null, null, settings, executor, registry, null, null);
         AgentProgressSession progress = new AgentProgressSession(1, "agent_call", "agent", AgentTool.TYPE_SUB_CODING, "run shell");
         controller.setToolReviewAwaiter((displayToolCallId, call, cancellationToken) -> "rejected");
@@ -390,7 +390,7 @@ public final class AgentExecutionControllerTest {
 
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
-            return new ToolResult("", name, "", false);
+            return ToolResult.withReview("", name, "", false, "", "", "");
         }
     }
 
@@ -430,7 +430,7 @@ public final class AgentExecutionControllerTest {
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
             runCount++;
-            return new ToolResult("", getName(), "ran " + getName(), false);
+            return ToolResult.withReview("", getName(), "ran " + getName(), false, "", "", "");
         }
     }
 

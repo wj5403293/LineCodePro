@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
@@ -16,50 +15,16 @@ import java.util.UUID;
 public final class LearningContextRepository extends BaseRepository implements LearningContextStore {
     private static final int SCAN_LIMIT = 120;
     private static final int OVERVIEW_LIMIT = 200;
-    private static final double WORKING_MEMORY_BOOST = 0.30;
 
-    private final Context context;
     private final WorkspacePaths workspacePaths;
-    private final PromptTemplateRepository promptTemplateRepository;
     private final ConversationIndexer conversationIndexer;
     private final MessageTextChunkStore textChunks;
-    private final MemoryPromptBuilder promptBuilder;
 
-    public LearningContextRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context.getApplicationContext()));
-        this.context = context.getApplicationContext();
-        this.workspacePaths = new WorkspacePaths(this.context);
-        this.promptTemplateRepository = new PromptTemplateRepository(this.context);
+    public LearningContextRepository(LineCodeDatabase database, WorkspacePaths workspacePaths, PromptTemplateRepository promptTemplateRepository) {
+        super(database);
+        this.workspacePaths = workspacePaths;
         this.conversationIndexer = new ConversationIndexer(database);
         this.textChunks = new MessageTextChunkStore(database);
-        this.promptBuilder = new MemoryPromptBuilder(workspacePaths, promptTemplateRepository);
-    }
-
-    @Override
-    public synchronized String buildLearningContext(String projectId, String userInput, String excludeConversationId) {
-        List<MemoryRanker.Candidate> workingMemory = MemoryRanker.rank(readWorkingMemory(projectId), userInput, 5, true, WORKING_MEMORY_BOOST);
-        List<MemoryRanker.Candidate> memories = MemoryRanker.rank(readMemories(projectId), userInput, 6, false);
-        List<MemoryRanker.Candidate> history = MemoryRanker.rank(readConversationIndex(projectId, excludeConversationId), userInput, 6, false);
-        if (history.isEmpty()) {
-            history = MemoryRanker.rank(readConversationMessages(projectId, excludeConversationId), userInput, 6, false);
-        }
-        List<MemoryRanker.Candidate> skills = MemoryRanker.rank(readSkills(), userInput, 8, true);
-        markMemoriesUsed(memories);
-
-        return promptBuilder.build(projectId, workingMemory, memories, history, skills);
-    }
-
-    @Override
-    public synchronized MemoryOverviewState getOverview(String projectId) {
-        String safeProjectId = safe(projectId);
-        return new MemoryOverviewState(
-                safeProjectId,
-                readOverviewMemories(MemoryOverviewState.Memory.SCOPE_USER, safeProjectId),
-                readOverviewMemories(MemoryOverviewState.Memory.SCOPE_PROJECT, safeProjectId),
-                readOverviewMemories(MemoryOverviewState.Memory.SCOPE_ENVIRONMENT, safeProjectId),
-                readOverviewWorkingMemory(safeProjectId),
-                readOverviewHistory(safeProjectId)
-        );
     }
 
     @Override
@@ -141,7 +106,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return MemoryRanker.rankingScore(query, text, updatedAt, now, boost);
     }
 
-    private List<MemoryRanker.Candidate> readWorkingMemory(String projectId) {
+    public List<MemoryRanker.Candidate> readWorkingMemory(String projectId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         String now = String.valueOf(System.currentTimeMillis());
         Cursor cursor = database.getReadableDatabase().rawQuery(
@@ -163,7 +128,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryRanker.Candidate> readMemories(String projectId) {
+    public List<MemoryRanker.Candidate> readMemories(String projectId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT id, scope, project_id, source, confidence, content, updated_at FROM memories "
@@ -188,7 +153,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryRanker.Candidate> readConversationIndex(String projectId, String excludeConversationId) {
+    public List<MemoryRanker.Candidate> readConversationIndex(String projectId, String excludeConversationId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT conversation_id, role, substr(text, 1, 320) AS text, title, updated_at FROM conversation_index "
@@ -210,7 +175,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryRanker.Candidate> readConversationMessages(String projectId, String excludeConversationId) {
+    public List<MemoryRanker.Candidate> readConversationMessages(String projectId, String excludeConversationId) {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT c.id AS conversation_id, c.title AS title, m.id AS message_id, m.role AS role, "
@@ -241,7 +206,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return text.length() == 0 ? legacyPrefix : text;
     }
 
-    private List<MemoryRanker.Candidate> readSkills() {
+    public List<MemoryRanker.Candidate> readSkills() {
         ArrayList<MemoryRanker.Candidate> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT name, path, description, updated_at FROM skills WHERE enabled = 1 ORDER BY updated_at DESC LIMIT ?",
@@ -270,7 +235,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryOverviewState.Memory> readOverviewMemories(String scope, String projectId) {
+    public List<MemoryOverviewState.Memory> readOverviewMemories(String scope, String projectId) {
         ArrayList<MemoryOverviewState.Memory> items = new ArrayList<>();
         String normalizedScope = normalizeScope(scope);
         Cursor cursor;
@@ -299,7 +264,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryOverviewState.WorkingMemory> readOverviewWorkingMemory(String projectId) {
+    public List<MemoryOverviewState.WorkingMemory> readOverviewWorkingMemory(String projectId) {
         ArrayList<MemoryOverviewState.WorkingMemory> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT id, project_id, content, source, expires_at, created_at, updated_at FROM working_memory "
@@ -319,7 +284,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return items;
     }
 
-    private List<MemoryOverviewState.HistoryEntry> readOverviewHistory(String projectId) {
+    public List<MemoryOverviewState.HistoryEntry> readOverviewHistory(String projectId) {
         ArrayList<MemoryOverviewState.HistoryEntry> items = new ArrayList<>();
         Cursor cursor = database.getReadableDatabase().rawQuery(
                 "SELECT id, project_id, conversation_id, message_id, role, substr(text, 1, 1000) AS text, title, created_at, updated_at "
@@ -394,7 +359,7 @@ public final class LearningContextRepository extends BaseRepository implements L
         return "";
     }
 
-    private void markMemoriesUsed(List<MemoryRanker.Candidate> memories) {
+    public void markMemoriesUsed(List<MemoryRanker.Candidate> memories) {
         if (memories == null || memories.isEmpty()) {
             return;
         }

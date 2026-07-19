@@ -2,9 +2,9 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -17,10 +17,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.),
- * LineCodeAccessibilityService, and PhoneScreenshotCache in :app.
- * See PhoneClickTool for full barrier notes.
- * No direct dependency on cn.lineai.ui.* classes.
+ * Phone control tool: capture screenshot and return saved image path.
  */
 public final class PhoneScreenshotTool extends BaseTool {
     public static final String NAME = "phone_screenshot";
@@ -51,6 +48,11 @@ public final class PhoneScreenshotTool extends BaseTool {
     }
 
     @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
+    }
+
+    @Override
     public String getDisplayLabel(Context ctx, JSONObject input, String workspacePath) {
         return ctx == null ? getName() : ctx.getString(R.string.tool_call_phone_summary_screenshot);
     }
@@ -73,7 +75,7 @@ public final class PhoneScreenshotTool extends BaseTool {
         if (this.context == null) {
             return error("Screenshot tool is missing app context");
         }
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
+        PhoneControlService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, this.context);
         }

@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
@@ -10,8 +9,8 @@ import java.util.Map;
 
 public final class SettingsRepository extends BaseRepository implements SettingsStore {
 
-    public SettingsRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context));
+    public SettingsRepository(LineCodeDatabase database) {
+        super(database);
     }
 
     public synchronized String getString(String key, String fallback) {

@@ -27,15 +27,14 @@ public final class ArchiveSecretRedactorTest {
         settings.put("@lineai_permission_mode", "ask");
 
         ImportedLineCodeData redacted = ArchiveSecretRedactor.redactData(new ImportedLineCodeData(
-                Collections.singletonList(new ModelConfig(
+                Collections.singletonList(ModelConfig.builder(
                         "m1",
                         "OpenAI",
                         ModelProtocolType.OPENAI_COMPATIBLE,
                         "OpenAI",
                         "https://api.example.test",
                         "sk-secret",
-                        "gpt-test"
-                )),
+                        "gpt-test").build()),
                 "m1",
                 Collections.emptyList(),
                 "",

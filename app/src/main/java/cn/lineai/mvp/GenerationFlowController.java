@@ -416,7 +416,7 @@ final class GenerationFlowController {
             if (existingIsFinal && "running".equals(reviewState)) {
                 return;
             }
-            addOrReplaceToolResult(new ToolResult(
+            addOrReplaceToolResult(ToolResult.withReview(
                     toolCallId,
                     toolName,
                     content,
@@ -617,7 +617,7 @@ final class GenerationFlowController {
     ) {
         toolMessageController.addOrReplaceToolResults(batch.getCompletedResults());
         if (batch.getPendingCall() != null) {
-            ToolResult pendingResult = new ToolResult(
+            ToolResult pendingResult = ToolResult.withReview(
                     batch.getPendingCall().getId(),
                     batch.getPendingCall().getName(),
                     "",
@@ -734,7 +734,7 @@ final class GenerationFlowController {
                         .withReview("accepted", "");
             } catch (Exception e) {
                 restoreInterrupt(e);
-                result = new ToolResult(
+                result = ToolResult.withReview(
                         pending.getToolCall().getId(),
                         pending.getToolCall().getName(),
                         "执行失败: " + describeException(e),

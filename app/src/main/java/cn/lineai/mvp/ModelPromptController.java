@@ -12,7 +12,7 @@ import cn.lineai.context.ContextManager;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ExtensionStore;
-import cn.lineai.data.repository.LearningContextStore;
+import cn.lineai.service.LearningContextService;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.AiBehaviorSettings;
@@ -74,7 +74,7 @@ final class ModelPromptController {
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final ChatModeRepository chatModeRepository;
     private final PromptTemplateRepository promptTemplateRepository;
-    private final LearningContextStore learningContextRepository;
+    private final LearningContextService learningContextService;
     private final ContextManager contextManager;
     private final ModelStore modelRepository;
     private final ExtensionStore extensionRepository;
@@ -91,7 +91,7 @@ final class ModelPromptController {
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
             ChatModeRepository chatModeRepository,
             PromptTemplateRepository promptTemplateRepository,
-            LearningContextStore learningContextRepository,
+            LearningContextService learningContextService,
             ContextManager contextManager,
             ModelStore modelRepository,
             ExtensionStore extensionRepository,
@@ -106,7 +106,7 @@ final class ModelPromptController {
         this.aiBehaviorSettingsRepository = aiBehaviorSettingsRepository;
         this.chatModeRepository = chatModeRepository;
         this.promptTemplateRepository = promptTemplateRepository;
-        this.learningContextRepository = learningContextRepository;
+        this.learningContextService = learningContextService;
         this.contextManager = contextManager;
         this.modelRepository = modelRepository;
         this.extensionRepository = extensionRepository;
@@ -127,7 +127,7 @@ final class ModelPromptController {
         AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
         String projectPath = host.projectPath();
         String learningContext = aiSettings.isLearningModeEnabled()
-                ? learningContextRepository.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
+                ? learningContextService.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
                 : "";
         ModelConfig selectedModel = modelRepository.getSelectedModel();
         String promptHomePath = promptHomePath();

@@ -1,7 +1,7 @@
 package cn.lineai.tool;
 
 import android.content.Context;
-import cn.lineai.data.repository.ExtensionRepository;
+import cn.lineai.data.repository.ExtensionStore;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.McpToolSummary;
@@ -24,6 +24,7 @@ public final class ToolRegistry {
     private final Map<String, BaseTool> tools = new LinkedHashMap<>();
     private final Map<String, ToolDisplayCategory> displayCategoryCache = new LinkedHashMap<>();
     private final Context context;
+    private ExtensionStore extensionStore;
 
     public ToolRegistry() {
         this(null);
@@ -42,6 +43,10 @@ public final class ToolRegistry {
             }
         }
         reloadExtensions();
+    }
+
+    public void setExtensionStore(ExtensionStore extensionStore) {
+        this.extensionStore = extensionStore;
     }
 
     public void register(BaseTool tool) {
@@ -66,11 +71,10 @@ public final class ToolRegistry {
 
     public void reloadExtensions() {
         removeExtensionTools();
-        if (context == null) {
+        if (extensionStore == null) {
             return;
         }
-        ExtensionRepository repository = new ExtensionRepository(context);
-        for (ExtensionMcpConfig mcp : repository.getMcpExtensions()) {
+        for (ExtensionMcpConfig mcp : extensionStore.getMcpExtensions()) {
             if (!mcp.isEnabled()) {
                 continue;
             }
@@ -80,7 +84,7 @@ public final class ToolRegistry {
                 }
             }
         }
-        for (ExtensionAgentConfig agent : repository.getAgentExtensions()) {
+        for (ExtensionAgentConfig agent : extensionStore.getAgentExtensions()) {
             if (agent.isEnabled()) {
                 register(new CustomAgentExtensionTool(customAgentToolName(agent), agent));
             }
@@ -162,11 +166,10 @@ public final class ToolRegistry {
 
     public Set<String> mcpToolNamesForIds(List<String> mcpIds) {
         HashSet<String> names = new HashSet<>();
-        if (mcpIds == null || mcpIds.isEmpty() || context == null) {
+        if (mcpIds == null || mcpIds.isEmpty() || extensionStore == null) {
             return names;
         }
-        ExtensionRepository repository = new ExtensionRepository(context);
-        for (ExtensionMcpConfig mcp : repository.getMcpExtensions()) {
+        for (ExtensionMcpConfig mcp : extensionStore.getMcpExtensions()) {
             if (!mcpIds.contains(mcp.getId())) {
                 continue;
             }

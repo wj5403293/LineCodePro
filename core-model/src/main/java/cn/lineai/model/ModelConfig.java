@@ -23,34 +23,6 @@ public final class ModelConfig {
     private final String compressionModelId;
     private final int contextSize;
 
-    @Deprecated
-    public ModelConfig(String id, String name, ModelProtocolType protocolType, String providerLabel, String baseUrl, String apiKey, String modelId) {
-        this(id, name, protocolType, providerLabel, baseUrl, apiKey, modelId, DEFAULT_TOOL_CALL_LIMIT);
-    }
-
-    @Deprecated
-    public ModelConfig(String id, String name, ModelProtocolType protocolType, String providerLabel, String baseUrl, String apiKey, String modelId, int toolCallLimit) {
-        this(id, name, protocolType, providerLabel, baseUrl, apiKey, modelId, toolCallLimit, false, DEFAULT_COMPRESSION_MODEL_AUTO, "");
-    }
-
-    @Deprecated
-    public ModelConfig(
-            String id,
-            String name,
-            ModelProtocolType protocolType,
-            String providerLabel,
-            String baseUrl,
-            String apiKey,
-            String modelId,
-            int toolCallLimit,
-            boolean compressionModelEnabled,
-            boolean compressionModelAuto,
-            String compressionModelId
-    ) {
-        this(id, name, protocolType, providerLabel, baseUrl, apiKey, modelId, toolCallLimit,
-                compressionModelEnabled, compressionModelAuto, compressionModelId, CONTEXT_SIZE_UNSET);
-    }
-
     /**
      * 显式带上 contextSize 的构造函数。新代码请优先使用 {@link Builder}。
      *
@@ -79,7 +51,7 @@ public final class ModelConfig {
         this.apiKey = Strings.nullToEmpty(apiKey);
         this.modelId = Strings.nullToEmpty(modelId);
         this.toolCallLimit = normalizeToolCallLimit(toolCallLimit);
-        this.compressionModelEnabled = compressionModelEnabled && supportsDedicatedCompression(this.protocolType);
+        this.compressionModelEnabled = compressionModelEnabled && this.protocolType.supportsDedicatedCompression();
         this.compressionModelAuto = compressionModelAuto;
         this.compressionModelId = Strings.nullToEmpty(compressionModelId).trim();
         this.contextSize = contextSize < 0 ? CONTEXT_SIZE_UNSET : contextSize;
@@ -94,7 +66,7 @@ public final class ModelConfig {
         this.apiKey = Strings.nullToEmpty(builder.apiKey);
         this.modelId = Strings.nullToEmpty(builder.modelId);
         this.toolCallLimit = normalizeToolCallLimit(builder.toolCallLimit);
-        this.compressionModelEnabled = builder.compressionModelEnabled && supportsDedicatedCompression(this.protocolType);
+        this.compressionModelEnabled = builder.compressionModelEnabled && this.protocolType.supportsDedicatedCompression();
         this.compressionModelAuto = builder.compressionModelAuto;
         this.compressionModelId = Strings.nullToEmpty(builder.compressionModelId).trim();
         this.contextSize = builder.contextSize < 0 ? CONTEXT_SIZE_UNSET : builder.contextSize;
@@ -311,10 +283,5 @@ public final class ModelConfig {
             return UNLIMITED_TOOL_CALLS;
         }
         return Math.max(0, limit);
-    }
-
-    @Deprecated
-    public static boolean supportsDedicatedCompression(ModelProtocolType type) {
-        return type == ModelProtocolType.OPENAI_COMPATIBLE || type == ModelProtocolType.CODEX_RESPONSES;
     }
 }

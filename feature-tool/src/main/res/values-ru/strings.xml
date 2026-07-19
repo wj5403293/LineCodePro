@@ -161,4 +161,13 @@
 
     <!-- ExceptionUtils -->
     <string name="tool_exception_unknown">Неизвестная ошибка</string>
+
+    <!-- Tool action labels (used by BaseTool.getActionName) -->
+    <string name="tool_call_action_read">Чтение</string>
+    <string name="tool_call_action_search">Поиск</string>
+    <string name="tool_call_action_fetch">Загрузить</string>
+    <string name="tool_call_action_match">Совпадение</string>
+    <string name="tool_call_action_list_dir">Список каталога</string>
+    <string name="tool_call_image_generation">Генерация изображения</string>
+    <string name="tool_call_image_understanding">Понимание изображения</string>
 </resources>

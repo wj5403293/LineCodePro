@@ -71,7 +71,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
             });
         }).start();
 
-        UserAgreementRepository agreement = new UserAgreementRepository(this);
+        UserAgreementRepository agreement = new UserAgreementRepository(new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this)));
         if (agreement.shouldShow()) {
             UserAgreementDialog.show(this, () -> {
                 agreement.setAccepted(true);
@@ -200,7 +200,24 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     }
 
     private void configureWindow() {
-        LineTheme.apply(new ThemeSettingsRepository(this).resolveCurrentPalette());
+        LineTheme.apply(new ThemeSettingsRepository(new cn.lineai.resource.SystemConfigProvider() {
+            @Override
+            public boolean isDarkModeEnabled() {
+                int nightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                return nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+            }
+            @Override
+            public int getSdkInt() { return android.os.Build.VERSION.SDK_INT; }
+            @Override
+            public String getFilesDirPath() { return getFilesDir().getAbsolutePath(); }
+            @Override
+            public String getDatabasePath(String name) { return MainActivity.this.getDatabasePath(name).getAbsolutePath(); }
+            @Override
+            public String getExternalFilesDirPath() {
+                java.io.File dir = getExternalFilesDir(null);
+                return dir != null ? dir.getAbsolutePath() : "";
+            }
+        }, new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this))).resolveCurrentPalette());
         Window window = getWindow();
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         window.setStatusBarColor(LineTheme.BG);

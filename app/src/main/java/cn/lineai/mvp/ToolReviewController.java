@@ -3,6 +3,7 @@ package cn.lineai.mvp;
 import cn.lineai.data.repository.DiffRecord;
 import cn.lineai.data.repository.DiffRepository;
 import cn.lineai.data.repository.DiffStore;
+import cn.lineai.data.service.FileRestorer;
 
 final class ToolReviewController {
     interface Host {
@@ -56,18 +57,42 @@ final class ToolReviewController {
     private void rejectWithRevert(String toolCallId, String diffId) {
         backgroundTasks.execute("linecode-diff-revert", () -> {
             DiffRecord diffRecord = diffRepository.getDiff(diffId);
-            DiffRepository.RevertResult result = diffRepository.revertDiff(diffId);
             String filePath = diffRecord == null ? "" : diffRecord.getFilePath();
+            DiffRepository.RevertResult result = diffRepository.revertDiff(diffId);
+            if (!result.isSuccess()) {
+                mainThread.post(() -> {
+                    toolMessageController.updateToolReview(toolCallId, diffId, "", result.getMessage());
+                    host.persistCurrentConversation();
+                    host.render();
+                });
+                return;
+            }
+            if (result.getDiffRecord() != null) {
+                try {
+                    FileRestorer.restoreOldContent(result.getDiffRecord());
+                } catch (Exception e) {
+                    mainThread.post(() -> {
+                        toolMessageController.updateToolReview(
+                                toolCallId,
+                                diffId,
+                                "",
+                                "File restore failed: " + e.getMessage()
+                        );
+                        host.persistCurrentConversation();
+                        host.render();
+                    });
+                    return;
+                }
+                diffRepository.markReverted(diffId);
+            }
             mainThread.post(() -> {
                 toolMessageController.updateToolReview(
                         toolCallId,
                         diffId,
-                        result.isSuccess() ? "rejected" : "",
-                        result.getMessage()
+                        "rejected",
+                        "Reverted change to " + filePath
                 );
-                if (result.isSuccess()) {
-                    host.refreshFileTreeAfterRevert(filePath);
-                }
+                host.refreshFileTreeAfterRevert(filePath);
                 host.persistCurrentConversation();
                 host.render();
             });

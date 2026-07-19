@@ -5,6 +5,7 @@ import android.net.Uri;
 import cn.lineai.R;
 import cn.lineai.model.SkillRecord;
 import cn.lineai.model.Strings;
+import cn.lineai.resource.ResourceProvider;
 import cn.lineai.workspace.WorkspacePaths;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -30,10 +31,24 @@ public final class SkillFileManager {
 
     private final Context context;
     private final WorkspacePaths workspacePaths;
+    private final ResourceProvider resourceProvider;
 
     public SkillFileManager(Context context) {
         this.context = context.getApplicationContext();
         this.workspacePaths = new WorkspacePaths(this.context);
+        this.resourceProvider = null;
+    }
+
+    public SkillFileManager(Context context, ResourceProvider resourceProvider) {
+        this.context = context.getApplicationContext();
+        this.workspacePaths = new WorkspacePaths(this.context);
+        this.resourceProvider = resourceProvider;
+    }
+
+    public SkillFileManager(WorkspacePaths workspacePaths, Context context, ResourceProvider resourceProvider) {
+        this.context = context.getApplicationContext();
+        this.workspacePaths = workspacePaths;
+        this.resourceProvider = resourceProvider;
     }
 
     public WorkspacePaths getWorkspacePaths() {
@@ -122,7 +137,10 @@ public final class SkillFileManager {
             return new File(homePath, ".linecode/skills");
         }
         if (SkillRecord.LOCATION_SSH.equals(location)) {
-            throw new IllegalArgumentException(context.getString(R.string.skill_ssh_directory_hint));
+            String hint = resourceProvider != null
+                    ? resourceProvider.getString(R.string.skill_ssh_directory_hint)
+                    : "SSH 模式下不支持直接写入 Skill 目录。";
+            throw new IllegalArgumentException(hint);
         }
         return workspacePaths.getSkillsRoot();
     }
@@ -465,7 +483,9 @@ public final class SkillFileManager {
                 File out = new File(target, entry.getName()).getCanonicalFile();
                 if (!out.getPath().equals(canonicalTarget.getPath())
                         && !out.getPath().startsWith(canonicalTarget.getPath() + File.separator)) {
-                    throw new IllegalArgumentException(context.getString(R.string.skill_zip_entry_out_of_bounds, entry.getName()));
+                    throw new IllegalArgumentException(resourceProvider != null
+                            ? resourceProvider.getString(R.string.skill_zip_entry_out_of_bounds, entry.getName())
+                            : "ZIP 条目越界: " + entry.getName());
                 }
                 if (entry.isDirectory()) {
                     out.mkdirs();

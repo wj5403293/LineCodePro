@@ -7,6 +7,7 @@ import cn.lineai.tool.PermissionResult;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolInfo;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -129,4 +130,29 @@ public interface ToolSettingsStore {
      * 构造工具提示（按已注册工具过滤）。
      */
     String buildToolPrompt(Collection<ToolInfo> implementedTools, boolean nativeToolProtocol);
+
+    /**
+     * 获取 Agent 禁止使用的工具名称集合。
+     * 默认排除 agent 和 agent_pipeline，防止递归调用。
+     */
+    default Set<String> getAgentExcludedToolNames() {
+        Set<String> names = new java.util.HashSet<>();
+        names.add("agent");
+        names.add("agent_pipeline");
+        return names;
+    }
+
+    /**
+     * 获取指定 Agent 类型允许的工具类别集合。
+     * explore 默认只允许 READ；其他类型默认允许 READ 和 WRITE。
+     */
+    default Set<ToolCategory> getAgentAllowedCategories(String type) {
+        if ("explore".equals(type)) {
+            return Collections.singleton(ToolCategory.READ);
+        }
+        Set<ToolCategory> categories = new java.util.HashSet<>();
+        categories.add(ToolCategory.READ);
+        categories.add(ToolCategory.WRITE);
+        return categories;
+    }
 }

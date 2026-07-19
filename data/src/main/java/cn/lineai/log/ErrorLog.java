@@ -11,7 +11,7 @@ public final class ErrorLog {
 
     public static void init(Context context) {
         if (context != null) {
-            repository = new ErrorLogRepository(context);
+            repository = new ErrorLogRepository(context.getFilesDir().getAbsolutePath());
             installUncaughtExceptionHandler();
         }
     }

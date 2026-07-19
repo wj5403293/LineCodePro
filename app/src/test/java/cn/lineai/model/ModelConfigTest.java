@@ -21,7 +21,8 @@ public final class ModelConfigTest {
                 200,
                 true,
                 false,
-                "gpt-5-mini"
+                "gpt-5-mini",
+                ModelConfig.CONTEXT_SIZE_UNSET
         );
 
         ModelConfig parsed = ModelConfig.fromJson(model.toJson());
@@ -45,7 +46,8 @@ public final class ModelConfigTest {
                 200,
                 true,
                 false,
-                "compact-model"
+                "compact-model",
+                ModelConfig.CONTEXT_SIZE_UNSET
         );
 
         assertFalse(model.isCompressionModelEnabled());

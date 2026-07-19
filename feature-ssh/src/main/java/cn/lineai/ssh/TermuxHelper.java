@@ -74,7 +74,7 @@ public final class TermuxHelper {
 
     public TermuxHelper(Context context) {
         this.context = context == null ? null : context.getApplicationContext();
-        this.repository = this.context == null ? null : new SshConfigRepository(this.context);
+        this.repository = this.context == null ? null : new SshConfigRepository(new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this.context)));
     }
 
     public SshConfigRepository getRepository() {

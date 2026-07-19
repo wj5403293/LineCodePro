@@ -146,8 +146,8 @@ public final class ImageGenerationToolTest {
     }
 
     private static ModelConfig model(String modelId) {
-        return new ModelConfig("id", "name", ModelProtocolType.OPENAI_COMPATIBLE,
-                "OpenAI", "https://api.openai.com/v1", "key", modelId);
+        return ModelConfig.builder("id", "name", ModelProtocolType.OPENAI_COMPATIBLE,
+                "OpenAI", "https://api.openai.com/v1", "key", modelId).build();
     }
 
     private static String invokeString(ImageGenerationTool tool, String methodName, String value) throws Exception {

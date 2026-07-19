@@ -16,6 +16,7 @@ import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.IpcFileTreeStore;
 import cn.lineai.data.repository.IpcProviderStore;
 import cn.lineai.data.repository.LearningContextStore;
+import cn.lineai.service.LearningContextService;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.ProjectStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
@@ -50,6 +51,7 @@ final class MainControllerInitializer {
         InputSettingsRepository inputSettingsRepository = dependencies.inputSettingsRepository;
         PromptTemplateRepository promptTemplateRepository = dependencies.promptTemplateRepository;
         LearningContextStore learningContextRepository = dependencies.learningContextRepository;
+        LearningContextService learningContextService = dependencies.learningContextService;
         OutputSettingsRepository outputSettingsRepository = dependencies.outputSettingsRepository;
         ThemeSettingsRepository themeSettingsRepository = dependencies.themeSettingsRepository;
         ExtensionStore extensionRepository = dependencies.extensionRepository;
@@ -178,6 +180,7 @@ final class MainControllerInitializer {
                 inputSettingsRepository,
                 promptTemplateRepository,
                 learningContextRepository,
+                learningContextService,
                 outputSettingsRepository,
                 themeSettingsRepository,
                 toolSettingsRepository,
@@ -395,7 +398,7 @@ final class MainControllerInitializer {
                 aiBehaviorSettingsRepository,
                 chatModeRepository,
                 promptTemplateRepository,
-                learningContextRepository,
+                learningContextService,
                 contextManager,
                 modelRepository,
                 extensionRepository,

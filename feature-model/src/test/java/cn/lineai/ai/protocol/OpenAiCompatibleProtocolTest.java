@@ -35,7 +35,7 @@ public final class OpenAiCompatibleProtocolTest {
         ArrayList<ModelMessage> messages = new ArrayList<>();
         messages.add(new UserModelMessage("fallback", ImageInputPayload.rawInputJson("看图", "image/jpeg", "abc123")));
 
-        JSONArray json = new OpenAiCompatibleProtocol().messagesJsonForTest(messages);
+        JSONArray json = new OpenAiMessageSerializer().messagesJsonForTest(messages);
 
         JSONObject user = json.getJSONObject(0);
         assertEquals("user", user.getString("role"));
@@ -64,15 +64,14 @@ public final class OpenAiCompatibleProtocolTest {
                         + "data: [DONE]\n\n");
         server.start();
         try {
-            ModelConfig config = new ModelConfig(
+            ModelConfig config = ModelConfig.builder(
                     "m1",
                     "OpenAI compatible",
                     ModelProtocolType.OPENAI_COMPATIBLE,
                     "OpenAI",
                     "http://127.0.0.1:" + server.port() + "/v1/chat/completions",
                     "sk-test",
-                    "deepseek-v4-flash"
-            );
+                    "deepseek-v4-flash").build();
             ArrayList<ModelMessage> messages = new ArrayList<>();
             messages.add(new UserModelMessage("check tools"));
 
@@ -106,15 +105,14 @@ public final class OpenAiCompatibleProtocolTest {
 
     @Test
     public void nvidiaGatewayDoesNotSendUnsupportedThinkingParameters() throws Exception {
-        ModelConfig config = new ModelConfig(
+        ModelConfig config = ModelConfig.builder(
                 "nvidia-qwen",
                 "NVIDIA Qwen",
                 ModelProtocolType.OPENAI_COMPATIBLE,
                 "NVIDIA",
                 "https://integrate.api.nvidia.com/v1",
                 "sk-test",
-                "qwen/qwen3-coder"
-        );
+                "qwen/qwen3-coder").build();
 
         JSONObject body = new OpenAiCompatibleProtocol().reasoningRequestBodyForTest(
                 config,
@@ -265,7 +263,7 @@ public final class OpenAiCompatibleProtocolTest {
 
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
-            return new ToolResult("", getName(), "", false);
+            return ToolResult.withReview("", getName(), "", false, "", "", "");
         }
     }
 }

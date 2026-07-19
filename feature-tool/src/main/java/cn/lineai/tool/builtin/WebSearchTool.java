@@ -1,5 +1,6 @@
 package cn.lineai.tool.builtin;
 
+import android.content.Context;
 import cn.lineai.data.repository.WebSearchConfigRepository;
 import cn.lineai.model.WebSearchConfig;
 import cn.lineai.tool.BaseTool;
@@ -50,6 +51,16 @@ public final class WebSearchTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.READ;
+    }
+
+    @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_search);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SEARCH;
     }
 
     @Override

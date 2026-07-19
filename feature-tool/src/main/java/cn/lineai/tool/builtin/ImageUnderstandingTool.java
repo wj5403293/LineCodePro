@@ -72,6 +72,16 @@ public final class ImageUnderstandingTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_image_understanding);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_PAINTBRUSH;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")

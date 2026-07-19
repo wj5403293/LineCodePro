@@ -34,7 +34,7 @@ public final class GenerationFlowControllerTest {
                 new FakeHost()
         );
 
-        agentHost(controller).addOrReplaceToolResult(new ToolResult("call_1", "agent", "done", false));
+        agentHost(controller).addOrReplaceToolResult(ToolResult.withReview("call_1", "agent", "done", false, "", "", ""));
 
         Assert.assertEquals(1, messages.size());
         Assert.assertEquals(ChatMessage.Role.TOOL, messages.get(0).getRole());

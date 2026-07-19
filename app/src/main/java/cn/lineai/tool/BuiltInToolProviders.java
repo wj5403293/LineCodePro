@@ -1,6 +1,8 @@
 package cn.lineai.tool;
 
 import android.content.Context;
+import cn.lineai.data.db.LineCodeDatabase;
+import cn.lineai.data.repository.SettingsRepository;
 import cn.lineai.data.repository.WebSearchConfigRepository;
 import cn.lineai.ipc.IpcProviderManager;
 import cn.lineai.tool.builtin.AgentPipelineTool;
@@ -62,7 +64,7 @@ public final class BuiltInToolProviders {
         list.add((context, ipc) -> new ImageGenerationTool(context));
         // WebSearchTool needs its own config repository.
         list.add((context, ipc) -> new WebSearchTool(
-                context == null ? null : new WebSearchConfigRepository(context)));
+                context == null ? null : new WebSearchConfigRepository(new SettingsRepository(LineCodeDatabase.getInstance(context)))));
         return list;
     }
 }

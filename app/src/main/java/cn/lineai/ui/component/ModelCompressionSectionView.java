@@ -8,7 +8,6 @@ import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import cn.lineai.R;
-import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelProtocolType;
 import cn.lineai.ui.theme.LineTheme;
 import cn.lineai.ui.util.KeyboardController;
@@ -139,7 +138,7 @@ public final class ModelCompressionSectionView extends LinearLayout {
     public boolean isEnabled() {
         return compressionEnabledSwitch != null
                 && compressionEnabledSwitch.isChecked()
-                && ModelConfig.supportsDedicatedCompression(protocolType[0]);
+                && protocolType[0].supportsDedicatedCompression();
     }
 
     public boolean isAuto() {
@@ -181,7 +180,7 @@ public final class ModelCompressionSectionView extends LinearLayout {
     }
 
     private void updateVisibility() {
-        boolean supported = ModelConfig.supportsDedicatedCompression(protocolType[0]);
+        boolean supported = protocolType[0].supportsDedicatedCompression();
         setVisibility(supported ? VISIBLE : GONE);
         if (!supported && compressionEnabledSwitch != null && compressionEnabledSwitch.isChecked()) {
             compressionEnabledSwitch.setChecked(false);

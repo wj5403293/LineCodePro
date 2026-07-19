@@ -1,20 +1,20 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.data.db.LineCodeSchema;
+import cn.lineai.resource.SystemConfigProvider;
 import java.io.File;
 
 public final class StorageStatsRepository {
-    private final Context context;
+    private final SystemConfigProvider systemConfigProvider;
     private final LineCodeDatabase database;
     private final MessageTextChunkStore textChunks;
 
-    public StorageStatsRepository(Context context) {
-        this.context = context;
-        this.database = LineCodeDatabase.getInstance(context);
+    public StorageStatsRepository(SystemConfigProvider systemConfigProvider, LineCodeDatabase database) {
+        this.systemConfigProvider = systemConfigProvider;
+        this.database = database;
         this.textChunks = new MessageTextChunkStore(database);
     }
 
@@ -56,20 +56,24 @@ public final class StorageStatsRepository {
     }
 
     private long getDatabaseFileSize() {
-        File dbFile = context.getDatabasePath("linecode.db");
-        if (dbFile != null && dbFile.exists()) {
-            return dbFile.length();
+        String dbPath = systemConfigProvider.getDatabasePath("linecode.db");
+        if (dbPath != null) {
+            File dbFile = new File(dbPath);
+            if (dbFile.exists()) {
+                return dbFile.length();
+            }
         }
         return 0;
     }
 
     private long calculateConfigSize() {
-        File prefsDir = new File(context.getFilesDir().getParentFile(), "shared_prefs");
+        String filesDirPath = systemConfigProvider.getFilesDirPath();
+        File filesDir = new File(filesDirPath);
+        File prefsDir = new File(filesDir.getParentFile(), "shared_prefs");
         long size = 0;
         if (prefsDir.exists() && prefsDir.isDirectory()) {
             size += calculateDirectorySize(prefsDir);
         }
-        File filesDir = context.getFilesDir();
         if (filesDir.exists() && filesDir.isDirectory()) {
             size += calculateDirectorySize(filesDir);
         }
@@ -78,11 +82,12 @@ public final class StorageStatsRepository {
 
     private int countConfigFiles() {
         int count = 0;
-        File prefsDir = new File(context.getFilesDir().getParentFile(), "shared_prefs");
+        String filesDirPath = systemConfigProvider.getFilesDirPath();
+        File filesDir = new File(filesDirPath);
+        File prefsDir = new File(filesDir.getParentFile(), "shared_prefs");
         if (prefsDir.exists() && prefsDir.isDirectory()) {
             count += countFilesInDirectory(prefsDir);
         }
-        File filesDir = context.getFilesDir();
         if (filesDir.exists() && filesDir.isDirectory()) {
             count += countFilesInDirectory(filesDir);
         }
@@ -110,11 +115,11 @@ public final class StorageStatsRepository {
         if (homePath != null && homePath.length() > 0) {
             return new File(homePath);
         }
-        File externalStorage = context.getExternalFilesDir(null);
-        if (externalStorage != null) {
-            return externalStorage;
+        String externalPath = systemConfigProvider.getExternalFilesDirPath();
+        if (externalPath != null) {
+            return new File(externalPath);
         }
-        return context.getFilesDir();
+        return new File(systemConfigProvider.getFilesDirPath());
     }
 
     private long calculateDirectorySize(File directory) {

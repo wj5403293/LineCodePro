@@ -9,7 +9,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import cn.lineai.R;
 import cn.lineai.tool.ToolCall;
-import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import cn.lineai.ui.component.IconButtonView;
 import cn.lineai.ui.theme.LineTheme;
@@ -104,36 +103,23 @@ public final class ToolCallReadView extends BaseToolCallView implements ToolCall
     }
 
     private String actionLabel(String name) {
-        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
-        if (category == ToolDisplayCategory.IMAGE_GENERATION) return getContext().getString(R.string.tool_call_image_generation);
-        if (cn.lineai.tool.builtin.ImageUnderstandingTool.NAME.equals(name)) return getContext().getString(R.string.tool_call_image_understanding);
-        if (category == ToolDisplayCategory.PHONE_CONTROL) return ToolCallInputParser.phoneControlActionName(getContext(), name);
-        if (cn.lineai.tool.builtin.WebSearchTool.NAME.equals(name)) return getContext().getString(R.string.tool_call_action_search);
-        if (cn.lineai.tool.builtin.WebFetchTool.NAME.equals(name)) return getContext().getString(R.string.tool_call_action_fetch);
-        if (cn.lineai.tool.builtin.GlobTool.NAME.equals(name)) return getContext().getString(R.string.tool_call_action_match);
-        if (cn.lineai.tool.builtin.ListDirectoryTool.NAME.equals(name)) return getContext().getString(R.string.tool_call_action_list_dir);
+        cn.lineai.tool.ToolDisplayResolver resolver = cn.lineai.tool.ToolDisplayResolver.getDefault();
+        if (resolver != null) {
+            String actionName = resolver.getActionName(getContext(), name);
+            if (actionName != null) {
+                return actionName;
+            }
+        }
         return getContext().getString(R.string.tool_call_action_read);
     }
 
     private int iconFor(String name) {
-        ToolDisplayCategory category = ToolCallUtils.getDisplayCategory(name);
-        if (cn.lineai.tool.builtin.GlobTool.NAME.equals(name) || cn.lineai.tool.builtin.WebSearchTool.NAME.equals(name)) {
-            return IconButtonView.SEARCH;
-        }
-        if (cn.lineai.tool.builtin.WebFetchTool.NAME.equals(name)) {
-            return IconButtonView.GLOBE;
-        }
-        if (cn.lineai.tool.builtin.ListDirectoryTool.NAME.equals(name)) {
-            return IconButtonView.FOLDER_OPEN;
-        }
-        if (cn.lineai.tool.builtin.ImageUnderstandingTool.NAME.equals(name)) {
-            return IconButtonView.PAINTBRUSH;
-        }
-        if (category == ToolDisplayCategory.IMAGE_GENERATION) {
-            return IconButtonView.SPARKLES;
-        }
-        if (category == ToolDisplayCategory.PHONE_CONTROL) {
-            return IconButtonView.SMARTPHONE;
+        cn.lineai.tool.ToolDisplayResolver resolver = cn.lineai.tool.ToolDisplayResolver.getDefault();
+        if (resolver != null) {
+            int icon = resolver.getActionIcon(name);
+            if (icon != 0) {
+                return icon;
+            }
         }
         return IconButtonView.EXPAND;
     }

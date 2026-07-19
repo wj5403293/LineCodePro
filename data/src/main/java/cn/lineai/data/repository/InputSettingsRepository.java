@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.InputSettings;
 
 public final class InputSettingsRepository {
@@ -8,8 +7,8 @@ public final class InputSettingsRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public InputSettingsRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public InputSettingsRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized InputSettings get() {

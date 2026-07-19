@@ -1,12 +1,8 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import cn.lineai.data.db.LineCodeDatabase;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,8 +10,8 @@ import java.util.List;
 public final class DiffRepository extends BaseRepository implements DiffStore {
     private final SecureRandom random = new SecureRandom();
 
-    public DiffRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context));
+    public DiffRepository(LineCodeDatabase database) {
+        super(database);
     }
 
     public synchronized DiffRecord recordDiff(
@@ -87,35 +83,13 @@ public final class DiffRepository extends BaseRepository implements DiffStore {
             }
         }
 
-        try {
-            restoreOldContent(target);
-            ContentValues values = new ContentValues();
-            values.put("reverted", 1);
-            database.getWritableDatabase().update("diff_records", values, "id = ?", new String[] {target.getId()});
-            return RevertResult.ok("Reverted change to " + target.getFilePath());
-        } catch (Exception e) {
-            return RevertResult.error("Revert failed: " + e.getMessage());
-        }
+        return RevertResult.ok("Ready to revert", target);
     }
 
-    private void restoreOldContent(DiffRecord record) throws Exception {
-        File file = new File(record.getFilePath());
-        if (!record.isOldExists()) {
-            if (file.exists() && !file.delete()) {
-                throw new java.io.IOException("Cannot delete file: " + record.getFilePath());
-            }
-            return;
-        }
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists() && !parent.mkdirs()) {
-            throw new java.io.IOException("Cannot create parent directory: " + parent.getPath());
-        }
-        FileOutputStream output = new FileOutputStream(file, false);
-        try {
-            output.write(record.getOldContent().getBytes(StandardCharsets.UTF_8));
-        } finally {
-            output.close();
-        }
+    public synchronized void markReverted(String diffId) {
+        ContentValues values = new ContentValues();
+        values.put("reverted", 1);
+        database.getWritableDatabase().update("diff_records", values, "id = ?", new String[] {diffId});
     }
 
     private DiffRecord readRecord(Cursor cursor) {
@@ -133,10 +107,12 @@ public final class DiffRepository extends BaseRepository implements DiffStore {
     public static final class RevertResult {
         private final boolean success;
         private final String message;
+        private final DiffRecord diffRecord;
 
-        private RevertResult(boolean success, String message) {
+        private RevertResult(boolean success, String message, DiffRecord diffRecord) {
             this.success = success;
             this.message = message == null ? "" : message;
+            this.diffRecord = diffRecord;
         }
 
         public boolean isSuccess() {
@@ -147,12 +123,20 @@ public final class DiffRepository extends BaseRepository implements DiffStore {
             return message;
         }
 
+        public DiffRecord getDiffRecord() {
+            return diffRecord;
+        }
+
         static RevertResult ok(String message) {
-            return new RevertResult(true, message);
+            return new RevertResult(true, message, null);
+        }
+
+        static RevertResult ok(String message, DiffRecord diffRecord) {
+            return new RevertResult(true, message, diffRecord);
         }
 
         static RevertResult error(String message) {
-            return new RevertResult(false, message);
+            return new RevertResult(false, message, null);
         }
     }
 }

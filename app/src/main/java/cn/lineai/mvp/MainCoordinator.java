@@ -961,7 +961,8 @@ public final class MainCoordinator implements MainUiController {
 
     String syncModePermission() {
         String mode = chatModeRepository.getMode();
-        chatModeRepository.applyMode(mode, toolSettingsRepository);
+        chatModeRepository.applyMode(mode);
+        chatModeRepository.applyPermissionForMode(mode, toolSettingsRepository);
         return chatModeRepository.getMode();
     }
 

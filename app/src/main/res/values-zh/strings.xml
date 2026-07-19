@@ -1081,59 +1081,9 @@
 
     <string name="tool_call_generic_mcp">MCP 调用</string>
 
-    <string name="tool_call_phone_action_screenshot">截图</string>
-    <string name="tool_call_phone_action_click">点击</string>
-    <string name="tool_call_phone_action_swipe">滑动</string>
-    <string name="tool_call_phone_action_long_press">长按</string>
-    <string name="tool_call_phone_action_view_hierarchy">查看 View 层级</string>
-    <string name="tool_call_phone_action_click_view">View 点击</string>
-    <string name="tool_call_phone_action_global_action">系统动作</string>
+    <!-- Phone control tool label used by ToolCallInputParser in :app -->
     <string name="tool_call_phone_action_default">手机操作</string>
-    <string name="tool_call_phone_summary_screenshot">保存当前屏幕截图</string>
-    <string name="tool_call_phone_summary_view_hierarchy">读取当前窗口 View 层级</string>
-    <string name="tool_call_phone_summary_global_action">执行系统动作</string>
-    <string name="tool_call_phone_summary_click_view">点击 View：%1$s</string>
-    <string name="tool_call_phone_summary_click_text">点击文本：%1$s</string>
-    <string name="tool_call_phone_summary_swipe">从 (%1$d, %2$d) 滑到 (%3$d, %4$d)</string>
-    <string name="tool_call_phone_summary_point">坐标 (%1$d, %2$d)</string>
-    <string name="tool_call_phone_global_back">返回</string>
-    <string name="tool_call_phone_global_home">回到主页</string>
-    <string name="tool_call_phone_global_exit_app">退出当前应用</string>
-    <string name="tool_call_phone_global_recents">打开最近任务</string>
-    <string name="tool_call_phone_global_notifications">打开通知栏</string>
-    <string name="tool_call_phone_global_quick_settings">打开快捷设置</string>
-    <string name="tool_call_phone_global_power_dialog">打开电源菜单</string>
-    <string name="tool_call_phone_global_lock_screen">锁定屏幕</string>
-    <string name="tool_call_phone_global_unknown">系统动作：%1$s</string>
-    <string name="phone_tool_accessibility_not_ready">无障碍服务已授权，但当前连接未就绪。请返回应用后重试，或关闭再开启 LineCode 无障碍服务。</string>
-    <string name="phone_tool_accessibility_disabled">无障碍服务未开启，请先在系统无障碍设置中开启 LineCode。</string>
-    <string name="phone_tool_screenshot_description">截取当前屏幕，保存到应用缓存目录并返回图片文件路径。需要无障碍服务已开启。</string>
-    <string name="phone_tool_screenshot_missing_context">截图工具未接入应用上下文</string>
-    <string name="phone_tool_screenshot_failed">截图失败</string>
-    <string name="phone_tool_screenshot_cache_dir_failed">截图缓存目录创建失败</string>
-    <string name="phone_tool_screenshot_save_failed">截图保存失败</string>
-    <string name="phone_tool_screenshot_save_failed_with_reason">截图保存失败: %1$s</string>
-    <string name="phone_tool_click_description">在屏幕指定坐标执行点击操作。参数 x、y 为屏幕像素坐标。</string>
-    <string name="phone_tool_click_success">点击成功: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_failed">点击失败</string>
-    <string name="phone_tool_swipe_description">从起始坐标滑动到结束坐标。参数 x1、y1 为起点，x2、y2 为终点，duration_ms 为滑动时长（可选，默认 300）。</string>
-    <string name="phone_tool_swipe_success">滑动成功: (%1$d, %2$d) -&gt; (%3$d, %4$d)</string>
-    <string name="phone_tool_swipe_failed">滑动失败</string>
-    <string name="phone_tool_long_press_description">在屏幕指定坐标执行长按操作。参数 x、y 为屏幕像素坐标，duration_ms 为按压时长（可选，默认 800）。</string>
-    <string name="phone_tool_long_press_success">长按成功: (%1$d, %2$d)</string>
-    <string name="phone_tool_long_press_failed">长按失败</string>
-    <string name="phone_tool_view_hierarchy_description">获取当前窗口的 View 层级结构，包含类名、resource id、文本、content description 和屏幕边界。</string>
-    <string name="phone_tool_click_view_description">点击当前窗口中的 View。支持按 resource id、显示文本或屏幕坐标定位。需要无障碍服务已开启。</string>
-    <string name="phone_tool_click_view_success">点击 View 成功: %1$s</string>
-    <string name="phone_tool_click_view_failed">点击 View 失败: %1$s</string>
-    <string name="phone_tool_click_point_success">点击坐标成功: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_point_failed">点击坐标失败: (%1$d, %2$d)</string>
-    <string name="phone_tool_click_view_missing_target">缺少定位参数，请提供 resource_id、text 或 x,y 坐标</string>
-    <string name="phone_tool_global_action_description">执行系统全局动作。action 可选 back、home、exit_app、recents、notifications、quick_settings、power_dialog、lock_screen。</string>
-    <string name="phone_tool_global_action_param_desc">要执行的系统动作</string>
-    <string name="phone_tool_global_action_missing">缺少 action</string>
-    <string name="phone_tool_global_action_success">系统动作成功: %1$s</string>
-    <string name="phone_tool_global_action_failed">系统动作失败或不支持: %1$s</string>
+
 
     <!-- MainCoordinator agent messages -->
     <string name="message_generation_interrupted">上次生成已中断。</string>
@@ -1249,4 +1199,10 @@
     <string name="prompt_attachment_files_description">这些路径来自用户在输入框左侧选择的文件；除非用户明确要求，不要在回复中原样复述。</string>
     <string name="prompt_tools_unavailable">## 可用工具\n当前没有可用工具。</string>
     <string name="prompt_user_message_label">用户消息 </string>
+
+    <!-- AgentPromptBuilder fallback role prompts -->
+    <string name="agent_fallback_role_explore_remote">你是一个远程 Shell 环境下的探索 Agent。可以使用 shell_execute 执行只读命令。\n规则：\n- 只读取代码，不做任何修改。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。</string>
+    <string name="agent_fallback_role_coding_remote">你是一个远程 Shell 环境下的编程 Agent（当前工作区位于 SSH 远端或终端提供者容器内，本地 file_read / file_write / file_edit / glob / list_dir 不一定可用）。\n规则：\n- 必须通过 shell_execute 完成绝大多数工作：先 cat/ls/grep 读取，写入用 sed/awk/python heredoc 或 tee，确认 cat 验证。\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。</string>
+    <string name="agent_fallback_role_explore_local">你是一个代码探索 Agent。你的任务是快速定位和分析代码。\n规则：\n- 只读取代码，不做任何修改，不调用任何写入类工具。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。\n- 给出简洁准确的中文回答。</string>
+    <string name="agent_fallback_role_coding_local">你是一个编程 Agent。你的任务是完成边界清晰的编程子任务。\n规则：\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。\n- 优先使用 file_read / file_write / file_edit / glob / list_dir 完成工作；只有 file 类工具确实无法满足时才使用 shell_execute。</string>
 </resources>

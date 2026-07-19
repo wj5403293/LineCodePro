@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit;
  * into a shared module, since Phone*Tool classes depend on this service.
  * See {@code cn.lineai.tool.builtin.PhoneClickTool} for full module split barrier notes.
  */
-public final class LineCodeAccessibilityService extends AccessibilityService {
+public final class LineCodeAccessibilityService extends AccessibilityService
+        implements cn.lineai.tool.PhoneControlService {
 
     private static volatile LineCodeAccessibilityService instance;
 
@@ -40,12 +41,14 @@ public final class LineCodeAccessibilityService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        cn.lineai.tool.builtin.PhoneControlToolSupport.setService(this);
     }
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        cn.lineai.tool.builtin.PhoneControlToolSupport.setService(this);
     }
 
     @Override
@@ -61,6 +64,7 @@ public final class LineCodeAccessibilityService extends AccessibilityService {
         super.onDestroy();
         if (instance == this) {
             instance = null;
+            cn.lineai.tool.builtin.PhoneControlToolSupport.setService(null);
         }
     }
 

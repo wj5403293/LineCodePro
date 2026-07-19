@@ -126,6 +126,7 @@ public final class AgentExecutionController {
 
     public void setContext(Context context) {
         this.context = context;
+        this.promptBuilder.setContext(context);
     }
 
     private String string(int resId, String fallback) {
@@ -154,10 +155,10 @@ public final class AgentExecutionController {
             int usedToolCallCount
     ) {
         if (selectedModel == null) {
-            return new ToolResult("", AgentTool.NAME, "当前没有可用模型，无法运行 Agent。", true);
+            return ToolResult.withReview("", AgentTool.NAME, "当前没有可用模型，无法运行 Agent。", true, "", "", "");
         }
         if (cancellationToken != null && cancellationToken.isCancelled()) {
-            return new ToolResult("", AgentTool.NAME, AGENT_TERMINATED_MESSAGE, true);
+            return ToolResult.withReview("", AgentTool.NAME, AGENT_TERMINATED_MESSAGE, true, "", "", "");
         }
         String type = AgentTool.normalizeType(input.optString("type"));
         String description = input.optString("description").trim();
@@ -199,7 +200,7 @@ public final class AgentExecutionController {
         progress.setFinished(result.isError() ? "error" : "done", result.isError(), builder.toString().trim());
         host.addOrReplaceToolResult(progress.snapshotResult());
         host.render();
-        return new ToolResult("", AgentTool.NAME, progress.snapshotResult().getContent(), result.isError());
+        return ToolResult.withReview("", AgentTool.NAME, progress.snapshotResult().getContent(), result.isError(), "", "", "");
     }
 
     public ToolResult runAgentPipelineTool(
@@ -212,22 +213,22 @@ public final class AgentExecutionController {
             int usedToolCallCount
     ) {
         if (selectedModel == null) {
-            return new ToolResult("", AgentPipelineTool.NAME, "当前没有可用模型，无法运行 Agent 流水线。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "当前没有可用模型，无法运行 Agent 流水线。", true, "", "", "");
         }
         if (cancellationToken != null && cancellationToken.isCancelled()) {
-            return new ToolResult("", AgentPipelineTool.NAME, AGENT_TERMINATED_MESSAGE, true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, AGENT_TERMINATED_MESSAGE, true, "", "", "");
         }
         ArrayList<PipelineAgent> agents = dependencyResolver.parsePipelineAgents(input.optJSONArray("agents"));
         if (agents.isEmpty()) {
-            return new ToolResult("", AgentPipelineTool.NAME, "agent_pipeline.agents 不能为空。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "agent_pipeline.agents 不能为空。", true, "", "", "");
         }
         String dependencyError = dependencyResolver.validatePipelineDependencies(agents);
         if (dependencyError.length() > 0) {
-            return new ToolResult("", AgentPipelineTool.NAME, dependencyError, true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, dependencyError, true, "", "", "");
         }
         ArrayList<ArrayList<PipelineAgent>> levels = dependencyResolver.dependencyLevels(agents);
         if (levels.isEmpty()) {
-            return new ToolResult("", AgentPipelineTool.NAME, "Agent 流水线存在循环依赖或重复 id，无法执行。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "Agent 流水线存在循环依赖或重复 id，无法执行。", true, "", "", "");
         }
 
         LinkedHashMap<String, AgentRunResult> results = new LinkedHashMap<>();
@@ -248,7 +249,7 @@ public final class AgentExecutionController {
                         }
                     } catch (Exception ignored) {
                     }
-                    host.addOrReplaceToolResult(new ToolResult(id, name, payload, nextError, "", reviewState, ""));
+                    host.addOrReplaceToolResult(ToolResult.withReview(id, name, payload, nextError, "", reviewState, ""));
                     host.render();
                 }
         );
@@ -361,9 +362,9 @@ public final class AgentExecutionController {
     ) {
         String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
         if (toolCallId.length() == 0) {
-            return new ToolResult("", AgentPipelineTool.NAME, summary, error);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, summary, error, "", "", "");
         }
-        return new ToolResult(
+        return ToolResult.withReview(
                 toolCallId,
                 AgentPipelineTool.NAME,
                 pipelineProgress.payload(),
@@ -549,7 +550,7 @@ public final class AgentExecutionController {
 
     public boolean isAgentToolAllowed(BaseTool tool, String type, Set<String> customToolNames, Set<String> allowedMcpToolNames) {
         String name = tool.getName();
-        if (AgentTool.NAME.equals(name) || AgentPipelineTool.NAME.equals(name)) {
+        if (getAgentExcludedToolNames().contains(name)) {
             return false;
         }
         if (!allowedMcpToolNames.isEmpty() && allowedMcpToolNames.contains(name)) {
@@ -565,14 +566,42 @@ public final class AgentExecutionController {
                 && tool.getDisplayCategory() == ToolDisplayCategory.DELETE) {
             return false;
         }
-        if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            return tool.getCategory() == ToolCategory.READ;
+        Set<ToolCategory> allowed = getAgentAllowedCategories(type);
+        boolean isRestrictedToRead = allowed.size() == 1 && allowed.contains(ToolCategory.READ);
+        if (isRestrictedToRead) {
+            return allowed.contains(tool.getCategory());
         }
         if (tool.isAllowedInReadonlyMode()) {
             return true;
         }
-        return tool.getCategory() == ToolCategory.READ
-                || tool.getCategory() == ToolCategory.WRITE;
+        return allowed.contains(tool.getCategory());
+    }
+
+    private Set<String> getAgentExcludedToolNames() {
+        if (toolSettingsRepository != null) {
+            return toolSettingsRepository.getAgentExcludedToolNames();
+        }
+        Set<String> names = new HashSet<>();
+        names.add(AgentTool.NAME);
+        names.add(AgentPipelineTool.NAME);
+        return names;
+    }
+
+    private Set<ToolCategory> getAgentAllowedCategories(String type) {
+        if (toolSettingsRepository != null) {
+            return toolSettingsRepository.getAgentAllowedCategories(type);
+        }
+        return defaultAgentAllowedCategories(type);
+    }
+
+    private static Set<ToolCategory> defaultAgentAllowedCategories(String type) {
+        if (AgentTool.TYPE_EXPLORE.equals(type)) {
+            return Collections.singleton(ToolCategory.READ);
+        }
+        Set<ToolCategory> categories = new HashSet<>();
+        categories.add(ToolCategory.READ);
+        categories.add(ToolCategory.WRITE);
+        return categories;
     }
 
     private boolean isRemoteExecutionMode() {
@@ -620,10 +649,10 @@ public final class AgentExecutionController {
     ) {
         host.syncModePermission();
         if (call == null) {
-            return new ToolResult("", "", "Agent 工具调用为空", true);
+            return ToolResult.error("Agent 工具调用为空");
         }
         if (!allowedToolNames.contains(call.getName())) {
-            return new ToolResult(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
+            return ToolResult.of(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
         }
         ToolContext context = ToolContext.builder()
                 .homePath(homePath)
@@ -663,7 +692,7 @@ public final class AgentExecutionController {
             return toolExecutor.execute(call, context);
         }
         String displayToolCallId = progress.displayToolCallId(call);
-        ToolResult pending = new ToolResult(call.getId(), call.getName(), "", false, "", "pending", "");
+        ToolResult pending = ToolResult.withReview(call.getId(), call.getName(), "", false, "", "pending", "");
         progress.putToolResult(call, pending);
         progress.setFinished("pending", false, "");
         host.addOrReplaceToolResult(progress.snapshotResult());
@@ -673,17 +702,17 @@ public final class AgentExecutionController {
             String state = toolReviewAwaiter.awaitReview(displayToolCallId, call, cancellationToken);
             progress.setStatus("running", false);
             if ("rejected".equals(state)) {
-                ToolResult rejected = new ToolResult(call.getId(), call.getName(), string(R.string.user_rejected_tool, "User rejected this tool."), true, "", "rejected", "");
+                ToolResult rejected = ToolResult.withReview(call.getId(), call.getName(), string(R.string.user_rejected_tool, "User rejected this tool."), true, "", "rejected", "");
                 progress.putToolResult(call, rejected);
                 host.addOrReplaceToolResult(progress.snapshotResult());
                 return rejected;
             }
-            progress.putToolResult(call, new ToolResult(call.getId(), call.getName(), "", false, "", "accepted", ""));
+            progress.putToolResult(call, ToolResult.withReview(call.getId(), call.getName(), "", false, "", "accepted", ""));
             host.addOrReplaceToolResult(progress.snapshotResult());
             return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new ToolResult(call.getId(), call.getName(), "等待工具确认时被中断。", true);
+            return ToolResult.of(call.getId(), call.getName(), "等待工具确认时被中断。", true);
         } finally {
             host.clearAgentToolReview(displayToolCallId);
         }
@@ -727,13 +756,13 @@ public final class AgentExecutionController {
             return null;
         }
         if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            return new ToolResult(call.getId(), call.getName(), "explore Agent 不允许写入文件。", true);
+            return ToolResult.of(call.getId(), call.getName(), "explore Agent 不允许写入文件。", true);
         }
         if (context != null && context.isBypassPathProtection()) {
             return null;
         }
         if (writeScope == null || writeScope.isEmpty()) {
-            return new ToolResult(call.getId(), call.getName(),
+            return ToolResult.of(call.getId(), call.getName(),
                     "Agent 未声明 write_scope，禁止写入文件。请让主模型重新分配明确的写入范围。", true);
         }
         try {
@@ -754,12 +783,12 @@ public final class AgentExecutionController {
                     return null;
                 }
             }
-            return new ToolResult(call.getId(), call.getName(),
+            return ToolResult.of(call.getId(), call.getName(),
                     "Agent 写入路径超出 write_scope: " + filePath
                             + "\n允许写入范围: " + promptBuilder.scopeSummary(writeScope)
                             + "\n请停止写入并让主模型重新分配。", true);
         } catch (Exception e) {
-            return new ToolResult(call.getId(), call.getName(), "Agent 写入范围检查失败: " + e.getMessage(), true);
+            return ToolResult.of(call.getId(), call.getName(), "Agent 写入范围检查失败: " + e.getMessage(), true);
         }
     }
 

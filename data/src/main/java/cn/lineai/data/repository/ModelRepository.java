@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -27,10 +26,9 @@ public final class ModelRepository implements ModelStore {
     private final LineCodeDatabase database;
     private final SharedPreferences legacyPreferences;
 
-    public ModelRepository(Context context) {
-        Context appContext = context.getApplicationContext();
-        database = LineCodeDatabase.getInstance(appContext);
-        legacyPreferences = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    public ModelRepository(LineCodeDatabase database, SharedPreferences legacyPreferences) {
+        this.database = database;
+        this.legacyPreferences = legacyPreferences;
         ensureModelConfigColumns();
         migrateLegacyPreferencesIfNeeded();
     }

@@ -1,25 +1,13 @@
 package cn.lineai.tool;
 
 import android.content.Context;
-import cn.lineai.tool.builtin.AgentPipelineTool;
-import cn.lineai.tool.builtin.AgentTool;
-import cn.lineai.tool.builtin.FileDeleteTool;
-import cn.lineai.tool.builtin.FileEditTool;
-import cn.lineai.tool.builtin.FileReadTool;
-import cn.lineai.tool.builtin.FileWriteTool;
-import cn.lineai.tool.builtin.GlobTool;
-import cn.lineai.tool.builtin.ImageGenerationTool;
-import cn.lineai.tool.builtin.ImageUnderstandingTool;
-import cn.lineai.tool.builtin.ListDirectoryTool;
-import cn.lineai.tool.builtin.ShellExecuteTool;
-import cn.lineai.tool.builtin.TodoUpdateTool;
-import cn.lineai.tool.builtin.WebFetchTool;
-import cn.lineai.tool.builtin.WebSearchTool;
 import org.json.JSONObject;
 
 /**
- * 工具显示信息解析器：根据工具名解析显示分类、标签、动作名。
+ * 工具显示信息解析器：根据工具名解析显示分类、标签、动作名、图标。
  * 供UI层使用，将显示路由逻辑从UI层下沉到tool层。
+ * 新增工具只需在 BaseTool 中覆写 getDisplayCategory/getActionName/getActionIcon，
+ * 无需修改此类或UI层代码。
  */
 public final class ToolDisplayResolver {
     private final ToolRegistry registry;
@@ -71,18 +59,26 @@ public final class ToolDisplayResolver {
         return null;
     }
 
+    public int getActionIcon(String name) {
+        if (registry != null) {
+            BaseTool tool = registry.get(name);
+            if (tool != null) {
+                int icon = tool.getActionIcon();
+                if (icon != 0) {
+                    return icon;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 静态回退方法：仅当registry不可用时使用。
+     * 所有内置工具已通过 BaseTool.getDisplayCategory() 提供自己的类别，
+     * 此处仅保留动态前缀工具的回退逻辑。
+     */
     public static ToolDisplayCategory fallbackDisplayCategory(String name) {
         if (name == null) return ToolDisplayCategory.GENERIC;
-        if (FileReadTool.NAME.equals(name) || GlobTool.NAME.equals(name) || ListDirectoryTool.NAME.equals(name)
-                || WebSearchTool.NAME.equals(name) || WebFetchTool.NAME.equals(name)
-                || ImageUnderstandingTool.NAME.equals(name)) return ToolDisplayCategory.READ;
-        if (FileWriteTool.NAME.equals(name) || FileEditTool.NAME.equals(name)) return ToolDisplayCategory.WRITE;
-        if (FileDeleteTool.NAME.equals(name)) return ToolDisplayCategory.DELETE;
-        if (ShellExecuteTool.NAME.equals(name)) return ToolDisplayCategory.SHELL;
-        if (AgentTool.NAME.equals(name)) return ToolDisplayCategory.AGENT;
-        if (AgentPipelineTool.NAME.equals(name)) return ToolDisplayCategory.AGENT_PIPELINE;
-        if (TodoUpdateTool.NAME.equals(name)) return ToolDisplayCategory.TODO;
-        if (ImageGenerationTool.NAME.equals(name)) return ToolDisplayCategory.IMAGE_GENERATION;
         if (name.startsWith("phone_")) return ToolDisplayCategory.PHONE_CONTROL;
         if (name.startsWith("agentx_")) return ToolDisplayCategory.AGENT;
         if (name.startsWith("mcpx_")) return ToolDisplayCategory.GENERIC;

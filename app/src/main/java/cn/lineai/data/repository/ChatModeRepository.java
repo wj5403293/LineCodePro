@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.ChatMode;
 
 public final class ChatModeRepository {
@@ -9,38 +8,40 @@ public final class ChatModeRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public ChatModeRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public ChatModeRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized String getMode() {
         return ChatMode.normalize(settingsRepository.getString(KEY_CHAT_MODE, ChatMode.DEFAULT));
     }
 
-    public synchronized void initialize(ToolSettingsStore toolSettingsRepository) {
+    public synchronized void initialize() {
         String storedMode = settingsRepository.getString(KEY_CHAT_MODE, "");
         if (storedMode.length() > 0) {
-            applyMode(storedMode, toolSettingsRepository);
+            applyMode(storedMode);
             return;
         }
-        String permissionMode = toolSettingsRepository == null
-                ? ToolSettingsRepository.PERMISSION_AUTO
-                : toolSettingsRepository.getPermissionMode();
-        String initialMode = ToolSettingsRepository.PERMISSION_READONLY.equals(permissionMode)
-                ? ChatMode.CHAT
-                : ChatMode.DEFAULT;
+        String initialMode = ChatMode.DEFAULT;
         settingsRepository.setString(KEY_CHAT_MODE, initialMode);
-        rememberRestorablePermission(permissionMode);
     }
 
-    public synchronized void applyMode(String mode, ToolSettingsStore toolSettingsRepository) {
+    public synchronized void applyMode(String mode) {
         String normalized = ChatMode.normalize(mode);
         if (!normalized.equals(getMode())) {
             settingsRepository.setString(KEY_CHAT_MODE, normalized);
         }
+    }
+
+    /**
+     * 根据 chat mode 变更同步权限模式。此方法由 Controller 层在调用 applyMode 后调用，
+     * 避免 Repository 层产生跨 Repository 副作用。
+     */
+    public void applyPermissionForMode(String mode, ToolSettingsStore toolSettingsRepository) {
         if (toolSettingsRepository == null) {
             return;
         }
+        String normalized = ChatMode.normalize(mode);
         String currentPermission = toolSettingsRepository.getPermissionMode();
         if (ChatMode.CHAT.equals(normalized)) {
             rememberRestorablePermission(currentPermission);

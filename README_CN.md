@@ -8,8 +8,8 @@
 [English](README.md) · [中文](README_CN.md)
 
 [![许可证: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
-[![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84.svg)](app/build.gradle.kts)
-[![当前版本: 1.1.7](https://img.shields.io/badge/version-1.1.7-success.svg)](app/build.gradle.kts)
+[![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-3DDC84.svg)](app/build.gradle.kts)
+[![当前版本: 1.2.2](https://img.shields.io/badge/version-1.2.2-success.svg)](app/build.gradle.kts)
 [![Java 11 only](https://img.shields.io/badge/code-Java%2011-orange.svg)](#项目结构)
 
 ---
@@ -35,11 +35,11 @@
 
 ## LineCode Pro 是什么？
 
-**LineCode Pro** 是一款面向 Android 7.0+ 的本地化 AI 编程助理。它围绕"一个 Activity + 一段流式聊天 + 一套真正可执行的工具循环"组织代码。你只要指定一个项目目录（本地、SSH 远程，或第三方 IPC Provider），接好一个大模型，模型就能读取、编辑、glob、新建、删除文件，能跑 Shell、能抓取和搜索网页、能理解和生成图片，还能分派子任务。
+**LineCode Pro** 是一款面向 Android 8.0+ 的本地化 AI 编程助理。它围绕"一个 Activity + 一段流式聊天 + 一套真正可执行的工具循环"组织代码。你只要指定一个项目目录（本地、SSH 远程，或第三方 IPC Provider），接好一个大模型，模型就能读取、编辑、glob、新建、删除文件，能跑 Shell、能抓取和搜索网页、能理解和生成图片，还能分派子任务。
 
 LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作台**：系统提示、工具注册表、上下文管理、Diff 存档、文件树、项目选择器、SSH / IPC 管道、导入导出归档、扩展框架、安全策略……全部跑在 App 内部。除非你自己接到远程模型，否则项目文件不会离开你的手机。
 
-应用包名是 `cn.lineai`，仓库采用"单模块 `:app` + 可复用库 `:ipc` + 示例 Provider `:terminal-provider`"的多模块 Gradle 结构。
+应用包名是 `cn.lineai`，仓库采用 12 模块 Gradle 结构：`:build-logic`（composite build）、`:core-model`、`:core-api`、`:core-security`、`:ui-theme`、`:markdown`、`:data`、`:feature-tool`、`:feature-model`、`:feature-ssh`、`:feature-share`、`:app`，外加可复用库 `:ipc` 与示例 Provider `:terminal-provider`。
 
 ---
 
@@ -50,8 +50,9 @@ LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作
 - 同一个聊天界面下支持**多种模型协议**：OpenAI 兼容 HTTP API、Anthropic Messages、OpenAI Codex Responses、本地 GGUF 推理。
 - 推理块（`<think>…</think>`）会被 `ThinkTagParser` 单独抽出来，和最终回答分块渲染。
 - 流中的工具调用文本由 `ToolCallTextParser` 解析并派发；模型请求做的每件事，在真正执行前都会先展示给你看。
-- 系统提示由 `app/src/main/assets/prompts/*.txt` 中的模板拼装：语气（聊天 / 编程）变体、上下文压缩、记忆抽取、技能抽取、工作目录、学习上下文、模型身份。你可以在设置里覆盖语气、工作目录、身份块、提示模板。
-- 长对话由 `ContextCompactionService` 后台用**当前模型本身**总结；`MemoryExtractionService` 抽取长期知识，`LearningContextRepository` 在下一次会话中喂回上下文。
+- 系统提示由 `feature-model/src/main/assets/prompts/*.txt` 中的模板拼装：语气（聊天 / 编程）变体、上下文压缩、记忆抽取、技能抽取、工作目录、学习上下文、模型身份。你可以在设置里覆盖语气、工作目录、身份块、提示模板。
+- 长对话由 `ContextCompactionService` 后台用**当前模型本身**做**动态压缩**（50% 软触发 + 80% 硬触发）；`MemoryExtractionService` 抽取长期知识，`LearningContextRepository` 在下一次会话中喂回上下文。
+- **图片附件** - 在输入框右侧点图片按钮打开系统选择器；选中的图片经压缩后 base64 编码，按协议格式输出（OpenAI `image_url`、Anthropic `image.source.base64`、Codex `input_image`）。
 
 ### 工具执行
 
@@ -67,6 +68,13 @@ LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作
 | 效率 | `todo_update` |
 
 每个会触碰文件的工具都走 `FileToolPathPolicy` 路径校验，模型只能动你授权的目录里的内容。Shell 调用走 Termux 或 IPC Provider —— **永远不在 App 自身进程里跑命令**。
+
+### 上下文保护
+
+- **动态压缩** - `ContextCompactionService` 在上下文窗口占用 50% 时触发软压缩（最早 70% 被总结、最近 30% 原文保留），80% 时硬压缩兜底；转录文本按 256KB 分段拼接防 OOM。
+- **工具结果截断** - `ToolResult.truncateContent()` 强制 50KB 上限：超过 50KB 中间截断（前 25KB + 截断提示 + 后 25KB）。Shell 输出同样截断。
+- **大文件防护** - `FileReadTool` 使用 KB 参数（`start_kb` / `end_kb`，50KB 上限）；超过 1MB 的文件直接拒绝读取。
+- **模型上下文大小** - 支持 `k` / `m` 单位输入（如 `128K`、`1m`），由 `ContextSizeParser` 解析；旧 `{id}[{size}]` 格式通过 `ModelContextParser` 兼容。
 
 ### 工作区与文件
 
@@ -98,50 +106,75 @@ LineCode 不是一个轻量聊天客户端，它是一个**完整的编程工作
 - **可在任意目录工作。** 本地（SAF + 可选 `MANAGE_EXTERNAL_STORAGE`）、远程（jsch SSH）、或第三方 IPC Provider。
 - **支持自定义扩展。** 自定义 Agent（`agentx_*`）和 MCP-HTTP 工具（`mcpx_*`）即配即用。
 - **可插拔 IPC Provider。** 把 Shell 和文件操作放到独立进程里以做安全隔离。可以把 Provider 当成普通 Android App 上架，详见 [`ipc/README.md`](ipc/README.md)。
-- **记忆与上下文。** 长对话自动总结；长期知识会在下一次会话注入。
+- **记忆与上下文。** 动态压缩（50% 软触发 + 80% 硬触发）+ 分段拼接转录。长期知识会在下一次会话注入。
+- **上下文溢出防护。** 工具结果 50KB 中间截断；文件读取使用 KB 参数；超过 1MB 的文件直接拒绝。
+- **免费网页搜索。** 内置 Bing RSS 搜索 Provider，无需任何 API key。
 - **默认隐私优先。** URL 白名单、严格 `network_security_config.xml`、导出文件去敏、内置浏览器默认关闭 JavaScript。
 - **纯 Java 写在骨子里。** 无 Kotlin 运行时、无 XML 布局 —— App 全部由 Java 11 写成，便于审计。
 
 ---
 
-
 ## 项目结构
 
 ```
 LineCode/
-├── app/                       # :app Gradle 模块（cn.lineai）
+├── build-logic/               # composite build，linecode.convention 约定插件
+├── core-model/                # :core-model — 纯数据类 / DTO / 枚举
+│   └── src/main/java/cn/lineai/model/    # ModelConfig、ThemePalette、OutputSettings、
+│                                          # ContextSizeParser、ModelContextParser、ChatMessage、ToolResult…
+├── core-api/                  # :core-api — 接口抽象
+│   └── src/main/java/cn/lineai/           # ToolInfo、ToolNames、ToolCategory、ToolDisplayCategory、
+│                                          # ModelServiceProvider、WebSearchProvider
+├── core-security/             # :core-security — UrlPolicy、SimpleHttpClient
+├── ui-theme/                  # :ui-theme — LineTheme 及共享 UI 基础设施
+│   └── src/main/java/cn/lineai/ui/theme/ # LineTheme（被约 80 个文件引用）
+├── markdown/                  # :markdown — Markdown 渲染（commonmark + GFM tables）
+│   └── src/main/java/cn/lineai/ui/markdown/
+├── data/                      # :data — 仓库 / 数据库 / 导入导出 / 错误日志
+│   └── src/main/java/cn/lineai/
+│       ├── data/db/                      # LineCodeDatabase、LineCodeSchema、迁移
+│       ├── data/repository/              # 所有仓库（对话、模型、Diff、扩展…）
+│       ├── data/importer/                # ArchiveSecretRedactor、LineCodeDatabaseArchive
+│       ├── log/                          # ErrorLog、ErrorLogRedactor
+│       └── workspace/                    # WorkspacePaths
+├── feature-tool/              # :feature-tool — BaseTool、ToolRegistry、全部内置工具
+│   └── src/main/java/cn/lineai/tool/
+│       ├── BaseTool.java、ToolRegistry.java、ToolContext.java、ToolArgsCleaner.java
+│       └── builtin/                     # FileReadTool、FileWriteTool、FileEditTool、ShellExecuteTool、
+│                                          # WebSearchTool、WebFetchTool、AgentTool、AgentPipelineTool…
+├── feature-model/             # :feature-model — 协议、ModelClient、ContextManager、提示词模板
+│   └── src/main/
+│       ├── assets/prompts/               # 全部 .txt 提示词模板（系统、压缩、Agent…）
+│       └── java/cn/lineai/
+│           ├── ai/protocol/              # ModelProtocol、OpenAiCompatibleProtocol、AnthropicMessagesProtocol…
+│           ├── ai/prompt/                # SystemPromptProvider、StringTemplate
+│           ├── context/                  # ContextManager、ContextCompactionService
+│           └── ai/message/               # SystemModelMessage、UserModelMessage 等
+├── feature-ssh/               # :feature-ssh — SshService、SshConnectionPool、TermuxHelper
+├── feature-share/             # :feature-share — 导出 / 分享 / PDF
+├── app/                       # :app — MainActivity、MainCoordinator、控制器、UI 组件
 │   ├── build.gradle.kts
 │   ├── lint.xml
 │   ├── proguard-rules.pro
 │   └── src/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
-│       │   ├── assets/prompts/        # 系统提示模板（.txt）
 │       │   ├── aidl/                  # IPC AIDL 存根
 │       │   ├── java/cn/lineai/
 │       │   │   ├── MainActivity.java
-│       │   │   ├── ai/                # 协议、消息、工具调用解析、系统提示
-│       │   │   ├── context/           # ContextManager、压缩、记忆
-│       │   │   ├── data/              # SQLite schema、仓库、导入导出
-│       │   │   ├── model/             # 纯数据类型（记录、设置、附件）
 │       │   │   ├── mvp/               # MainCoordinator + 各关注点控制器
-│       │   │   ├── security/          # UrlPolicy
-│       │   │   ├── service/           # KeepAliveService
-│       │   │   ├── ssh/               # SshService、jsch 连接池、TermuxHelper
-│       │   │   ├── state/             # TodoStateStore
-│       │   │   ├── tool/              # ToolRegistry + builtin/*
-│       │   │   ├── ui/                # Java 写的视图 + Markdown 渲染
-│       │   │   └── workspace/         # WorkspacePaths、SafPathResolver、存储权限
-│       │   └── res/                   # 矢量图、字符串、主题（无 XML 布局）
+│       │   │   ├── ui/                # Java 写的视图（不 inflate XML）
+│       │   │   └── tool/             # ToolExecutor、ToolExecutionCoordinator（装配）
+│       │   └── res/                   # 矢量图、字符串、主题
 │       ├── test/                      # JUnit 4 单元测试
-│       └── debugUserCert/             # 旁加载构建 flavor
-├── ipc/                       # 可复用 Android 库（cn.lineai.ipc）
+│       └── debugUserCert/             # 旁加载 build flavor
+├── ipc/                       # :ipc — 可复用 Android 库（cn.lineai.ipc）
 │   ├── build.gradle.kts
 │   └── src/main/
 │       ├── AndroidManifest.xml        # <permission> cn.lineai.permission.IPC_TERMINAL_PROVIDER
 │       ├── aidl/                      # IBaseIpcService + terminal 接口
 │       └── java/cn/lineai/ipc/        # BaseIpcProvider、IpcProviderManager、注册表、扫描器
-├── terminal-provider/         # 示例 Provider App（cn.lineai.terminalprovider）
+├── terminal-provider/         # :terminal-provider — 示例 Provider App（cn.lineai.terminalprovider）
 │   ├── build.gradle.kts
 │   ├── proguard-rules.pro
 │   └── src/main/
@@ -153,16 +186,16 @@ LineCode/
 ├── build.gradle.kts
 ├── CLAUDE.md                  # 面向 AI / 评审者的架构圣经
 ├── README.md / README_CN.md   # ← 你正在看这里
-├── LICENSE / COPYING
-└── 问题.txt                   # 本地临时问题清单（gitignored）
+└── LICENSE
 ```
 
 ### 30 秒看架构
 
 * `MainActivity` 是唯一的 Activity，它实例化 `MainCoordinator`（Presenter）和 `MainChatView`（View），View 完全由 Java 代码构建 —— 不 inflate XML；`lint.xml` 故意屏蔽 `ViewConstructor`。
-* `MainCoordinator` 实现 `MainUiController`，把行为分派给 `cn.lineai.mvp.*` 下各关注点控制器（聊天、生成、工具执行、模型管理、设置、页面、权限模式、归档、项目面板、SSH 文件树、IPC 文件树、文件操作）。UI 状态走 `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)` 通路。
-* `cn.lineai.ai.protocol.ModelProtocol` 是流式 / Completion 接口，`ModelProtocolFactory` 按 `ModelProtocolType` 分派（`OPENAI_COMPATIBLE`、`CODEX_RESPONSES`、`ANTHROPIC_MESSAGES`、`LOCAL_GGUF`）。
+* `MainCoordinator` 实现 `MainUiController`，把行为分派给 `cn.lineai.mvp.*` 下各关注点控制器（聊天、生成、工具执行、模型管理、设置、页面、权限模式、归档、项目面板、SSH 文件树、IPC 文件树、文件操作、Agent 执行、上下文压缩、手机控制、错误日志、存储维护）。UI 状态走 `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)` 通路。
+* `cn.lineai.ai.protocol.ModelProtocol` 是流式 / Completion 接口，`ModelProtocolFactory` 按 `ModelProtocolType` 分派（`OPENAI_COMPATIBLE`、`CODEX_RESPONSES`、`ANTHROPIC_MESSAGES`、`LOCAL_GGUF`）。每个协议通过 `supportsNativeTools()` / `supportsContextCompaction()` / `supportsImageGeneration()` / `supportsImageUnderstanding()` 声明自身能力。
 * `BaseTool`（name、description、category、JSON schema、`execute(JSONObject, ToolContext)`）是工具契约；`ToolRegistry` 注册内置并热加载用户扩展；`ToolExecutionCoordinator` + `ToolExecutor` 执行；`PermissionModeController` + `ToolReviewListener` 控制逐条审批。
+* 模块依赖规则：`:app` → `:feature-*` → `:data` → `:core-model` / `:core-api` / `:core-security`。`ai ↔ tool` 循环依赖已打破：`:feature-tool` 不得引用 `cn.lineai.ai`，`:feature-model` 只引用 `:core-api` 中的 `ToolInfo` / `ToolNames` / `ToolCategory`。
 
 完整架构圣经（控制器、工具系统、上下文管理、SQLite schema、安全模型）见 [`CLAUDE.md`](CLAUDE.md)。
 
@@ -235,7 +268,7 @@ LineCode 在 **设置 → MCP execution mode** 里提供三种 Shell / 文件工
 * 入参的 JSON schema
 * `execute(JSONObject args, ToolContext ctx)` 返回 `ToolResult`
 
-内置工具在 `app/src/main/java/cn/lineai/tool/builtin/`：
+内置工具在 `feature-tool/src/main/java/cn/lineai/tool/builtin/`：
 
 ```
 FileReadTool      FileWriteTool      FileEditTool      FileDeleteTool
@@ -245,6 +278,8 @@ AgentTool  AgentPipelineTool  TodoUpdateTool
 ```
 
 执行由 `ToolExecutionCoordinator` + `ToolExecutor` 驱动；每次调用都要过 `PermissionModeController` + `ToolReviewListener`，用户可逐条确认或会话级自动确认。自动确认列表由 `MainCoordinator.sessionAutoConfirmedTools` 跟踪。
+
+工具结果由 `ToolResult.truncateContent()` 在 50KB 处截断（首尾各 25KB）后进入上下文。文件读取使用 KB 参数，50KB 范围上限；超过 1MB 的文件直接拒绝。Shell 输出超过 50KB 同样中间截断。
 
 聊天流的工具调用由 `app/src/main/java/cn/lineai/ui/component/toolcall/` 下的自定义卡片渲染（`ToolCallReadView`、`ToolCallWriteView`、`ToolCallShellView`、`ToolCallAgentView`、`ToolCallAgentPipelineView`、`ToolCallGenericView`…）。新工具只要在 `ToolCallUtils` 注册，就能拿到自己的卡片。
 
@@ -348,6 +383,7 @@ Release 流水线刻意加强：
 * **出网请求全部走 `UrlPolicy`。** 内置浏览器、外链打开、模型 HTTP、模型目录、网页抓取 / 搜索、自定义 MCP HTTP 都要过白名单。明文 HTTP 仅放行 `localhost`、`127.0.0.1`、`10.0.2.2`，与 `res/xml/network_security_config.xml`（`cleartextTrafficPermitted="false"` 默认）一致。
 * **内置 WebView** 禁用 `file://` / `content://`、禁止混合内容、默认关闭 JavaScript，直到用户主动开启。
 * **IPC 权限模型。** Provider 必须在 `<service>` 上声明 `android:permission="cn.lineai.permission.IPC_TERMINAL_PROVIDER"`；主 App 声明同名 `<permission>` 和 `<uses-permission>`。没有权限的调用方会在 Android 框架层被直接拒掉，Provider 端不必再做校验。
+* **绕过路径保护。** 安全设置页提供 `OutputSettings.bypassPathProtection` 开关（默认关闭）；开启后 `FileToolPathPolicy` 跳过工作区边界校验。开启时会显示警告对话框。所有文件类工具自动遵守此标志。
 * **Release 加固。** R8 + 8192 项混淆字典，剥离 LineNumberTable、native debug symbols、mapping 文件。Debug 证书签 release 会被 `validateReleaseSigning` 拒绝。
 
 完整威胁模型与已接受风险见 [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md)。
@@ -360,9 +396,9 @@ Release 流水线刻意加强：
 
 * **纯 Java。** `app/src/main/java` 全部是 Java；Kotlin stdlib 被刻意排除在运行时 classpath 外，引入 Kotlin 传递依赖会在运行期静默失败。`ipc/` 与 `terminal-provider/` 同样。
 * **视图用 Java 写，不用 XML。** `lint.xml` 故意屏蔽 `ViewConstructor` 与 `IconDuplicates`。
+* **选择最低层模块。** 加新代码时挑能容纳它的最低层模块：DTO → `:core-model`；接口 → `:core-api`；UI 基础设施 → `:ui-theme`；新工具 → `:feature-tool`；新协议 → `:feature-model`。库模块不要回头引用 `:app`。
 * **通过控制器扩展。** 新增聊天或工具行为时，扩展 `cn.lineai.mvp.*` 下对应的控制器，状态走 `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)`。不要绕过控制器去直接动 View。
-* **测试镜像包路径。** `app/src/test/java/cn/lineai/...` 与生产代码同包名。仅用 JUnit 4 + `org.json`（无 Robolectric、无 Mockito）。仓库或控制器单测优先用 sibling test 里已有的内存 fake。
-* **`问题.txt` 是临时清单。** 已 gitignored，正常改动不要动它。
+* **测试镜像包路径。** `app/src/test/java/cn/lineai/...` 与生产代码同包名。仅用 JUnit 4 + `org.json`（无 Robolectric、无 Mockito）。仓库或控制器单测优先用 sibling test 里已有的内存 fake。Feature 模块有各自独立的 `feature-*/src/test/java`。
 * **发 PR 前跑门禁：**
 
   ```bash

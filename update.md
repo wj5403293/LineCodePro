@@ -1,5 +1,79 @@
 # 更新日志
 
+## v1.2.2
+
+### 项目模块化拆分
+
+- **10 个新 Gradle 模块** - 从单模块 `:app` 拆分为多模块架构，新增 `:core-model`（纯数据类 / DTO / 枚举）、`:core-api`（接口抽象）、`:core-security`（`UrlPolicy`、`SimpleHttpClient`）、`:ui-theme`（`LineTheme` 及共享 UI 基础设施）、`:markdown`（Markdown 渲染，commonmark + GFM tables）、`:data`（SQLite schema、仓库、导入导出归档、错误日志）、`:feature-tool`（`BaseTool`、`ToolRegistry`、全部内置工具）、`:feature-model`（`ModelProtocol`、`ModelProtocolFactory`、四种协议实现、`ContextManager`、`ContextCompactionService`、提示词模板）、`:feature-ssh`（`SshService`、`SshConnectionPool`、`SshCommandExecutor`、`TermuxHelper`）、`:feature-share`（导出 / 分享 / PDF）。`settings.gradle.kts` 新增 `includeBuild("build-logic")` composite build 共享约定插件。
+- **代码迁移** - `:app` 模块中 `cn.lineai.model.*` → `:core-model`；`cn.lineai.tool.ToolInfo` / `ToolNames` / `ToolCategory` / `ToolDisplayCategory` / `ModelServiceProvider` → `:core-api`；`cn.lineai.security.*` → `:core-security`；`cn.lineai.ui.theme.*` → `:ui-theme`；`cn.lineai.ui.markdown.*` → `:markdown`；`cn.lineai.data.*` + `cn.lineai.log.*` + `cn.lineai.workspace.*` → `:data`；`cn.lineai.tool.*` → `:feature-tool`；`cn.lineai.ai.*` + `cn.lineai.context.*` → `:feature-model`；`cn.lineai.ssh.*` → `:feature-ssh`；`cn.lineai.share.*` → `:feature-share`。`app/src/main/assets/prompts/*.txt` 提示词模板 → `:feature-model`。
+- **新增基类与工具** - `BaseRepository`（公共 Cursor 辅助方法）、`FileTreeBaseRepository`（文件树仓库公共基类）、`ExceptionUtils`（工具异常格式化）、`AbstractToolCallBuilder`（协议 tool_call 构建公共逻辑）、`DefaultModelServiceProvider`（默认 `ModelServiceProvider` 实现）、`ReasoningDeltaExtractor`（推理增量提取）。
+- **循环依赖打破** - `:feature-tool` 不得引用 `cn.lineai.ai`；`:feature-model` 只引用 `:core-api` 中的 `ToolInfo` / `ToolNames` / `ToolCategory`；`ai ↔ tool` 循环依赖已消除。
+
+### 上下文压缩动态化
+
+- **50% 软触发** - `ContextCompactionService` 引入 `SOFT_COMPACT_TRIGGER_RATIO = 0.5`，上下文窗口占用超过 50% 时触发软压缩：最早 70% 可压缩消息被总结，最近 30%（`SOFT_COMPACT_TAIL_KEEP_RATIO`）原文保留。布局：`[head(excludeFromContext)] + [summary] + [tail(original)] + [preservedTail] + [progressDone]`。
+- **80% 硬触发** - `shouldCompact` 在 80% 占用时执行全量压缩兜底。`ChatInteractionController` 在每次请求前检查软触发（未硬触发时）。
+- **分段存储防 OOM** - `ContextCompactionService` 用 `List<String>` 逐段拼接转录文本，每段 ≤ `TRANSCRIPT_SEGMENT_MAX_CHARS = 256KB`，避免单个 `StringBuilder` OOM。移除固定大小截断（`MAX_MESSAGE_CONTENT_CHARS` / `MAX_TRANSCRIPT_CHARS`）。
+- **大堆内存** - `AndroidManifest.xml` 设置 `android:largeHeap="true"` 支持大转录。
+- **压缩控制器** - `ContextCompactionController` 新增 `startSoftContextCompaction` / `finishSoftContextCompaction` 驱动流程；`OutOfMemoryError` 在服务和控制器中均被捕获作为最后兜底。
+
+### 模型上下文大小
+
+- **`ContextSizeParser`** - 新增 `cn.lineai.model.ContextSizeParser`（`:core-model`），解析用户输入如 `128K`、`1m`、`128000` 为整数 token 数。
+- **`ModelContextParser`** - 新增 `cn.lineai.model.ModelContextParser`（`:core-model`），兼容旧 `{id}[{size}]` 后缀格式，提供 `parse(ModelConfig)` / `apiModelId(ModelConfig)` 方法。协议统一调用 `apiModelId(ModelConfig)` 发送请求，剥离 `[size]` 后缀。
+- **`ModelConfig.contextSize`** - `contextSize` 作为一等字段由 `ContextSizeParser` 解析；UI 使用纯文本字段输入；`model_configs` SQLite 表新增 `context_size` 列。
+
+### 工具结果内容截断
+
+- **`ToolResult.truncateContent()`** - 新增静态方法，50KB 上限截断：输出 ≤ 50KB 原样返回，> 50KB 保留前 25KB + 截断提示 + 后 25KB（中间截断，保留首尾）。
+- **`FileReadTool` KB 参数** - 文件读取参数从行制（`start_line` / `end_line` / `offset` / `limit`）改为 KB 制（`start_kb` / `end_kb`），50KB 上限；超过 1MB 的文件拒绝读取并返回提示。
+- **`ShellExecuteTool` 输出截断** - Shell 输出超过 50KB 时自动截断（首 25KB + 截断消息 + 尾 25KB）。
+- **压缩期截断** - `ContextCompactionService` 构建转录时对消息内容、工具调用参数、推理内容执行截断，防止超大内容进入上下文。
+- **安全校验** - `ToolMessageController` 在写入工具结果前检查内容大小。
+
+### 图片选择与路径保护
+
+- **图片选择按钮** - `ComposerView` 在附件 `+` 按钮右侧新增图片按钮（`IconButtonView.IMAGE`），点击打开系统图片选择器（`ACTION_OPEN_DOCUMENT`，`image/*`）。选中图片经压缩（长边 ≤ 1568px，JPEG q=85，>3.5MB 再降级）后 base64 编码，通过 `ChatInteractionController.sendMessageWithImage` → `ImageInputPayload.rawInputJson` 注入消息。协议自动检测 `ImageInputPayload.KIND` 并按供应商格式输出（OpenAI `image_url`、Anthropic `image.source.base64`、Codex `input_image`）。
+- **绕过路径保护** - 安全设置页新增"绕过路径保护"开关（`OutputSettings.bypassPathProtection`，默认关闭）。开启后 `FileToolPathPolicy.resolve` 跳过工作区边界校验直接返回规范路径；`ToolContext.bypassPathProtection` 由 `ToolExecutor.injectDependencies` 传播；`AgentExecutionController.validateAgentWriteScope` 在绕过开启时跳过 `write_scope` 检查。开启时显示警告对话框需用户确认。所有文件类工具（`FileReadTool` / `FileWriteTool` / `FileEditTool` / `FileDeleteTool` / `GlobTool` / `ListDirectoryTool` / `ImageUnderstandingTool`）自动遵守此标志。
+
+### Bing RSS 免费网页搜索
+
+- **`BingRssSearchProvider`** - 新增 `cn.lineai.tool.builtin.search.BingRssSearchProvider`，利用 Bing RSS 搜索接口提供免费网页搜索能力（无需 API key）。解析 RSS/Atom XML 提取标题、摘要、URL。
+- **搜索配置优化** - `WebSearchConfig` 新增 `bingRss` 提供商标识字段；`ToolSettingsScreenView` 搜索配置区域支持 Bing RSS 选项；`WebSearchService` 适配新 provider；`ToolSettingsRepository` 搜索配置逻辑重构。
+- **测试** - 新增 `BingRssSearchProviderTest`（49 行）覆盖 RSS 解析。
+
+### 工具调用参数清洗
+
+- **`ToolArgsCleaner`** - 新增 `cn.lineai.tool.ToolArgsCleaner`（移至 `:feature-tool`），对模型返回的工具参数字符串做清洗：剥离 Markdown 代码围栏、NFKC 归一化并移除零宽字符、删除注释与控制字符、移除对象/数组尾部多余逗号、将简单单引号字符串转为双引号。合法 JSON 原样返回，空/空白返回 `{}`。
+- **`ToolExecutor` 接入** - `ToolExecutor.execute` 在 `new JSONObject(...)` 之前先调用 `ToolArgsCleaner.clean(toolCall.getArguments())`，降低模型输出带围栏、注释、单引号或多余逗号时参数解析失败的概率。
+- **测试** - 新增 `ToolArgsCleanerTest` 覆盖空输入、Markdown 围栏、注释、尾部逗号、单引号、控制字符等场景。
+
+### 工具调用视图优化
+
+- **Agent 类型展示** - `ToolCallAgentPipelineView` / `ToolCallAgentView` 优化 Agent 角色类型标签展示，区分编程型/探索型 Agent。
+- **参数补全** - `ToolCallBlockView` 工具调用卡片参数补全逻辑优化。
+- **状态显示修复** - 修复 `ToolCallReadView` / `ToolCallWriteView` 在某些状态下进度圈不消失的问题；`BaseToolCallView` 新增 `TerminalStatus` 枚举和 `computeTerminalStatus` 统一终态判断。
+
+### 协议与模型增强
+
+- **`ModelProtocol` 默认方法** - `ModelProtocol` 接口新增 `supportsNativeTools()` / `supportsContextCompaction()` / `supportsImageGeneration()` / `supportsImageUnderstanding()` 4 个 `default` 方法返回 `true`；各协议按需覆写。
+- **`AbstractToolCallBuilder`** - 新增 `cn.lineai.ai.protocol.AbstractToolCallBuilder`，提取 `OpenAiCompatibleProtocol` / `AnthropicMessagesProtocol` / `CodexResponsesProtocol` 共用的 tool_call JSON 构建逻辑。
+- **`ReasoningDeltaExtractor`** - 新增 `cn.lineai.ai.protocol.reasoning.ReasoningDeltaExtractor`，统一提取各协议流式推理增量内容。
+- **`ToolCallTextParser` 增强** - 工具调用文本解析健壮性提升，解析失败返回空数组而非抛异常。
+- **`ModelCatalogClient` 重构** - 模型目录客户端清理冗余逻辑。
+
+### i18n 与资源
+
+- **新增 30+ 条字符串** - 图片选择、路径保护、上下文大小、搜索配置、安全设置等相关文案同步添加到 `values/strings.xml` 与 `values-zh/strings.xml`，各子模块（`data`、`markdown`、`feature-ssh`）各自持有资源文件。
+- **模块级资源隔离** - `:data`、`:markdown`、`:feature-ssh` 等模块拥有独立的 `strings.xml`，不再全部集中到 `:app`。
+
+### 版本
+
+- 版本号升级到 `1.2.2`
+- `versionCode` 升级到 `25`
+
+---
+
 ## v1.2.1
 
 ### 上下文压缩

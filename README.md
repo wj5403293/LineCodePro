@@ -8,8 +8,8 @@
 [English](README.md) · [中文](README_CN.md)
 
 [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
-[![Android 7.0+](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-3DDC84.svg)](app/build.gradle.kts)
-[![Latest: 1.1.7](https://img.shields.io/badge/version-1.1.7-success.svg)](app/build.gradle.kts)
+[![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B%20(API%2026)-3DDC84.svg)](app/build.gradle.kts)
+[![Latest: 1.2.2](https://img.shields.io/badge/version-1.2.2-success.svg)](app/build.gradle.kts)
 [![Java only](https://img.shields.io/badge/code-Java%2011-orange.svg)](#project-layout)
 
 ---
@@ -35,11 +35,11 @@
 
 ## What is LineCode Pro?
 
-**LineCode Pro** is a self-hosted, on-device AI coding assistant for Android 7.0+. It is built around a single Activity that hosts a streaming chat with a real tool-call loop. You point it at a project folder (local, SSH remote, or a pluggable IPC provider), wire up a model, and the model can read, edit, glob, create, and delete files — as well as run shell commands, fetch and search the web, understand and generate images, and dispatch sub-agents.
+**LineCode Pro** is a self-hosted, on-device AI coding assistant for Android 8.0+. It is built around a single Activity that hosts a streaming chat with a real tool-call loop. You point it at a project folder (local, SSH remote, or a pluggable IPC provider), wire up a model, and the model can read, edit, glob, create, and delete files — as well as run shell commands, fetch and search the web, understand and generate images, and dispatch sub-agents.
 
 LineCode is not a thin chat client. It is a full coding workspace: the system prompt, the tool registry, the context manager, the diff store, the file tree, the project picker, the SSH / IPC plumbing, the import/export archive, the extensions framework, and the security policy all live in the app. Nothing leaves your phone unless you wire it up to a remote model.
 
-The application id is `cn.lineai` and the project is shipped as a single-module Gradle project (`:app`) plus a reusable library (`:ipc`) and a sample provider app (`:terminal-provider`).
+The application id is `cn.lineai` and the project is a multi-module Gradle project with 12 modules: `:build-logic` (composite build), `:core-model`, `:core-api`, `:core-security`, `:ui-theme`, `:markdown`, `:data`, `:feature-tool`, `:feature-model`, `:feature-ssh`, `:feature-share`, `:app`, plus the reusable `:ipc` library and the sample `:terminal-provider` app.
 
 ---
 
@@ -50,8 +50,9 @@ The application id is `cn.lineai` and the project is shipped as a single-module 
 - Streaming chat with **multiple model protocols** in the same UI: OpenAI-compatible HTTP APIs, Anthropic Messages, OpenAI Codex Responses, and a local GGUF runtime.
 - Reasoning blocks (`<think>…</think>`) are extracted and rendered separately from the final answer.
 - Tool-call text inside a stream is parsed and dispatched by `ToolCallTextParser`; everything the model asks to do is shown to you before it runs.
-- System prompts are assembled from `app/src/main/assets/prompts/*.txt` — tone variants (chat / coding), context-compaction, memory-extraction, skill-extraction, work-directory, learning-context, and model-identity templates. You can override the tone, the work directory, the identity block, and the prompt template from settings.
-- Long conversations are summarised in the background by `ContextCompactionService` using the active model itself; durable knowledge is extracted by `MemoryExtractionService` and reinjected next session by `LearningContextRepository`.
+- System prompts are assembled from `feature-model/src/main/assets/prompts/*.txt` — tone variants (chat / coding), context-compaction, memory-extraction, skill-extraction, work-directory, learning-context, and model-identity templates. You can override the tone, the work directory, the identity block, and the prompt template from settings.
+- Long conversations are summarised in the background by `ContextCompactionService` with **dynamic compaction** (50% soft trigger + 80% hard trigger) using the active model itself; durable knowledge is extracted by `MemoryExtractionService` and reinjected next session by `LearningContextRepository`.
+- **Image attachments** — pick an image from the system picker; it is compressed, base64-encoded, and sent in the protocol-specific format (OpenAI `image_url`, Anthropic `image.source.base64`, Codex `input_image`).
 
 ### Tool execution
 
@@ -67,6 +68,13 @@ The model has access to a registry of tools (`ToolRegistry`) with session-scoped
 | Productivity| `todo_update` |
 
 Every file-touching tool routes paths through `FileToolPathPolicy` so the model can only act inside the workspace you opened. Shell calls go through Termux or an IPC provider — never the app process itself.
+
+### Context protection
+
+- **Dynamic compaction** — `ContextCompactionService` triggers soft compaction at 50% of the context window (summarising the earliest 70%, preserving the most recent 30% verbatim) and hard compaction at 80%. Transcripts are built segment-by-segment (max 256KB each) to prevent OOM.
+- **Tool result truncation** — `ToolResult.truncateContent()` enforces a 50KB limit: outputs larger than 50KB are middle-truncated (first 25KB + notice + last 25KB). Shell outputs are similarly truncated.
+- **Large file guard** — `FileReadTool` uses KB-based parameters (`start_kb` / `end_kb`, 50KB max) and refuses to read files larger than 1MB.
+- **Model context size** — Supports `k`/`m` unit input (e.g. `128K`, `1m`) parsed by `ContextSizeParser`; legacy `{id}[{size}]` format still tolerated via `ModelContextParser`.
 
 ### Workspace & files
 
@@ -98,7 +106,9 @@ Every file-touching tool routes paths through `FileToolPathPolicy` so the model 
 - **Works on any folder.** Local (SAF + optional `MANAGE_EXTERNAL_STORAGE`), remote (SSH via jsch), or any third-party IPC provider.
 - **Bring your own extensions.** Custom agents (`agentx_*`) and MCP-HTTP tools (`mcpx_*`) register automatically.
 - **Pluggable IPC provider.** Run shell and file ops in a separate process for security and isolation. Ship a provider as a normal Android app — see [`ipc/README.md`](ipc/README.md) for the protocol.
-- **Memory and context.** Long conversations are summarised; durable knowledge is re-injected next session.
+- **Memory and context.** Dynamic compaction (50% soft / 80% hard trigger) with segment-by-segment transcript building. Durable knowledge is re-injected next session.
+- **Context overflow protection.** Tool results are middle-truncated at 50KB; file reads use KB-based parameters and refuse files over 1MB.
+- **Free web search.** Built-in Bing RSS search provider works without any API key.
 - **Private by default.** URL allow-list, strict `network_security_config.xml`, secrets redacted from exports, in-app browser keeps JavaScript off.
 - **Java-only, on purpose.** No Kotlin runtime, no XML layouts — the app is built entirely in Java 11 for transparency and reviewability.
 
@@ -108,39 +118,63 @@ Every file-touching tool routes paths through `FileToolPathPolicy` so the model 
 
 ```
 LineCode/
-├── app/                       # The :app Gradle module (cn.lineai)
+├── build-logic/               # Composite build (linecode.convention plugin)
+├── core-model/                # :core-model — data classes / DTOs / enums
+│   └── src/main/java/cn/lineai/model/    # ModelConfig, ThemePalette, OutputSettings,
+│                                          # ContextSizeParser, ModelContextParser, ChatMessage, ToolResult…
+├── core-api/                  # :core-api — interface abstractions
+│   └── src/main/java/cn/lineai/           # ToolInfo, ToolNames, ToolCategory, ToolDisplayCategory,
+│                                          # ModelServiceProvider, WebSearchProvider
+├── core-security/             # :core-security — UrlPolicy, SimpleHttpClient
+├── ui-theme/                  # :ui-theme — LineTheme and shared UI infrastructure
+│   └── src/main/java/cn/lineai/ui/theme/ # LineTheme (referenced by ~80 files)
+├── markdown/                  # :markdown — Markdown rendering (commonmark + GFM tables)
+│   └── src/main/java/cn/lineai/ui/markdown/
+├── data/                      # :data — repositories / DB / stores / importer / exporter
+│   └── src/main/java/cn/lineai/
+│       ├── data/db/                      # LineCodeDatabase, LineCodeSchema, migrations
+│       ├── data/repository/              # All repositories (Conversation, Model, Diff, Extension…)
+│       ├── data/importer/                # ArchiveSecretRedactor, LineCodeDatabaseArchive
+│       ├── log/                          # ErrorLog, ErrorLogRedactor
+│       └── workspace/                    # WorkspacePaths
+├── feature-tool/              # :feature-tool — BaseTool, ToolRegistry, all builtin tools
+│   └── src/main/java/cn/lineai/tool/
+│       ├── BaseTool.java, ToolRegistry.java, ToolContext.java, ToolArgsCleaner.java
+│       └── builtin/                     # FileReadTool, FileWriteTool, FileEditTool, ShellExecuteTool,
+│                                          # WebSearchTool, WebFetchTool, AgentTool, AgentPipelineTool…
+├── feature-model/             # :feature-model — protocols, ModelClient, ContextManager, prompts
+│   └── src/main/
+│       ├── assets/prompts/               # All .txt prompt templates (system, compaction, agent…)
+│       └── java/cn/lineai/
+│           ├── ai/protocol/              # ModelProtocol, OpenAiCompatibleProtocol, AnthropicMessagesProtocol…
+│           ├── ai/prompt/                # SystemPromptProvider, StringTemplate
+│           ├── context/                  # ContextManager, ContextCompactionService
+│           └── ai/message/               # SystemModelMessage, UserModelMessage, etc.
+├── feature-ssh/               # :feature-ssh — SshService, SshConnectionPool, TermuxHelper
+├── feature-share/             # :feature-share — export/share/PDF
+├── app/                       # :app — MainActivity, MainCoordinator, controllers, UI components
 │   ├── build.gradle.kts
 │   ├── lint.xml
 │   ├── proguard-rules.pro
 │   └── src/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
-│       │   ├── assets/prompts/        # System prompt templates (.txt)
-│       │   ├── aidl/                  # IPC AIDL stubs (compiled to :app)
+│       │   ├── aidl/                  # IPC AIDL stubs
 │       │   ├── java/cn/lineai/
 │       │   │   ├── MainActivity.java
-│       │   │   ├── ai/                # Protocols, messages, tool-call parser, system prompt
-│       │   │   ├── context/           # ContextManager, compaction, memory
-│       │   │   ├── data/              # SQLite schema, repositories, importer/exporter
-│       │   │   ├── model/             # Plain data types (records, settings, attachments)
 │       │   │   ├── mvp/               # MainCoordinator + per-concern controllers
-│       │   │   ├── security/          # UrlPolicy
-│       │   │   ├── service/           # KeepAliveService
-│       │   │   ├── ssh/               # SshService, jsch pool, TermuxHelper
-│       │   │   ├── state/             # TodoStateStore
-│       │   │   ├── tool/              # ToolRegistry + builtin/*
-│       │   │   ├── ui/                # Views built in Java, markdown rendering
-│       │   │   └── workspace/         # WorkspacePaths, SafPathResolver, storage perms
-│       │   └── res/                   # Drawables, strings, themes, layout XML (none)
+│       │   │   ├── ui/                # Views built in Java (no XML inflation)
+│       │   │   └── tool/             # ToolExecutor, ToolExecutionCoordinator (wiring)
+│       │   └── res/                   # Drawables, strings, themes
 │       ├── test/                      # JUnit 4 unit tests
 │       └── debugUserCert/             # Sideload build flavor
-├── ipc/                       # Reusable Android library (cn.lineai.ipc)
+├── ipc/                       # :ipc — Reusable Android library (cn.lineai.ipc)
 │   ├── build.gradle.kts
 │   └── src/main/
 │       ├── AndroidManifest.xml        # <permission> cn.lineai.permission.IPC_TERMINAL_PROVIDER
 │       ├── aidl/                      # IBaseIpcService + terminal interfaces
 │       └── java/cn/lineai/ipc/        # BaseIpcProvider, IpcProviderManager, registry, scanner
-├── terminal-provider/         # Sample provider app (cn.lineai.terminalprovider)
+├── terminal-provider/         # :terminal-provider — Sample provider app (cn.lineai.terminalprovider)
 │   ├── build.gradle.kts
 │   ├── proguard-rules.pro
 │   └── src/main/
@@ -152,16 +186,16 @@ LineCode/
 ├── build.gradle.kts
 ├── CLAUDE.md                  # Architecture bible for AI/code reviewers
 ├── README.md / README_CN.md   # ← you are here
-├── LICENSE / COPYING
-└── 问题.txt                   # Local scratch issue list (gitignored)
+└── LICENSE
 ```
 
 ### Architecture in 30 seconds
 
 * `MainActivity` is the only Activity. It instantiates `MainCoordinator` (the presenter) and `MainChatView` (the view, built entirely in Java — no XML inflation; `lint.xml` silences `ViewConstructor` accordingly).
-* `MainCoordinator` implements `MainUiController` and delegates behaviour to per-concern controllers in `cn.lineai.mvp.*` (chat, generation, tool run, model management, settings, screens, permission mode, archive, project sheet, SSH file tree, IPC file tree, file operations). UI state flows through `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)`.
-* `cn.lineai.ai.protocol.ModelProtocol` is the streaming/completion interface. `ModelProtocolFactory` dispatches on `ModelProtocolType` (`OPENAI_COMPATIBLE`, `CODEX_RESPONSES`, `ANTHROPIC_MESSAGES`, `LOCAL_GGUF`).
+* `MainCoordinator` implements `MainUiController` and delegates behaviour to per-concern controllers in `cn.lineai.mvp.*` (chat, generation, tool run, model management, settings, screens, permission mode, archive, project sheet, SSH file tree, IPC file tree, file operations, agent execution, context compaction, phone control, error log, storage maintenance). UI state flows through `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)`.
+* `cn.lineai.ai.protocol.ModelProtocol` is the streaming/completion interface. `ModelProtocolFactory` dispatches on `ModelProtocolType` (`OPENAI_COMPATIBLE`, `CODEX_RESPONSES`, `ANTHROPIC_MESSAGES`, `LOCAL_GGUF`). Each protocol declares capabilities via `supportsNativeTools()`, `supportsContextCompaction()`, `supportsImageGeneration()`, `supportsImageUnderstanding()`.
 * `BaseTool` (name, description, category, JSON schema, `execute(JSONObject, ToolContext)`) is the tool contract. `ToolRegistry` registers built-ins and reloads user extensions. `ToolExecutionCoordinator` + `ToolExecutor` run them; `PermissionModeController` + `ToolReviewListener` gate per-call confirmation.
+* Module dependency rule: `:app` → `:feature-*` → `:data` → `:core-model` / `:core-api` / `:core-security`. The `ai ↔ tool` circular dependency is broken: `:feature-tool` must not import `cn.lineai.ai`, and `:feature-model` may only reference `ToolInfo`/`ToolNames`/`ToolCategory` from `:core-api`.
 
 For the full architecture bible (controllers, tool system, context manager, SQLite schema, security model), see [`CLAUDE.md`](CLAUDE.md).
 
@@ -236,7 +270,7 @@ Adding a new provider is usually just a base URL and key. The capabilities inspe
 * a JSON schema for its arguments
 * an `execute(JSONObject args, ToolContext ctx)` that returns a `ToolResult`
 
-Built-in tools live in `app/src/main/java/cn/lineai/tool/builtin/`:
+Built-in tools live in `feature-tool/src/main/java/cn/lineai/tool/builtin/`:
 
 ```
 FileReadTool      FileWriteTool      FileEditTool      FileDeleteTool
@@ -247,20 +281,21 @@ AgentTool  AgentPipelineTool  TodoUpdateTool
 
 Execution is driven by `ToolExecutionCoordinator` + `ToolExecutor`. Every call goes through `PermissionModeController` + `ToolReviewListener`; the user can confirm per-call or auto-confirm for the session. The list of auto-confirmed tools is tracked on the coordinator (`MainCoordinator.sessionAutoConfirmedTools`).
 
+Tool results are truncated at 50KB by `ToolResult.truncateContent()` before entering the context. File reads use KB-based parameters with a 50KB range limit; files over 1MB are rejected. Shell outputs exceeding 50KB are middle-truncated.
+
 The chat renders tool calls in custom cards under `app/src/main/java/cn/lineai/ui/component/toolcall/` (`ToolCallReadView`, `ToolCallWriteView`, `ToolCallShellView`, `ToolCallAgentView`, `ToolCallAgentPipelineView`, `ToolCallGenericView`, …). New tools get a custom card by registering with `ToolCallUtils`.
 
 ---
 
 ## Extending LineCode
 
-Two extension points are first-class:
+Three extension points are first-class:
 
 1. **Custom agents** (`agentx_*`) — implement `CustomAgentExtensionTool`; the model can call them like any other tool.
 2. **Custom MCP-HTTP tools** (`mcpx_*`) — implement `CustomMcpHttpTool`; the model can call them over HTTP, with per-tool headers stored in the settings repository.
-
-Both are persisted via `ExtensionRepository` and hot-reloaded by `ToolRegistry.reloadExtensions()`. Configure them under **Extensions** in the app.
-
 3. **Custom IPC provider** — implement the `IBaseIpcService` / `ITerminalProviderService` AIDL in any Android app, ship it as a normal APK, and LineCode will auto-detect, bind, and route shell + file ops through it. See [`ipc/README.md`](ipc/README.md) for the full protocol and a working example.
+
+All three are persisted via `ExtensionRepository` and hot-reloaded by `ToolRegistry.reloadExtensions()`.
 
 ---
 
@@ -350,6 +385,7 @@ Per [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md), the 
 * **Outbound URLs go through `UrlPolicy`.** Every fetch — in-app browser, external link opener, model HTTP, model catalog, web fetch/search, custom MCP HTTP — is checked against an allow-list. HTTP is rejected outside `localhost`, `127.0.0.1`, `10.0.2.2`. This is mirrored in `res/xml/network_security_config.xml` (`cleartextTrafficPermitted="false"` by default).
 * **In-app WebView** disables `file://` and `content://` access, blocks mixed content, and keeps JavaScript off until the user toggles it.
 * **IPC permission model.** A provider Service must declare `android:permission="cn.lineai.permission.IPC_TERMINAL_PROVIDER"` on its `<service>` tag; the app declares both the permission and the matching `<uses-permission>`. Callers without the permission are rejected at the Android framework layer — no extra check needed in the provider.
+* **Bypass path protection.** A toggle in the Security settings screen (`OutputSettings.bypassPathProtection`, default off) skips `FileToolPathPolicy` workspace-boundary checks. Enabling it shows a warning dialog. All file-touching tools honour this flag automatically.
 * **Release hardening.** R8 with the 8192-entry obfuscation dictionary, plus removal of line-number tables, native debug symbols, and mapping files. See `validateReleaseSigning` for the debug-cert refusal.
 
 The full threat model and accepted risks are documented in [`docs/android-compliance-audit.md`](docs/android-compliance-audit.md).
@@ -362,9 +398,9 @@ Bug reports, ideas and patches are welcome. A few notes if you plan to send code
 
 * **Java only.** `app/src/main/java` is pure Java. The Kotlin stdlib is intentionally excluded from the runtime classpath in `app/build.gradle.kts`; pulling in a Kotlin transitive will silently fail at runtime. The same is true for `ipc/` and `terminal-provider/`.
 * **Views in Java, not XML.** `lint.xml` silences `ViewConstructor` and `IconDuplicates` deliberately.
+* **Choose the lowest-level module.** When adding code, pick the lowest-level module that fits: DTOs → `:core-model`; interfaces → `:core-api`; UI infrastructure → `:ui-theme`; a new tool → `:feature-tool`; a new protocol → `:feature-model`. Do not reach back into `:app` from a library module.
 * **Extend the controllers.** When adding chat or tool behaviour, extend the matching controller in `cn.lineai.mvp.*` and thread state through `ChatUiStateAssembler` → `ChatUiState` → `MainContract.View.render(...)`. Do not reach into views from new code.
-* **Tests mirror the package layout.** `app/src/test/java/cn/lineai/...` mirrors production. JUnit 4 + `org.json` only (no Robolectric, no Mockito). When testing repository or controller logic, prefer the in-memory fakes that already exist in sibling tests.
-* **`问题.txt` is a scratch list.** It's gitignored; do not edit it as part of normal changes.
+* **Tests mirror the package layout.** `app/src/test/java/cn/lineai/...` mirrors production. JUnit 4 + `org.json` only (no Robolectric, no Mockito). When testing repository or controller logic, prefer the in-memory fakes that already exist in sibling tests. Feature modules have their own tests under `feature-*/src/test/java`.
 * **Run the gates before sending a PR:**
 
   ```bash

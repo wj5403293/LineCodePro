@@ -158,9 +158,12 @@ public final class ShellExecuteTool extends BaseTool {
             String output = streamedOutput.toString().trim();
             if (!result.isSuccess()) {
                 String message = "命令执行失败，退出码: " + result.getExitCode();
-                return error(output.length() == 0 ? message : output + "\n" + message);
+                return error(output.length() == 0 ? message : truncateOutput(output) + "\n" + message);
             }
-            return ok(output.length() == 0 ? "命令执行完成，无输出" : output);
+            if (output.length() == 0) {
+                return ok("命令执行完成，无输出");
+            }
+            return ok(truncateOutput(output));
         } catch (Exception e) {
             restoreInterrupt(e);
             String existing;
@@ -168,7 +171,7 @@ public final class ShellExecuteTool extends BaseTool {
                 existing = streamedOutput.toString().trim();
             }
             String message = "命令执行失败: " + describeException(e);
-            return error(existing.length() == 0 ? message : existing + "\n" + message);
+            return error(existing.length() == 0 ? message : truncateOutput(existing) + "\n" + message);
         }
     }
 
@@ -193,7 +196,10 @@ public final class ShellExecuteTool extends BaseTool {
                     context.reportToolProgress(getName(), streamed, false);
                 }
             });
-            return ok(output.length() == 0 ? "命令执行完成，无输出" : output);
+            if (output.length() == 0) {
+                return ok("命令执行完成，无输出");
+            }
+            return ok(truncateOutput(output));
         } catch (Exception e) {
             restoreInterrupt(e);
             String existing;
@@ -201,8 +207,20 @@ public final class ShellExecuteTool extends BaseTool {
                 existing = streamedOutput.toString().trim();
             }
             String message = "命令执行失败: " + describeException(e);
-            return error(existing.length() == 0 ? message : existing + "\n" + message);
+            return error(existing.length() == 0 ? message : truncateOutput(existing) + "\n" + message);
         }
+    }
+
+    private String truncateOutput(String output) {
+        if (output == null || output.length() <= ToolResult.MAX_TOOL_RESULT_CHARS) {
+            return output;
+        }
+        int lines = 1;
+        for (int i = 0; i < output.length(); i++) {
+            if (output.charAt(i) == '\n') lines++;
+        }
+        String truncated = ToolResult.truncateContent(output);
+        return "(总行数: " + lines + ")\n" + truncated;
     }
 
     private String shellQuote(String value) {

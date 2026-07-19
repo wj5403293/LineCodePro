@@ -9,10 +9,12 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import cn.lineai.data.repository.ThemeSettingsRepository;
 import cn.lineai.data.repository.UserAgreementRepository;
 import cn.lineai.log.ErrorLog;
 import cn.lineai.mvp.MainCoordinator;
+import cn.lineai.mvp.MainDependencies;
 import cn.lineai.ui.MainChatView;
 import cn.lineai.ui.component.PermissionUiHelper;
 import cn.lineai.ui.component.SafPickerDelegate;
@@ -47,11 +49,27 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
             }
         });
 
-        presenter = new MainCoordinator(this);
-        mainView = new MainChatView(this, presenter);
-        setContentView(mainView);
-        presenter.attachView(mainView);
-        registerBackCallback();
+        // 先设置启动画面占位，避免白屏
+        FrameLayout splash = new FrameLayout(this);
+        splash.setBackgroundColor(LineTheme.BG);
+        setContentView(splash);
+
+        // 在后台线程构建 MainDependencies + MainCoordinator，
+        // 避免大量 DB 初始化阻塞主线程导致 ANR
+        new Thread(() -> {
+            MainDependencies dependencies = new MainDependencies(this);
+            MainCoordinator coordinator = new MainCoordinator(dependencies);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) {
+                    return;
+                }
+                presenter = coordinator;
+                mainView = new MainChatView(this, presenter);
+                setContentView(mainView);
+                presenter.attachView(mainView);
+                registerBackCallback();
+            });
+        }).start();
 
         UserAgreementRepository agreement = new UserAgreementRepository(this);
         if (agreement.shouldShow()) {

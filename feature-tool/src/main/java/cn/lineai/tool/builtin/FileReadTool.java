@@ -13,7 +13,6 @@ import org.json.JSONObject;
 public final class FileReadTool extends BaseTool {
     public static final String NAME = "file_read";
     private static final long LARGE_FILE_THRESHOLD_BYTES = 50L * 1024L;
-    private static final int DEFAULT_LIMIT = 2000;
     private static final int MAX_DIRECTORY_ITEMS = 400;
 
     @Override
@@ -23,7 +22,7 @@ public final class FileReadTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "读取文件内容。返回带行号的文件内容；大文件请通过 start_line/end_line 分段读取。读取目录时返回目录树。";
+        return "读取文件内容。返回带行号的文件内容；大文件请通过 start_kb/end_kb 分段读取。读取目录时返回目录树。";
     }
 
     @Override
@@ -56,10 +55,8 @@ public final class FileReadTool extends BaseTool {
                 .put("type", "object")
                 .put("properties", new JSONObject()
                         .put("file_path", new JSONObject().put("type", "string").put("description", "文件的绝对或相对路径"))
-                        .put("start_line", new JSONObject().put("type", "number").put("description", "起始行号，从 1 开始，包含该行"))
-                        .put("end_line", new JSONObject().put("type", "number").put("description", "结束行号，从 1 开始，包含该行"))
-                        .put("offset", new JSONObject().put("type", "number").put("description", "起始行偏移（0-based），与 start_line 互斥"))
-                        .put("limit", new JSONObject().put("type", "number").put("description", "最大读取行数，默认 2000")))
+                        .put("start_kb", new JSONObject().put("type", "number").put("description", "起始位置，单位 KB，默认 0"))
+                        .put("end_kb", new JSONObject().put("type", "number").put("description", "结束位置，单位 KB，默认 50，上限 50")))
                 .put("required", new org.json.JSONArray().put("file_path"));
     }
 
@@ -78,31 +75,92 @@ public final class FileReadTool extends BaseTool {
                 return ok("目录 " + FileToolPathPolicy.displayPath(context.getHomePath(), file) + ":\n" + list
                         + "\n\n如需读取文件，请指定具体文件路径。");
             }
-            boolean hasLineRange = input.has("start_line") || input.has("end_line");
-            if (!hasLineRange && file.length() > LARGE_FILE_THRESHOLD_BYTES) {
+
+            int startKb = Math.max(0, input.optInt("start_kb", 0));
+            int endKb = Math.max(startKb + 1, Math.min(50, input.optInt("end_kb", 50)));
+            boolean hasKbRange = input.has("start_kb") || input.has("end_kb");
+
+            // For files > 1MB, refuse to read entirely
+            if (file.length() > 1024 * 1024) {
                 return error("文件 " + FileToolPathPolicy.displayPath(context.getHomePath(), file)
-                        + " 大小为 " + file.length() + " bytes，单次读取超过 50KB。\n"
-                        + "请使用 start_line 和 end_line 指定行号范围，例如："
-                        + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_line\":1,\"end_line\":200}");
+                        + " 大小为 " + (file.length() / 1024) + "KB，超过 1MB 读取限制。\n"
+                        + "请使用 start_kb/end_kb 指定更小的范围，例如："
+                        + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_kb\":0,\"end_kb\":50}");
             }
+
+            // No KB range specified and file > 50KB: suggest using KB range
+            if (!hasKbRange && file.length() > LARGE_FILE_THRESHOLD_BYTES) {
+                return error("文件 " + FileToolPathPolicy.displayPath(context.getHomePath(), file)
+                        + " 大小为 " + (file.length() / 1024) + "KB，单次读取超过 50KB。\n"
+                        + "请使用 start_kb 和 end_kb 指定读取范围，例如："
+                        + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_kb\":0,\"end_kb\":50}");
+            }
+
             String content = FileIo.readUtf8(file);
-            String[] lines = content.split("\n", -1);
-            Range range = resolveRange(input, lines.length);
-            StringBuilder result = new StringBuilder();
-            for (int i = range.startIndex; i < range.endIndexExclusive; i++) {
-                result.append(i + 1).append('\t').append(lines[i]);
-                if (i + 1 < range.endIndexExclusive) {
-                    result.append('\n');
+
+            if (!hasKbRange) {
+                // Small file, no range specified: return entire content with line numbers
+                String numbered = addLineNumbers(content, 1);
+                return ok(ToolResult.truncateContent(numbered));
+            }
+
+            // KB range specified: extract the relevant portion
+            int startChar = Math.min(startKb * 1024, content.length());
+            int endChar = Math.min(endKb * 1024, content.length());
+            if (startChar >= content.length()) {
+                return error("start_kb=" + startKb + " 超出文件大小（文件共 "
+                        + (content.length() / 1024) + "KB）");
+            }
+
+            // Snap to line boundaries
+            if (startChar > 0) {
+                int lineStart = content.lastIndexOf('\n', startChar - 1);
+                startChar = lineStart >= 0 ? lineStart + 1 : 0;
+            }
+            if (endChar < content.length()) {
+                int lineEnd = content.indexOf('\n', endChar);
+                endChar = lineEnd >= 0 ? lineEnd + 1 : content.length();
+            }
+
+            // Count line number at startChar
+            int startLineNumber = 1;
+            for (int i = 0; i < startChar; i++) {
+                if (content.charAt(i) == '\n') {
+                    startLineNumber++;
                 }
             }
-            if (range.startIndex > 0 || range.endIndexExclusive < lines.length) {
-                result.append("\n\n... (共 ").append(lines.length).append(" 行，显示 ")
-                        .append(range.startIndex + 1).append('-').append(range.endIndexExclusive).append(')');
+
+            String extracted = content.substring(startChar, endChar);
+            StringBuilder result = new StringBuilder();
+            result.append(addLineNumbers(extracted, startLineNumber));
+
+            // Add range info
+            int totalLines = 1;
+            for (int i = 0; i < content.length(); i++) {
+                if (content.charAt(i) == '\n') totalLines++;
             }
-            return ok(result.toString());
+            if (startChar > 0 || endChar < content.length()) {
+                result.append("\n\n... (共 ").append(totalLines).append(" 行，")
+                        .append("显示 KB ").append(startKb).append('-').append(endKb)
+                        .append(" / 共 ").append(content.length() / 1024).append("KB)");
+            }
+
+            return ok(ToolResult.truncateContent(result.toString()));
         } catch (Exception e) {
             return error("读取文件失败: " + e.getMessage());
         }
+    }
+
+    private String addLineNumbers(String content, int startLine) {
+        String[] lines = content.split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            sb.append(startLine + i).append('\t').append(lines[i]);
+            if (i + 1 < lines.length) {
+                sb.append('\n');
+            }
+        }
+        return sb.toString();
     }
 
     private void appendDirectory(StringBuilder builder, File dir, String parentPath, int[] count) {
@@ -133,27 +191,6 @@ public final class FileReadTool extends BaseTool {
                 builder.append("[FILE] ").append(relative).append('\n');
                 count[0]++;
             }
-        }
-    }
-
-    private Range resolveRange(JSONObject input, int totalLines) {
-        if (input.has("start_line") || input.has("end_line")) {
-            int startLine = Math.max(1, input.optInt("start_line", 1));
-            int endLine = Math.min(totalLines, Math.max(startLine, input.optInt("end_line", Math.min(totalLines, startLine + DEFAULT_LIMIT - 1))));
-            return new Range(startLine - 1, endLine);
-        }
-        int offset = Math.max(0, input.optInt("offset", 0));
-        int limit = Math.max(1, input.optInt("limit", DEFAULT_LIMIT));
-        return new Range(Math.min(offset, totalLines), Math.min(totalLines, offset + limit));
-    }
-
-    private static final class Range {
-        final int startIndex;
-        final int endIndexExclusive;
-
-        Range(int startIndex, int endIndexExclusive) {
-            this.startIndex = startIndex;
-            this.endIndexExclusive = endIndexExclusive;
         }
     }
 

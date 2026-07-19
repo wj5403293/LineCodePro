@@ -45,9 +45,13 @@ final class ToolMessageController {
         }
         int index = findToolMessageIndex(result.getToolCallId());
         String messageId = index >= 0 ? messages.get(index).getId() : idProvider.nextId();
+        String content = result.getContent();
+        if (content != null && content.length() > ToolResult.MAX_TOOL_RESULT_CHARS) {
+            content = ToolResult.truncateContent(content);
+        }
         ChatMessage message = ChatMessage.toolResult(
                 messageId,
-                result.getContent(),
+                content,
                 result.getToolCallId(),
                 result.getToolName(),
                 result.isError(),

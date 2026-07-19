@@ -21,6 +21,7 @@ import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelProtocolType;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolInfo;
+import cn.lineai.tool.ToolResult;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -325,13 +326,13 @@ public final class ContextCompactionService {
             }
             current.append("## ").append(i + 1).append(". ").append(message.getRole().getProtocolName());
             if (message.getContent().trim().length() > 0) {
-                current.append("\n\n").append(MessageContentSanitizer.forModel(message));
+                current.append("\n\n").append(ToolResult.truncateContent(MessageContentSanitizer.forModel(message)));
             }
             if (message.hasToolCalls()) {
                 current.append("\n\nTool calls:\n");
                 for (ToolCall call : message.getToolCalls()) {
                     current.append("- ").append(call.getName()).append(": ")
-                            .append(call.getArguments()).append('\n');
+                            .append(ToolResult.truncateContent(call.getArguments())).append('\n');
                     flushSegmentIfNeeded(segments, current);
                 }
             }
@@ -339,7 +340,7 @@ public final class ContextCompactionService {
                 current.append("\n\nTool result for: ").append(message.getToolCallId());
             }
             if (message.getReasoningContent().trim().length() > 0) {
-                current.append("\n\nReasoning:\n").append(message.getReasoningContent());
+                current.append("\n\nReasoning:\n").append(ToolResult.truncateContent(message.getReasoningContent()));
             }
             flushSegmentIfNeeded(segments, current);
         }

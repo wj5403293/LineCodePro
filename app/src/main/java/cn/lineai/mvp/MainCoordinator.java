@@ -175,7 +175,7 @@ public final class MainCoordinator implements MainUiController {
         this(new MainDependencies(context));
     }
 
-    MainCoordinator(MainDependencies dependencies) {
+    public MainCoordinator(MainDependencies dependencies) {
         // === assignDependencies ===
         this.context = dependencies.context;
         modelRepository = dependencies.modelRepository;

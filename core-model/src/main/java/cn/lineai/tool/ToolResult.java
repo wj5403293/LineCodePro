@@ -11,6 +11,12 @@ public final class ToolResult {
     private final String reviewState;
     private final String reviewMessage;
 
+    /** 工具结果内容最大字符数（50KB），超过此限制时执行中间截断。 */
+    public static final int MAX_TOOL_RESULT_CHARS = 50 * 1024;
+
+    /** 中间截断时保留的首/尾各半字符数。 */
+    private static final int TRUNCATION_HALF = MAX_TOOL_RESULT_CHARS / 2;
+
     @Deprecated
     public ToolResult(String toolCallId, String toolName, String content, boolean error) {
         this(toolCallId, toolName, content, error, "", "", "");
@@ -86,5 +92,23 @@ public final class ToolResult {
 
     public ToolResult withReview(String nextReviewState, String nextReviewMessage) {
         return new ToolResult(toolCallId, toolName, content, error, diffId, nextReviewState, nextReviewMessage);
+    }
+
+    /**
+     * 对内容执行中间截断：当内容超过 {@link #MAX_TOOL_RESULT_CHARS} 时，
+     * 保留首 TRUNCATION_HALF 字符 + 截断标记 + 尾 TRUNCATION_HALF 字符。
+     * 不超过限制时原样返回。
+     *
+     * @param content 原始内容
+     * @return 截断后的内容，或原始内容（如未超限）
+     */
+    public static String truncateContent(String content) {
+        if (content == null || content.length() <= MAX_TOOL_RESULT_CHARS) {
+            return content;
+        }
+        int truncated = content.length() - MAX_TOOL_RESULT_CHARS;
+        return content.substring(0, TRUNCATION_HALF)
+                + "\n... (" + truncated + " chars truncated) ...\n"
+                + content.substring(content.length() - TRUNCATION_HALF);
     }
 }

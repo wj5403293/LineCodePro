@@ -24,18 +24,31 @@ public final class ToolBuiltinsTest {
     public final TemporaryFolder folder = new TemporaryFolder();
 
     @Test
-    public void fileReadReturnsNumberedLineRange() throws Exception {
+    public void fileReadReturnsNumberedLines() throws Exception {
+        File file = folder.newFile("demo.txt");
+        Files.write(file.toPath(), "one\ntwo\nthree\n".getBytes(StandardCharsets.UTF_8));
+
+        ToolResult result = new FileReadTool().execute(new JSONObject()
+                .put("file_path", "demo.txt"), context());
+
+        Assert.assertFalse(result.isError());
+        Assert.assertTrue(result.getContent().contains("1\tone"));
+        Assert.assertTrue(result.getContent().contains("2\ttwo"));
+        Assert.assertTrue(result.getContent().contains("3\tthree"));
+    }
+
+    @Test
+    public void fileReadWithKbRange() throws Exception {
         File file = folder.newFile("demo.txt");
         Files.write(file.toPath(), "one\ntwo\nthree\n".getBytes(StandardCharsets.UTF_8));
 
         ToolResult result = new FileReadTool().execute(new JSONObject()
                 .put("file_path", "demo.txt")
-                .put("start_line", 2)
-                .put("end_line", 3), context());
+                .put("start_kb", 0)
+                .put("end_kb", 50), context());
 
         Assert.assertFalse(result.isError());
-        Assert.assertTrue(result.getContent().contains("2\ttwo"));
-        Assert.assertTrue(result.getContent().contains("3\tthree"));
+        Assert.assertTrue(result.getContent().contains("1\tone"));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package cn.lineai.tool;
 
+import cn.lineai.data.repository.LearningContextStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.SshFileTreeStore;
 import cn.lineai.data.repository.ToolSettingsStore;
@@ -13,6 +14,7 @@ public final class ToolExecutor {
     private final SshFileTreeStore sshFileTreeRepository;
     private final ModelServiceProvider modelServiceProvider;
     private final PromptTemplateRepository promptTemplateRepository;
+    private final LearningContextStore learningContextStore;
     private final DiffRecorder diffRecorder;
 
     public ToolExecutor(
@@ -24,6 +26,20 @@ public final class ToolExecutor {
             ModelServiceProvider modelServiceProvider,
             PromptTemplateRepository promptTemplateRepository
     ) {
+        this(registry, settingsRepository, diffRecorder, modelRepository, sshFileTreeRepository,
+                modelServiceProvider, promptTemplateRepository, null);
+    }
+
+    public ToolExecutor(
+            ToolRegistry registry,
+            ToolSettingsStore settingsRepository,
+            DiffRecorder diffRecorder,
+            ModelStore modelRepository,
+            SshFileTreeStore sshFileTreeRepository,
+            ModelServiceProvider modelServiceProvider,
+            PromptTemplateRepository promptTemplateRepository,
+            LearningContextStore learningContextStore
+    ) {
         this.registry = registry;
         this.settingsRepository = settingsRepository;
         this.diffRecorder = diffRecorder;
@@ -31,6 +47,7 @@ public final class ToolExecutor {
         this.sshFileTreeRepository = sshFileTreeRepository;
         this.modelServiceProvider = modelServiceProvider;
         this.promptTemplateRepository = promptTemplateRepository;
+        this.learningContextStore = learningContextStore;
     }
 
     public ToolResult execute(ToolCall toolCall, ToolContext context) {
@@ -83,7 +100,8 @@ public final class ToolExecutor {
     private boolean needsInjection(ToolContext context) {
         return context.getToolSettingsStore() == null
                 || context.getModelRepository() == null
-                || context.getModelServiceProvider() == null;
+                || context.getModelServiceProvider() == null
+                || context.getLearningContextStore() == null;
     }
 
     private ToolContext injectDependencies(ToolContext context) {
@@ -93,6 +111,7 @@ public final class ToolExecutor {
                 .agentRunner(context.getAgentRunner())
                 .toolCallId(context.getToolCallId())
                 .todoStateStore(context.getTodoStateStore())
+                .learningContextStore(context.getLearningContextStore() != null ? context.getLearningContextStore() : learningContextStore)
                 .toolSettingsStore(context.getToolSettingsStore() != null ? context.getToolSettingsStore() : settingsRepository)
                 .modelRepository(context.getModelRepository() != null ? context.getModelRepository() : modelRepository)
                 .sshFileTreeRepository(context.getSshFileTreeRepository() != null ? context.getSshFileTreeRepository() : sshFileTreeRepository)

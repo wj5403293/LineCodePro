@@ -79,6 +79,15 @@
     <string name="tool_todo_cleared">Список TODO очищен.</string>
     <string name="tool_todo_updated">Список TODO обновлён, всего %1$d элемент(ов), выполнено %2$d.</string>
 
+    <!-- MemoryUpdateTool -->
+    <string name="tool_memory_params_empty">Параметры не могут быть пустыми.</string>
+    <string name="tool_memory_content_empty">Содержимое памяти не может быть пустым.</string>
+    <string name="tool_memory_store_not_init">Хранилище памяти не инициализировано.</string>
+    <string name="tool_memory_sensitive_rejected">Отказ сохранить конфиденциальные данные в памяти.</string>
+    <string name="tool_memory_updated">Память обновлена.</string>
+    <string name="tool_memory_updated_label">Память обновлена</string>
+    <string name="tool_call_action_memory">Память</string>
+
     <!-- ImageGenerationTool -->
     <string name="tool_img_gen_no_context">Инструмент генерации изображений не подключён к контексту приложения.</string>
     <string name="tool_img_gen_prompt_empty">Подсказка генерации изображений не может быть пустой.</string>

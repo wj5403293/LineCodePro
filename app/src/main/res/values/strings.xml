@@ -727,6 +727,9 @@
     <string name="screen_memory_action_body">Delete this memory?\n\n%1$s</string>
     <string name="screen_memory_action_edit">Edit</string>
     <string name="screen_memory_action_delete">Delete</string>
+    <string name="screen_memory_action_multi_select">Multi-select</string>
+    <string name="screen_memory_selected_count">Selected: %1$d</string>
+    <string name="screen_memory_delete_selected_message">Delete the selected %1$d memory item(s)?</string>
     <string name="screen_memory_project_unselected">No project selected</string>
     <string name="screen_memory_current_project_prefix">Current project: </string>
     <string name="screen_memory_empty_text">No content</string>

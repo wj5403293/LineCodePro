@@ -727,6 +727,9 @@
     <string name="screen_memory_action_body">确定删除这条记忆？\n\n%1$s</string>
     <string name="screen_memory_action_edit">编辑</string>
     <string name="screen_memory_action_delete">删除</string>
+    <string name="screen_memory_action_multi_select">多选</string>
+    <string name="screen_memory_selected_count">已选 %1$d 项</string>
+    <string name="screen_memory_delete_selected_message">确定删除 %1$d 条记忆？</string>
     <string name="screen_memory_project_unselected">未选择项目</string>
     <string name="screen_memory_current_project_prefix">当前项目: </string>
     <string name="screen_memory_empty_text">暂无内容</string>

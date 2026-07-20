@@ -79,6 +79,15 @@
     <string name="tool_todo_cleared">已清空 TODO 列表。</string>
     <string name="tool_todo_updated">TODO 列表已更新，共 %1$d 项，已完成 %2$d 项。</string>
 
+    <!-- MemoryUpdateTool -->
+    <string name="tool_memory_params_empty">参数不能为空。</string>
+    <string name="tool_memory_content_empty">记忆内容不能为空。</string>
+    <string name="tool_memory_store_not_init">记忆存储未初始化。</string>
+    <string name="tool_memory_sensitive_rejected">拒绝将敏感信息写入记忆。</string>
+    <string name="tool_memory_updated">记忆已更新。</string>
+    <string name="tool_memory_updated_label">记忆已更新</string>
+    <string name="tool_call_action_memory">记忆</string>
+
     <!-- ImageGenerationTool -->
     <string name="tool_img_gen_no_context">图片生成工具未接入应用上下文。</string>
     <string name="tool_img_gen_prompt_empty">图片生成提示词不能为空。</string>

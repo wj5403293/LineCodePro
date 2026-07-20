@@ -727,6 +727,9 @@
     <string name="screen_memory_action_body">Удалить эту память?\n\n%1$s</string>
     <string name="screen_memory_action_edit">Редактировать</string>
     <string name="screen_memory_action_delete">Удалить</string>
+    <string name="screen_memory_action_multi_select">Множественный выбор</string>
+    <string name="screen_memory_selected_count">Выбрано: %1$d</string>
+    <string name="screen_memory_delete_selected_message">Удалить выбранные %1$d записей памяти?</string>
     <string name="screen_memory_project_unselected">Проект не выбран</string>
     <string name="screen_memory_current_project_prefix">Текущий проект: </string>
     <string name="screen_memory_empty_text">Нет содержимого</string>

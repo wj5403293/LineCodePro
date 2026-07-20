@@ -23,7 +23,6 @@ public final class GenerationFlowControllerTest {
                 null,
                 null,
                 null,
-                null,
                 toolMessages,
                 null,
                 null,
@@ -102,6 +101,16 @@ public final class GenerationFlowControllerTest {
 
         @Override
         public void setCurrentCancellationToken(ModelCancellationToken cancellationToken) {
+        }
+
+        @Override
+        public String formatRetryNotice(int attempt, int maxRetries, String error) {
+            return "retry " + attempt + "/" + maxRetries + ": " + (error == null ? "" : error);
+        }
+
+        @Override
+        public String formatModelFailed(String error) {
+            return error == null ? "" : error;
         }
     }
 }

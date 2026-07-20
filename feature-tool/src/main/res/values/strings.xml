@@ -79,6 +79,15 @@
     <string name="tool_todo_cleared">TODO list cleared.</string>
     <string name="tool_todo_updated">TODO list updated, %1$d item(s) total, %2$d completed.</string>
 
+    <!-- MemoryUpdateTool -->
+    <string name="tool_memory_params_empty">Parameters cannot be empty.</string>
+    <string name="tool_memory_content_empty">Memory content cannot be empty.</string>
+    <string name="tool_memory_store_not_init">Memory store not initialized.</string>
+    <string name="tool_memory_sensitive_rejected">Refused to store sensitive content as memory.</string>
+    <string name="tool_memory_updated">Memory updated.</string>
+    <string name="tool_memory_updated_label">Memory updated</string>
+    <string name="tool_call_action_memory">Memory</string>
+
     <!-- ImageGenerationTool -->
     <string name="tool_img_gen_no_context">Image generation tool is not connected to the app context.</string>
     <string name="tool_img_gen_prompt_empty">Image generation prompt cannot be empty.</string>

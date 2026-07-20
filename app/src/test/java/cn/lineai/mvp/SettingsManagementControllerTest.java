@@ -195,6 +195,10 @@ public final class SettingsManagementControllerTest {
         }
 
         @Override
+        public void deleteMemories(List<String> ids) {
+        }
+
+        @Override
         public OutputSettings getOutputSettings() {
             return new OutputSettings(false, OutputSettings.BROWSER_BUILTIN);
         }

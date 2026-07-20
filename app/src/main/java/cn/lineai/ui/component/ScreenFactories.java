@@ -509,6 +509,11 @@ public final class ScreenFactories {
                 public void onMemoryDeleted(String id) {
                     controller.onMemoryDeleted(id);
                 }
+
+                @Override
+                public void onMemoriesDeleted(java.util.List<String> ids) {
+                    controller.onMemoriesDeleted(ids);
+                }
             });
         }
 

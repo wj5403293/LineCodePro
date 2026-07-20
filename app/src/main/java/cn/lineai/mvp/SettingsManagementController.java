@@ -66,6 +66,8 @@ public final class SettingsManagementController {
 
         void deleteMemory(String id);
 
+        void deleteMemories(List<String> ids);
+
         OutputSettings getOutputSettings();
 
         void setCodeWrapEnabled(boolean enabled);
@@ -206,6 +208,11 @@ public final class SettingsManagementController {
         @Override
         public void deleteMemory(String id) {
             learningContextRepository.deleteMemory(id);
+        }
+
+        @Override
+        public void deleteMemories(List<String> ids) {
+            learningContextRepository.deleteMemories(ids);
         }
 
         @Override
@@ -394,6 +401,10 @@ public final class SettingsManagementController {
 
     public void deleteMemory(String id) {
         settingsStore.deleteMemory(id);
+    }
+
+    public void deleteMemories(List<String> ids) {
+        settingsStore.deleteMemories(ids);
     }
 
     public OutputSettings getOutputSettings() {

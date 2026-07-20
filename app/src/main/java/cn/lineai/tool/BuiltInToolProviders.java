@@ -15,6 +15,7 @@ import cn.lineai.tool.builtin.GlobTool;
 import cn.lineai.tool.builtin.ImageGenerationTool;
 import cn.lineai.tool.builtin.ImageUnderstandingTool;
 import cn.lineai.tool.builtin.ListDirectoryTool;
+import cn.lineai.tool.builtin.MemoryUpdateTool;
 import cn.lineai.tool.builtin.PhoneClickTool;
 import cn.lineai.tool.builtin.PhoneClickViewTool;
 import cn.lineai.tool.builtin.PhoneGlobalActionTool;
@@ -49,6 +50,7 @@ public final class BuiltInToolProviders {
         list.add((context, ipc) -> new AgentTool());
         list.add((context, ipc) -> new AgentPipelineTool());
         list.add((context, ipc) -> new TodoUpdateTool());
+        list.add((context, ipc) -> new MemoryUpdateTool());
         list.add((context, ipc) -> new WebFetchTool());
         // Phone control tools need the accessibility service.
         list.add((context, ipc) -> new PhoneScreenshotTool(context));

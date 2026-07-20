@@ -86,6 +86,31 @@ public final class LearningContextRepository extends BaseRepository implements L
     }
 
     @Override
+    public synchronized void deleteMemories(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        SQLiteDatabase db = database.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (String id : ids) {
+                String safeId = safe(id);
+                if (safeId.length() == 0) {
+                    continue;
+                }
+                db.delete("memories", "id = ?", new String[] {safeId});
+                try {
+                    db.delete("memories_fts", "id = ?", new String[] {safeId});
+                } catch (RuntimeException ignored) {
+                }
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    @Override
     public synchronized void indexConversation(String projectId, ConversationRecord conversation) {
         conversationIndexer.indexConversation(projectId, conversation);
     }

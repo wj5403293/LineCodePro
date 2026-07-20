@@ -5,7 +5,7 @@ import cn.lineai.R;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
-import cn.lineai.context.MemoryExtractionService;
+
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ConversationStore;
@@ -60,7 +60,6 @@ final class MainControllerInitializer {
         FileTreeStore fileTreeRepository = dependencies.fileTreeRepository;
         IpcFileTreeStore ipcFileTreeRepository = dependencies.ipcFileTreeRepository;
         SshFileTreeStore sshFileTreeRepository = dependencies.sshFileTreeRepository;
-        MemoryExtractionService memoryExtractionService = dependencies.memoryExtractionService;
         ContextManager contextManager = dependencies.contextManager;
         ContextCompactionService contextCompactionService = dependencies.contextCompactionService;
         cn.lineai.ai.ModelClient modelClient = dependencies.modelClient;
@@ -572,7 +571,6 @@ final class MainControllerInitializer {
                 chatSessionStore,
                 modelClient,
                 aiBehaviorSettingsRepository,
-                memoryExtractionService,
                 extensionRepository,
                 toolRegistry,
                 toolExecutor,

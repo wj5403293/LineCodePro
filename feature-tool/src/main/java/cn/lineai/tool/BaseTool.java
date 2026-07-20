@@ -12,6 +12,7 @@ public abstract class BaseTool implements ToolInfo {
     public static final int ICON_PAINTBRUSH = 48;
     public static final int ICON_SPARKLES = 38;
     public static final int ICON_SMARTPHONE = 57;
+    public static final int ICON_BOOK_OPEN = 30;
 
     public abstract String getName();
 

@@ -17,6 +17,7 @@ public final class ToolNames {
     public static final String AGENT = "agent";
     public static final String AGENT_PIPELINE = "agent_pipeline";
     public static final String TODO_UPDATE = "todo_update";
+    public static final String MEMORY_UPDATE = "memory_update";
     public static final String WEB_SEARCH = "web_search";
     public static final String WEB_FETCH = "web_fetch";
     public static final String IMAGE_UNDERSTANDING = "image_understanding";

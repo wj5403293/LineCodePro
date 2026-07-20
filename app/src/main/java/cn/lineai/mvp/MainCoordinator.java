@@ -6,7 +6,7 @@ import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.prompt.SystemPromptProvider;
 import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
-import cn.lineai.context.MemoryExtractionService;
+
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ConversationRecord;
@@ -119,7 +119,6 @@ public final class MainCoordinator implements MainUiController {
     private final ConversationStore conversationRepository;
     private final ProjectStore projectRepository;
     private final LearningContextStore learningContextRepository;
-    private final MemoryExtractionService memoryExtractionService;
     private final ToolSettingsStore toolSettingsRepository;
     private final ExtensionStore extensionRepository;
     private final IpcProviderStore ipcProviderRepository;
@@ -188,7 +187,6 @@ public final class MainCoordinator implements MainUiController {
         conversationRepository = dependencies.conversationRepository;
         projectRepository = dependencies.projectRepository;
         learningContextRepository = dependencies.learningContextRepository;
-        memoryExtractionService = dependencies.memoryExtractionService;
         toolSettingsRepository = dependencies.toolSettingsRepository;
         extensionRepository = dependencies.extensionRepository;
         ipcProviderRepository = dependencies.ipcProviderRepository;
@@ -605,6 +603,11 @@ public final class MainCoordinator implements MainUiController {
     @Override
     public void onMemoryDeleted(String id) {
         settingsManagementController.deleteMemory(id);
+    }
+
+    @Override
+    public void onMemoriesDeleted(java.util.List<String> ids) {
+        settingsManagementController.deleteMemories(ids);
     }
 
     @Override

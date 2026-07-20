@@ -10,10 +10,10 @@ import cn.lineai.ai.ToolCallTextParser;
 import cn.lineai.ai.message.ModelMessage;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ExtensionStore;
-import cn.lineai.context.MemoryExtractionService;
+
 import cn.lineai.model.AiBehaviorSettings;
 import cn.lineai.model.ChatMessage;
-import cn.lineai.model.MessageContentSanitizer;
+
 import cn.lineai.model.ModelConfig;
 import cn.lineai.mvp.agent.AgentExecutionController;
 import cn.lineai.mvp.agent.AgentProgressSession;
@@ -73,7 +73,6 @@ final class GenerationFlowController {
     private final ChatSessionStore chatSessionStore;
     private final ModelClient modelClient;
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
-    private final MemoryExtractionService memoryExtractionService;
     private final ExtensionStore extensionRepository;
     private final ToolRegistry toolRegistry;
     private final ToolMessageController toolMessageController;
@@ -223,7 +222,6 @@ final class GenerationFlowController {
             ChatSessionStore chatSessionStore,
             ModelClient modelClient,
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
-            MemoryExtractionService memoryExtractionService,
             ExtensionStore extensionRepository,
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
@@ -243,7 +241,6 @@ final class GenerationFlowController {
                 chatSessionStore,
                 modelClient,
                 aiBehaviorSettingsRepository,
-                memoryExtractionService,
                 extensionRepository,
                 toolRegistry,
                 toolExecutor,
@@ -264,7 +261,6 @@ final class GenerationFlowController {
             ChatSessionStore chatSessionStore,
             ModelClient modelClient,
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
-            MemoryExtractionService memoryExtractionService,
             ExtensionStore extensionRepository,
             ToolRegistry toolRegistry,
             ToolExecutor toolExecutor,
@@ -282,7 +278,6 @@ final class GenerationFlowController {
         this.chatSessionStore = chatSessionStore;
         this.modelClient = modelClient;
         this.aiBehaviorSettingsRepository = aiBehaviorSettingsRepository;
-        this.memoryExtractionService = memoryExtractionService;
         this.extensionRepository = extensionRepository;
         this.toolRegistry = toolRegistry;
         this.toolMessageController = toolMessageController;
@@ -626,7 +621,6 @@ final class GenerationFlowController {
             }
             finishActiveGeneration();
             host.persistCurrentConversation();
-            scheduleMemoryExtractionIfNeeded(selectedModel);
             host.render();
         });
     }
@@ -854,78 +848,6 @@ final class GenerationFlowController {
         session.notifyMirror();
         addOrReplaceToolResult(session.snapshotResult());
         host.render();
-    }
-
-    private void scheduleMemoryExtractionIfNeeded(ModelConfig selectedModel) {
-        if (!aiBehaviorSettingsRepository.get().isLearningModeEnabled() || selectedModel == null) {
-            return;
-        }
-        String userInput = recentUserInput();
-        String transcript = recentTurnTranscript();
-        if (userInput.trim().length() == 0 || transcript.trim().length() == 0) {
-            return;
-        }
-        String capturedProjectPath = host.projectPath();
-        backgroundTasks.execute("linecode-memory-extract", () -> memoryExtractionService.extractAndStore(
-                selectedModel,
-                capturedProjectPath,
-                userInput,
-                transcript
-        ));
-    }
-
-    private String recentUserInput() {
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessage message = messages.get(i);
-            if (message.getRole() == ChatMessage.Role.USER && message.getContent().trim().length() > 0) {
-                return message.getContent();
-            }
-        }
-        return "";
-    }
-
-    private String recentTurnTranscript() {
-        int start = -1;
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessage message = messages.get(i);
-            if (message.getRole() == ChatMessage.Role.USER && message.getContent().trim().length() > 0) {
-                start = i;
-                break;
-            }
-        }
-        if (start < 0) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
-        for (int i = start; i < messages.size(); i++) {
-            ChatMessage message = messages.get(i);
-            if (message.isHidden() || message.isExcludeFromContext()) {
-                continue;
-            }
-            if (message.getRole() == ChatMessage.Role.USER) {
-                appendTranscriptMessage(builder, "user", message.getContent(), 1400);
-            } else if (message.getRole() == ChatMessage.Role.ASSISTANT) {
-                appendTranscriptMessage(builder, "assistant", message.getContent(), 2200);
-            }
-            if (builder.length() > 6000) {
-                return builder.substring(0, 5997) + "...";
-            }
-        }
-        return builder.toString().trim();
-    }
-
-    private void appendTranscriptMessage(StringBuilder builder, String role, String content, int maxChars) {
-        String text = MessageContentSanitizer.stripInlineDataImages(content).trim();
-        if (text.length() == 0) {
-            return;
-        }
-        if (text.length() > maxChars) {
-            text = text.substring(0, Math.max(0, maxChars - 3)) + "...";
-        }
-        if (builder.length() > 0) {
-            builder.append("\n\n");
-        }
-        builder.append(role).append(": ").append(text);
     }
 
     private List<ToolCall> mergeToolCalls(List<ToolCall> nativeCalls, List<ToolCall> textCalls) {

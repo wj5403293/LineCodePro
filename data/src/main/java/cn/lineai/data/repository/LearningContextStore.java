@@ -22,6 +22,11 @@ public interface LearningContextStore {
     void deleteMemory(String id);
 
     /**
+     * 批量删除记忆。
+     */
+    void deleteMemories(java.util.List<String> ids);
+
+    /**
      * 将指定会话索引到对话索引中。
      */
     void indexConversation(String projectId, ConversationRecord conversation);

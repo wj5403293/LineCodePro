@@ -13,6 +13,8 @@ public final class MinimaxReasoningStrategy implements ReasoningRequestStrategy 
 
     @Override
     public void apply(JSONObject body, ReasoningRequestContext context) throws Exception {
+        body.put("thinking", new JSONObject().put("type",
+                context.isEnabled() ? "adaptive" : "disabled"));
         body.put("reasoning_split", context.isEnabled());
     }
 }

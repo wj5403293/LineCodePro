@@ -75,6 +75,8 @@
     <string name="message_empty_session_start">Начните сессию с вопроса</string>
     <string name="message_empty_permission_needed">Вызовы инструментов требуют подтверждения разрешений</string>
     <string name="message_model_switched">Модель переключена</string>
+    <string name="model_retry_attempt">Повтор %1$d/%2$d, ошибка: %3$s</string>
+    <string name="model_retry_failed">Сбой связи с моделью: %1$s</string>
     <string name="message_thinking_label">Размышления</string>
     <string name="message_thinking_collapsed">Показать</string>
     <string name="message_thinking_expanded">Скрыть</string>

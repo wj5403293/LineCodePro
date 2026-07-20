@@ -366,6 +366,12 @@ public final class ChatMessage {
                 "", "", "", "", "", Collections.emptyList(), content);
     }
 
+    public static ChatMessage retryNotice(String id, String content) {
+        return new ChatMessage(id, Role.ASSISTANT, "", "", false, false, true,
+                Collections.emptyList(), Collections.emptyList(), "", "", false,
+                "", "", "", "", "", Collections.emptyList(), content);
+    }
+
     private String normalizeCompactStatus(String value) {
         if (COMPACT_STATUS_RUNNING.equals(value)
                 || COMPACT_STATUS_DONE.equals(value)

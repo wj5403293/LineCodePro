@@ -75,6 +75,8 @@
     <string name="message_empty_session_start">开始对话，问个问题吧</string>
     <string name="message_empty_permission_needed">工具调用需要权限确认</string>
     <string name="message_model_switched">已切换模型</string>
+    <string name="model_retry_attempt">正在第 %1$d/%2$d 次重试，错误：%3$s</string>
+    <string name="model_retry_failed">模型通信失败：%1$s</string>
     <string name="message_thinking_label">思考</string>
     <string name="message_thinking_collapsed">展开</string>
     <string name="message_thinking_expanded">收起</string>

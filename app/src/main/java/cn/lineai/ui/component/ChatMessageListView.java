@@ -368,7 +368,7 @@ public final class ChatMessageListView extends FrameLayout {
         return box;
     }
 
-    private static View createModelSwitchNotice(Context context, String noticeText) {
+    private static View createNoticeView(Context context, String noticeText) {
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
@@ -389,7 +389,7 @@ public final class ChatMessageListView extends FrameLayout {
         private static final int VIEW_TYPE_CONFIGURE = 0;
         private static final int VIEW_TYPE_USER = 1;
         private static final int VIEW_TYPE_ASSISTANT = 2;
-        private static final int VIEW_TYPE_MODEL_SWITCH = 3;
+        private static final int VIEW_TYPE_NOTICE = 3;
 
         private final Context context;
         private final ArrayList<ChatMessage> visibleMessages = new ArrayList<>();
@@ -507,7 +507,7 @@ public final class ChatMessageListView extends FrameLayout {
             }
             ChatMessage message = visibleMessages.get(position);
             if (message.isModelSwitchNotification()) {
-                return VIEW_TYPE_MODEL_SWITCH;
+                return VIEW_TYPE_NOTICE;
             }
             return message.getRole() == ChatMessage.Role.USER ? VIEW_TYPE_USER : VIEW_TYPE_ASSISTANT;
         }
@@ -528,7 +528,7 @@ public final class ChatMessageListView extends FrameLayout {
                 if (cached != null && cached.getParent() == null) {
                     return cached;
                 }
-                View notice = createModelSwitchNotice(context, message.getModelSwitchNotification());
+                View notice = createNoticeView(context, message.getModelSwitchNotification());
                 putCache(ck, notice);
                 return notice;
             }

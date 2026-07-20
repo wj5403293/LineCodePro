@@ -60,7 +60,14 @@ final class GenerationFlowController {
         default boolean isTerminalProviderExecutionMode() {
             return false;
         }
+
+        String formatRetryNotice(int attempt, int maxRetries, String error);
+
+        String formatModelFailed(String error);
     }
+
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 5000L;
 
     private final ArrayList<ChatMessage> messages;
     private final ChatSessionStore chatSessionStore;
@@ -341,16 +348,28 @@ final class GenerationFlowController {
             return;
         }
         ArrayList<ModelMessage> requestMessages = modelPromptController.buildModelMessages(userInput);
+        retryableModelStream(generationId, selectedModel, cancellationToken, requestMessages, 0, 0, userInput);
+    }
+
+    private void retryableModelStream(
+            int generationId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            ArrayList<ModelMessage> requestMessages,
+            int usedToolCallCount,
+            int attempt,
+            String userInput
+    ) {
         String assistantId = host.nextId();
         streamingRenderController.initRawText(assistantId);
         messages.add(new ChatMessage(assistantId, ChatMessage.Role.ASSISTANT, "", true));
         host.persistCurrentConversation();
         host.render();
 
-        backgroundTasks.execute("linecode-model-stream", () -> {
+        backgroundTasks.execute(attempt == 0 ? "linecode-model-stream" : "linecode-model-stream-retry", () -> {
             try {
                 AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
-                ModelRequestOptions requestOptions = modelPromptController.requestOptions(aiSettings, selectedModel, 0);
+                ModelRequestOptions requestOptions = modelPromptController.requestOptions(aiSettings, selectedModel, usedToolCallCount);
                 ModelCompletionResponse response = modelClient.stream(selectedModel, requestMessages, new ModelStreamCallback() {
                     @Override
                     public void onTextDelta(String delta) {
@@ -362,10 +381,57 @@ final class GenerationFlowController {
                         streamingRenderController.appendDelta(generationId, assistantId, "", delta);
                     }
                 }, cancellationToken, requestOptions);
-                finishGeneration(generationId, assistantId, selectedModel, response, cancellationToken, 0);
+                finishGeneration(generationId, assistantId, selectedModel, response, cancellationToken, usedToolCallCount);
             } catch (ModelCompletionException e) {
-                failGeneration(generationId, assistantId, "模型通信失败：\n" + e.getMessage());
+                handleModelError(generationId, assistantId, selectedModel, cancellationToken,
+                        requestMessages, usedToolCallCount, attempt, e, userInput);
             }
+        });
+    }
+
+    private void handleModelError(
+            int generationId,
+            String failedAssistantId,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            ArrayList<ModelMessage> requestMessages,
+            int usedToolCallCount,
+            int failedAttempt,
+            ModelCompletionException error,
+            String userInput
+    ) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            failGeneration(generationId, failedAssistantId, host.formatModelFailed(error.getMessage()));
+            return;
+        }
+        int nextAttempt = failedAttempt + 1;
+        if (nextAttempt >= MAX_RETRIES) {
+            failGeneration(generationId, failedAssistantId, host.formatModelFailed(error.getMessage()));
+            return;
+        }
+
+        mainThread.post(() -> {
+            if (cancellationToken != null && cancellationToken.isCancelled()) {
+                return;
+            }
+            int index = findMessageIndex(failedAssistantId);
+            if (index >= 0) {
+                messages.remove(index);
+            }
+            streamingRenderController.removeRawText(failedAssistantId);
+
+            String retryText = host.formatRetryNotice(nextAttempt + 1, MAX_RETRIES, error.getMessage());
+            messages.add(ChatMessage.retryNotice(host.nextId(), retryText));
+            host.persistCurrentConversation();
+            host.render();
+
+            mainThread.postDelayed(() -> {
+                if (cancellationToken != null && cancellationToken.isCancelled()) {
+                    return;
+                }
+                retryableModelStream(generationId, selectedModel, cancellationToken,
+                        requestMessages, usedToolCallCount, nextAttempt, userInput);
+            }, RETRY_DELAY_MS);
         });
     }
 
@@ -651,30 +717,7 @@ final class GenerationFlowController {
             ModelCancellationToken cancellationToken
     ) {
         ArrayList<ModelMessage> nextRequestMessages = modelPromptController.buildModelMessages("", usedToolCallCount);
-        String nextAssistantId = host.nextId();
-        streamingRenderController.initRawText(nextAssistantId);
-        messages.add(new ChatMessage(nextAssistantId, ChatMessage.Role.ASSISTANT, "", true));
-        host.render();
-        backgroundTasks.execute("linecode-tool-continuation", () -> {
-            try {
-                AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
-                ModelRequestOptions nextRequestOptions = modelPromptController.requestOptions(aiSettings, selectedModel, usedToolCallCount);
-                ModelCompletionResponse response = modelClient.stream(selectedModel, nextRequestMessages, new ModelStreamCallback() {
-                    @Override
-                    public void onTextDelta(String delta) {
-                        streamingRenderController.appendDelta(generationId, nextAssistantId, delta, "");
-                    }
-
-                    @Override
-                    public void onReasoningDelta(String delta) {
-                        streamingRenderController.appendDelta(generationId, nextAssistantId, "", delta);
-                    }
-                }, cancellationToken, nextRequestOptions);
-                finishGeneration(generationId, nextAssistantId, selectedModel, response, cancellationToken, usedToolCallCount);
-            } catch (ModelCompletionException e) {
-                failGeneration(generationId, nextAssistantId, "模型通信失败：\n" + e.getMessage());
-            }
-        });
+        retryableModelStream(generationId, selectedModel, cancellationToken, nextRequestMessages, usedToolCallCount, 0, "");
     }
 
     private ToolContext toolContext(

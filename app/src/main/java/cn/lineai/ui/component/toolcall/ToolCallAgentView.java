@@ -42,15 +42,18 @@ public final class ToolCallAgentView extends BaseToolCallView implements ToolCal
         String toolName = toolCall == null ? "" : toolCall.getName();
         boolean isCustomAgent = ToolCallUtils.isCustomAgentTool(toolName);
         JSONObject input = ToolCallUtils.parseInput(toolCall);
-        JSONObject progress = progressPayload(result);
-        String name = progress == null
-                ? (isCustomAgent ? input.optString("task", toolName) : input.optString("description", "Agent"))
-                : progress.optString("description", isCustomAgent ? input.optString("task", toolName) : input.optString("description", "Agent"));
-        String type = normalizeType(progress == null
-                ? (isCustomAgent ? "sub-coding" : input.optString("type"))
-                : progress.optString("type", isCustomAgent ? "sub-coding" : input.optString("type")));
+        String resultContent = result == null ? "" : result.getContent();
+        JSONObject progress = AgentToolResultDisplay.progressPayload(resultContent);
+        String fallbackName = isCustomAgent ? input.optString("task", toolName) : input.optString("description", "Agent");
+        String name = AgentToolResultDisplay.description(resultContent, fallbackName);
+        if (name == null || name.trim().length() == 0) {
+            name = fallbackName;
+        }
+        String type = normalizeType(AgentToolResultDisplay.type(
+                resultContent,
+                isCustomAgent ? "sub-coding" : input.optString("type")));
         String outerReviewState = result == null ? "" : result.getReviewState();
-        String progressStatus = progress == null ? "" : progress.optString("status");
+        String progressStatus = AgentToolResultDisplay.progressStatus(resultContent);
         boolean running = progress != null && ("running".equals(progressStatus) || "waiting_unlock".equals(progressStatus));
         boolean pendingReview = "pending".equals(progressStatus) || "pending".equals(outerReviewState);
         boolean resultHasError = result != null && result.isError();
@@ -60,10 +63,13 @@ public final class ToolCallAgentView extends BaseToolCallView implements ToolCal
         }
         boolean complete = result != null && !running && !pendingReview;
         boolean error = resultHasError || "error".equals(progressStatus) || interrupted;
-        String output = progress == null ? outputText(result) : progress.optString("output");
-        String thinking = progress == null ? "" : progress.optString("thinking");
-        JSONArray nestedToolCalls = progress == null ? null : progress.optJSONArray("tool_calls");
-        int toolCount = progress == null ? toolCount(result) : progress.optInt("tool_call_count", nestedToolCalls == null ? 0 : nestedToolCalls.length());
+        // Never dump raw linecode_agent_progress JSON into Markdown.
+        String output = AgentToolResultDisplay.displayOutput(resultContent);
+        String thinking = AgentToolResultDisplay.thinking(resultContent);
+        JSONArray nestedToolCalls = AgentToolResultDisplay.nestedToolCalls(resultContent);
+        int toolCount = progress == null
+                ? toolCount(result)
+                : AgentToolResultDisplay.toolCallCount(resultContent);
         String status = error ? getContext().getString(R.string.tool_call_status_failed) : pendingReview ? getContext().getString(R.string.tool_call_status_pending_review) : complete ? getContext().getString(R.string.tool_call_status_done) : getContext().getString(R.string.tool_call_status_running);
         int typeColor = "explore".equals(type) ? LineTheme.ACCENT : LineTheme.DANGER;
         int statusColor = error ? LineTheme.DANGER : pendingReview ? LineTheme.WARNING : complete ? LineTheme.SUCCESS : LineTheme.ACCENT;
@@ -197,43 +203,22 @@ public final class ToolCallAgentView extends BaseToolCallView implements ToolCal
     }
 
     private int toolCount(ToolResult result) {
-        JSONObject progress = progressPayload(result);
-        if (progress != null) {
-            JSONArray calls = progress.optJSONArray("tool_calls");
-            return progress.optInt("tool_call_count", calls == null ? 0 : calls.length());
-        }
         if (result == null) {
             return 0;
+        }
+        int fromProgress = AgentToolResultDisplay.toolCallCount(result.getContent());
+        if (fromProgress > 0) {
+            return fromProgress;
         }
         return intAfterLabel(result.getContent(), "工具调用:");
     }
 
     private String outputText(ToolResult result) {
-        JSONObject progress = progressPayload(result);
-        if (progress != null) {
-            return progress.optString("output");
-        }
-        if (result == null) {
-            return "";
-        }
-        String content = result.getContent();
-        int index = content.indexOf("输出:\n");
-        if (index >= 0) {
-            return content.substring(index + "输出:\n".length()).trim();
-        }
-        return content.trim();
+        return AgentToolResultDisplay.displayOutput(result == null ? "" : result.getContent());
     }
 
     private JSONObject progressPayload(ToolResult result) {
-        if (result == null || result.getContent().trim().length() == 0) {
-            return null;
-        }
-        try {
-            JSONObject object = new JSONObject(result.getContent());
-            return object.optBoolean("linecode_agent_progress") ? object : null;
-        } catch (Exception ignored) {
-            return null;
-        }
+        return AgentToolResultDisplay.progressPayload(result == null ? "" : result.getContent());
     }
 
     private void addNestedToolCalls(LinearLayout content, JSONArray nestedToolCalls) {

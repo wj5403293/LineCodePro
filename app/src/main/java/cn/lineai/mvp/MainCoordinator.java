@@ -248,15 +248,14 @@ public final class MainCoordinator implements MainUiController {
     }
 
     /**
-     * 统一的生成状态清理入口，用于终止、退出 App、进入 App 三个触发点。
-     * <p>幂等：即使当前不在生成，调用也是安全的。</p>
+     * Full generation teardown: cancel network, reject pending tool reviews, stop keep-alive.
+     * <p>Call sites (only explicit stop / permanent exit — never mere background visibility):</p>
      * <ul>
-     *   <li>取消当前网络请求的 cancellation token</li>
-     *   <li>重置 {@code streaming} 标志并失效当前 generation id</li>
-     *   <li>关闭流式渲染残留与 keep alive 服务</li>
-     *   <li>把进行中的工具调用与 Agent 进度标记为已终止</li>
-     *   <li>渲染最新状态以隐藏进度圈</li>
+     *   <li>User taps Stop ({@link #onStopGeneration()})</li>
+     *   <li>Activity finishing via {@link cn.lineai.mvp.ActivityGenerationLifecyclePolicy}</li>
+     *   <li>{@link #destroy()} path (uses cancelActiveGeneration + stopKeepAlive directly)</li>
      * </ul>
+     * <p>幂等：即使当前不在生成，调用也是安全的。</p>
      */
     public void resetGenerationState() {
         if (chatInteractionController != null) {

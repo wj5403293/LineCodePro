@@ -94,8 +94,10 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onStop() {
         super.onStop();
-        // 退出 App 时清理生成状态：取消网络请求、关闭流式连接、隐藏进度圈
-        if (presenter != null) {
+        // Only finish/destroy should cancel generation. Home / multi-task must keep
+        // the stream + pending tool reviews alive (KeepAliveService covers process priority).
+        if (presenter != null
+                && cn.lineai.mvp.ActivityGenerationLifecyclePolicy.shouldStopGenerationOnStop(isFinishing())) {
             presenter.resetGenerationState();
         }
     }
@@ -103,8 +105,9 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onStart() {
         super.onStart();
-        // 进入 App 时清理残留状态：避免上次退出时未完成的进度圈、孤立 streaming 标志残留
-        if (presenter != null) {
+        // Never cancel on resume: process-death orphans are cleaned by ConversationResumeSanitizer.
+        if (presenter != null
+                && cn.lineai.mvp.ActivityGenerationLifecyclePolicy.shouldStopGenerationOnStart()) {
             presenter.resetGenerationState();
         }
     }
@@ -112,7 +115,10 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onDestroy() {
         unregisterBackCallback();
-        presenter.destroy();
+        // destroy() always cancels generation + keep-alive (explicit teardown).
+        if (presenter != null) {
+            presenter.destroy();
+        }
         super.onDestroy();
     }
 

@@ -80,7 +80,13 @@ public final class ToolDisplayResolver {
     public static ToolDisplayCategory fallbackDisplayCategory(String name) {
         if (name == null) return ToolDisplayCategory.GENERIC;
         if (name.startsWith("phone_")) return ToolDisplayCategory.PHONE_CONTROL;
-        if (name.startsWith("agentx_")) return ToolDisplayCategory.AGENT;
+        // Built-in agent tools when registry is not yet wired (or name-only fallback).
+        if ("agent".equals(name) || name.startsWith("agentx_")) {
+            return ToolDisplayCategory.AGENT;
+        }
+        if ("agent_pipeline".equals(name)) {
+            return ToolDisplayCategory.AGENT_PIPELINE;
+        }
         if (name.startsWith("mcpx_")) return ToolDisplayCategory.GENERIC;
         return ToolDisplayCategory.GENERIC;
     }

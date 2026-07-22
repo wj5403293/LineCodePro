@@ -1,7 +1,7 @@
-## 当前 TODO 列表
+## Current TODO List
 {{TODO_LIST}}
 
-- pending：未开始；in_progress：进行中（同一时刻最多 1 个）；completed：已完成
-- 每次开始新任务前调用 todo_update 把目标项改为 in_progress；任务完成时立即改为 completed
-- 新任务放在列表底部；任务全部完成后传入空列表或全 completed 项
-- TODO 列表会跨本会话的多个用户轮次持续维护：用户追问时不要重置既有列表，仅在新增任务时追加或在全部完成时清空
+- pending: not started; in_progress: in progress (at most 1 at a time); completed: done
+- Call todo_update to set the target item to in_progress before starting each task; immediately change it to completed when the task is done
+- New tasks are added at the bottom of the list; when all tasks are done, pass an empty list or all-completed items
+- The TODO list is maintained across multiple user turns within this session: do not reset the existing list when the user follows up, only append for new tasks or clear when all are completed

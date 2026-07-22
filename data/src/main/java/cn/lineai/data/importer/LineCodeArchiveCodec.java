@@ -68,7 +68,7 @@ public final class LineCodeArchiveCodec {
 
     public void extractArchive(InputStream rawInput, File targetDir) throws Exception {
         if (targetDir == null) {
-            throw new IllegalArgumentException("缺少 .linecode 解压目录。");
+            throw new IllegalArgumentException("Missing .linecode extraction directory.");
         }
         if (!targetDir.exists()) {
             targetDir.mkdirs();
@@ -85,7 +85,7 @@ public final class LineCodeArchiveCodec {
                 }
                 File out = new File(targetDir, name).getCanonicalFile();
                 if (!isInside(canonicalTarget, out)) {
-                    throw new IllegalArgumentException(".linecode 包含越界路径: " + name);
+                    throw new IllegalArgumentException(".linecode contains out-of-bounds path: " + name);
                 }
                 if (entry.isDirectory()) {
                     out.mkdirs();
@@ -349,7 +349,7 @@ public final class LineCodeArchiveCodec {
             String relative = relativePath(sourceRoot, canonicalChild);
             File out = new File(targetRoot, relative).getCanonicalFile();
             if (!isInside(targetRoot, out)) {
-                throw new IllegalArgumentException(".linecode 工作区路径越界: " + relative);
+                throw new IllegalArgumentException(".linecode workspace path out of bounds: " + relative);
             }
             if (canonicalChild.isDirectory()) {
                 out.mkdirs();
@@ -389,7 +389,7 @@ public final class LineCodeArchiveCodec {
 
     private void deleteRecursive(File canonicalRoot, File file) throws Exception {
         if (!isInside(canonicalRoot, file)) {
-            throw new IllegalArgumentException("删除路径越界: " + file.getPath());
+            throw new IllegalArgumentException("Delete path out of bounds: " + file.getPath());
         }
         if (file.isDirectory()) {
             File[] children = file.listFiles();

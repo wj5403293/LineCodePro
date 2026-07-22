@@ -10,7 +10,7 @@ public final class ConversationUiModel {
 
     public ConversationUiModel(String id, String title, long updatedAt) {
         this.id = id == null ? "" : id;
-        this.title = title == null || title.length() == 0 ? "新对话" : title;
+        this.title = title == null || title.length() == 0 ? "New conversation" : title;
         this.updatedAt = updatedAt;
     }
 

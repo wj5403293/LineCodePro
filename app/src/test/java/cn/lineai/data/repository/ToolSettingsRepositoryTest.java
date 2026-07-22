@@ -1,21 +1,48 @@
 package cn.lineai.data.repository;
 
+import cn.lineai.ai.prompt.ToolPromptRenderer;
 import cn.lineai.model.McpToolConfig;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.ToolCategory;
+import cn.lineai.tool.ToolCategoryResolver;
+import cn.lineai.tool.ToolContext;
+import cn.lineai.tool.ToolDisplayCategory;
+import cn.lineai.tool.ToolDisplayResolver;
 import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.ToolRegistry;
-import cn.lineai.tool.ToolCategory;
-import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolResult;
+import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.json.JSONObject;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public final class ToolSettingsRepositoryTest {
+
+    private static ToolCategoryResolver previousResolver;
+
+    @BeforeClass
+    public static void setUpToolCategoryResolver() throws Exception {
+        Field field = ToolSettingsRepository.class.getDeclaredField("toolCategoryResolver");
+        field.setAccessible(true);
+        previousResolver = (ToolCategoryResolver) field.get(null);
+        ToolRegistry registry = new ToolRegistry();
+        ToolDisplayResolver displayResolver = new ToolDisplayResolver(registry);
+        field.set(null, (ToolCategoryResolver) name -> displayResolver.getDisplayCategory(name));
+    }
+
+    @AfterClass
+    public static void tearDownToolCategoryResolver() throws Exception {
+        Field field = ToolSettingsRepository.class.getDeclaredField("toolCategoryResolver");
+        field.setAccessible(true);
+        field.set(null, previousResolver);
+    }
+
     @Test
     public void toolPromptUsesRegisteredToolMetadata() {
         ToolRegistry registry = new ToolRegistry();
@@ -38,7 +65,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"file_read", "web_search", "image_understanding", "image_generation", "agent", "agent_pipeline", "shell_execute"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 java.util.Collections.singletonList(config),
                 enabled,
                 toolByName,
@@ -58,7 +85,7 @@ public final class ToolSettingsRepositoryTest {
         Assert.assertTrue(prompt.contains("agent_pipeline [system]"));
         Assert.assertTrue(prompt.contains("\"depends_on\""));
         Assert.assertFalse(prompt.contains("shell_execute"));
-        Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"工具名\">"));
+        Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"tool_name\">"));
     }
 
     @Test
@@ -103,15 +130,15 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"file_read"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 java.util.Collections.singletonList(config),
                 enabled,
                 toolByName,
                 true
         );
 
-        Assert.assertTrue(prompt.contains("原生 tools/function calling"));
-        Assert.assertTrue(prompt.contains("不要把工具调用 JSON、XML、<tool_calls>"));
+        Assert.assertTrue(prompt.contains("native tools/function calling"));
+        Assert.assertTrue(prompt.contains("do not output tool call JSON, XML, <tool_calls>"));
     }
 
     @Test
@@ -150,7 +177,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"image_generation"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_SSH,
                 java.util.Arrays.asList(shell, imageUnderstanding, imageGeneration),
                 enabled,
@@ -165,8 +192,8 @@ public final class ToolSettingsRepositoryTest {
         Assert.assertTrue(prompt.contains("以内联 Markdown 图片返回"));
         Assert.assertTrue(prompt.contains("mcpx_test_lookup"));
         Assert.assertTrue(prompt.contains("调用测试 MCP"));
-        Assert.assertTrue(prompt.contains("本地文件读写和文件搜索已禁用"));
-        Assert.assertTrue(prompt.contains("Agent、Agent Pipeline、任务清单仍可用"));
+        Assert.assertTrue(prompt.contains("Local file read/write and file search are disabled"));
+        Assert.assertTrue(prompt.contains("Agent, Agent Pipeline, and todo list remain available"));
     }
 
     @Test
@@ -202,7 +229,8 @@ public final class ToolSettingsRepositoryTest {
         McpToolConfig config = ToolSettingsRepository.displayConfigForMode(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 new McpToolConfig("shell", "SSH Shell", "通过 SSH 执行 shell 命令", true, new String[] {"shell_execute"}),
-                true
+                true,
+                null
         );
 
         Assert.assertEquals("IPC Shell", config.getName());
@@ -243,7 +271,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"image_generation"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 java.util.Arrays.asList(shell, imageUnderstanding, imageGeneration),
                 enabled,
@@ -256,10 +284,10 @@ public final class ToolSettingsRepositoryTest {
         Assert.assertTrue(prompt.contains("通过 IPC 读取终端提供者环境图片"));
         Assert.assertTrue(prompt.contains("image_generation"));
         Assert.assertTrue(prompt.contains("以内联 Markdown 图片返回"));
-        Assert.assertTrue(prompt.contains("终端提供者（Terminal Provider）"));
+        Assert.assertTrue(prompt.contains("Terminal Provider"));
         Assert.assertTrue(prompt.contains("通过终端提供者 IPC 执行"));
-        Assert.assertTrue(prompt.contains("本地文件读写和文件搜索已禁用"));
-        Assert.assertTrue(prompt.contains("Agent、Agent Pipeline、任务清单仍可用"));
+        Assert.assertTrue(prompt.contains("Local file read/write and file search are disabled"));
+        Assert.assertTrue(prompt.contains("Agent, Agent Pipeline, and todo list remain available"));
     }
 
     @Test
@@ -280,7 +308,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"shell_execute"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 java.util.Collections.singletonList(shell),
                 enabled,
@@ -308,7 +336,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"shell_execute"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 java.util.Collections.singletonList(shell),
                 enabled,
@@ -316,7 +344,7 @@ public final class ToolSettingsRepositoryTest {
                 true
         );
 
-        Assert.assertTrue(prompt.contains("原生 tools/function calling"));
+        Assert.assertTrue(prompt.contains("native tools/function calling"));
     }
 
     @Test
@@ -334,7 +362,7 @@ public final class ToolSettingsRepositoryTest {
                 new String[] {"shell_execute"}
         );
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 java.util.Collections.singletonList(shell),
                 enabled,
@@ -342,7 +370,7 @@ public final class ToolSettingsRepositoryTest {
                 false
         );
 
-        Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"工具名\">"));
+        Assert.assertTrue(prompt.contains("<tool_calls><tool_call name=\"tool_name\">"));
     }
 
     @Test
@@ -356,7 +384,7 @@ public final class ToolSettingsRepositoryTest {
         enabled.add(beta.getName());
         enabled.add(alpha.getName());
 
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 java.util.Collections.<McpToolConfig>emptyList(),
                 enabled,
                 toolByName,
@@ -368,7 +396,7 @@ public final class ToolSettingsRepositoryTest {
 
     @Test
     public void terminalProviderToolPromptEmptyEnabledReturnsNoToolsMessage() {
-        String prompt = ToolSettingsRepository.renderToolPrompt(
+        String prompt = ToolPromptRenderer.renderToolPrompt(
                 ToolSettingsRepository.EXECUTION_TERMINAL_PROVIDER,
                 java.util.Collections.<McpToolConfig>emptyList(),
                 new LinkedHashSet<>(),
@@ -376,7 +404,7 @@ public final class ToolSettingsRepositoryTest {
                 false
         );
 
-        Assert.assertTrue(prompt.contains("当前没有可用工具"));
+        Assert.assertTrue(prompt.contains("No tools are available"));
     }
 
     private static final class DummyCustomMcpTool extends BaseTool {
@@ -404,7 +432,7 @@ public final class ToolSettingsRepositoryTest {
 
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
-            return new ToolResult("", getName(), "", false);
+            return ToolResult.of("", getName(), "", false);
         }
     }
 
@@ -439,7 +467,7 @@ public final class ToolSettingsRepositoryTest {
 
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
-            return new ToolResult("", getName(), "", false);
+            return ToolResult.of("", getName(), "", false);
         }
     }
 }

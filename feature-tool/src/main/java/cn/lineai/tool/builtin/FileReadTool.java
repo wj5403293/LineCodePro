@@ -2,11 +2,14 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
 import java.io.File;
+import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.json.JSONObject;
 
@@ -22,7 +25,7 @@ public final class FileReadTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "读取文件内容。返回带行号的文件内容；大文件请通过 start_kb/end_kb 分段读取。读取目录时返回目录树。";
+        return "Read file contents. Returns line-numbered content; for large files, read in segments via start_kb/end_kb. Returns a directory tree when reading a directory.";
     }
 
     @Override
@@ -33,6 +36,11 @@ public final class FileReadTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.READ;
+    }
+
+    @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_read);
     }
 
     @Override
@@ -54,9 +62,9 @@ public final class FileReadTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("file_path", new JSONObject().put("type", "string").put("description", "文件的绝对或相对路径"))
-                        .put("start_kb", new JSONObject().put("type", "number").put("description", "起始位置，单位 KB，默认 0"))
-                        .put("end_kb", new JSONObject().put("type", "number").put("description", "结束位置，单位 KB，默认 50，上限 50")))
+                        .put("file_path", new JSONObject().put("type", "string").put("description", "Absolute or relative file path"))
+                        .put("start_kb", new JSONObject().put("type", "number").put("description", "Start position in KB, default 0"))
+                        .put("end_kb", new JSONObject().put("type", "number").put("description", "End position in KB, default 50, max 50")))
                 .put("required", new org.json.JSONArray().put("file_path"));
     }
 
@@ -65,89 +73,122 @@ public final class FileReadTool extends BaseTool {
         try {
             File file = FileToolPathPolicy.resolve(context, input.optString("file_path"));
             if (!file.exists()) {
-                return error("文件不存在: " + FileToolPathPolicy.displayPath(context.getHomePath(), file));
+                return error(context.getString(R.string.tool_file_read_not_found, FileToolPathPolicy.displayPath(context.getHomePath(), file)));
             }
             if (file.isDirectory()) {
                 StringBuilder builder = new StringBuilder();
                 int[] count = new int[] {0};
-                appendDirectory(builder, file, "", count);
-                String list = builder.length() == 0 ? "(空目录)" : builder.toString().trim();
-                return ok("目录 " + FileToolPathPolicy.displayPath(context.getHomePath(), file) + ":\n" + list
-                        + "\n\n如需读取文件，请指定具体文件路径。");
+                appendDirectory(builder, file, "", count, context);
+                String list = builder.length() == 0 ? context.getString(R.string.tool_file_read_empty_dir) : builder.toString().trim();
+                return ok(context.getString(R.string.tool_file_read_dir_content, FileToolPathPolicy.displayPath(context.getHomePath(), file), list)
+                        + context.getString(R.string.tool_file_read_dir_specify_file));
             }
 
             int startKb = Math.max(0, input.optInt("start_kb", 0));
             int endKb = Math.max(startKb + 1, Math.min(50, input.optInt("end_kb", 50)));
             boolean hasKbRange = input.has("start_kb") || input.has("end_kb");
 
-            // For files > 1MB, refuse to read entirely
-            if (file.length() > 1024 * 1024) {
-                return error("文件 " + FileToolPathPolicy.displayPath(context.getHomePath(), file)
-                        + " 大小为 " + (file.length() / 1024) + "KB，超过 1MB 读取限制。\n"
-                        + "请使用 start_kb/end_kb 指定更小的范围，例如："
-                        + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_kb\":0,\"end_kb\":50}");
-            }
+            long fileLen = file.length();
 
-            // No KB range specified and file > 50KB: suggest using KB range
-            if (!hasKbRange && file.length() > LARGE_FILE_THRESHOLD_BYTES) {
-                return error("文件 " + FileToolPathPolicy.displayPath(context.getHomePath(), file)
-                        + " 大小为 " + (file.length() / 1024) + "KB，单次读取超过 50KB。\n"
-                        + "请使用 start_kb 和 end_kb 指定读取范围，例如："
-                        + "{\"file_path\":\"" + input.optString("file_path") + "\",\"start_kb\":0,\"end_kb\":50}");
-            }
-
-            String content = FileIo.readUtf8(file);
-
+            // No KB range specified:
+            //  - small file (< 50KB): read entirely
+            //  - large file (>= 50KB): refuse and suggest using KB range
             if (!hasKbRange) {
-                // Small file, no range specified: return entire content with line numbers
+                if (fileLen > LARGE_FILE_THRESHOLD_BYTES) {
+                    return error(context.getString(R.string.tool_file_read_exceed_50kb,
+                            FileToolPathPolicy.displayPath(context.getHomePath(), file),
+                            fileLen / 1024,
+                            input.optString("file_path")));
+                }
+                String content = FileIo.readUtf8(file);
                 String numbered = addLineNumbers(content, 1);
                 return ok(ToolResult.truncateContent(numbered));
             }
 
-            // KB range specified: extract the relevant portion
-            int startChar = Math.min(startKb * 1024, content.length());
-            int endChar = Math.min(endKb * 1024, content.length());
-            if (startChar >= content.length()) {
-                return error("start_kb=" + startKb + " 超出文件大小（文件共 "
-                        + (content.length() / 1024) + "KB）");
+            // KB range specified: read ONLY the requested byte range. This caps the
+            // single-read size at (end_kb - start_kb) KB regardless of file size, so
+            // files larger than 1MB can still be read range-by-range.
+            long startByte = Math.min((long) startKb * 1024L, fileLen);
+            long endByte = Math.min((long) endKb * 1024L, fileLen);
+            if (startByte >= fileLen) {
+                return error(context.getString(R.string.tool_file_read_start_out_of_range, startKb, fileLen / 1024));
             }
 
-            // Snap to line boundaries
-            if (startChar > 0) {
-                int lineStart = content.lastIndexOf('\n', startChar - 1);
-                startChar = lineStart >= 0 ? lineStart + 1 : 0;
+            byte[] chunk = readRange(file, startByte, endByte);
+            String content = new String(chunk, StandardCharsets.UTF_8);
+
+            // Snap to line boundaries so we never return a partial line.
+            int startChar = 0;
+            int endChar = content.length();
+            if (startByte > 0) {
+                int lineStart = content.lastIndexOf('\n', content.length() - 1);
+                if (lineStart >= 0) {
+                    startChar = lineStart + 1;
+                }
             }
-            if (endChar < content.length()) {
-                int lineEnd = content.indexOf('\n', endChar);
-                endChar = lineEnd >= 0 ? lineEnd + 1 : content.length();
+            if (endByte < fileLen) {
+                int lineEnd = content.indexOf('\n', startChar);
+                if (lineEnd >= 0) {
+                    endChar = lineEnd + 1;
+                }
             }
 
-            // Count line number at startChar
-            int startLineNumber = 1;
-            for (int i = 0; i < startChar; i++) {
-                if (content.charAt(i) == '\n') {
-                    startLineNumber++;
+            // Count the absolute line number at the (snapped) start position.
+            long startLineNumber = 1;
+            try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                long scan = Math.max(0, startByte + startChar);
+                long pos = 0;
+                while (pos < scan) {
+                    raf.seek(pos);
+                    int b = raf.read();
+                    if (b < 0) break;
+                    if (b == '\n') startLineNumber++;
+                    pos++;
                 }
             }
 
             String extracted = content.substring(startChar, endChar);
             StringBuilder result = new StringBuilder();
-            result.append(addLineNumbers(extracted, startLineNumber));
+            result.append(addLineNumbers(extracted, (int) startLineNumber));
 
             // Add range info
-            int totalLines = 1;
-            for (int i = 0; i < content.length(); i++) {
-                if (content.charAt(i) == '\n') totalLines++;
+            long totalLines = 1;
+            try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                long pos = 0;
+                while (true) {
+                    raf.seek(pos);
+                    int b = raf.read();
+                    if (b < 0) break;
+                    if (b == '\n') totalLines++;
+                    pos++;
+                }
             }
-            if (startChar > 0 || endChar < content.length()) {
-                result.append("\n\n... (共 ").append(totalLines).append(" 行，")
-                        .append("显示 KB ").append(startKb).append('-').append(endKb)
-                        .append(" / 共 ").append(content.length() / 1024).append("KB)");
-            }
+            result.append(context.getString(R.string.tool_file_read_range_info, totalLines, startKb, endKb, fileLen / 1024));
 
             return ok(ToolResult.truncateContent(result.toString()));
         } catch (Exception e) {
-            return error("读取文件失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_file_read_failed, e.getMessage()));
+        }
+    }
+
+    /** 只读取文件的 [start, end) 字节区间，避免一次性加载整个文件。 */
+    private static byte[] readRange(File file, long start, long end) throws Exception {
+        long len = end - start;
+        if (len <= 0) return new byte[0];
+        byte[] buffer = new byte[(int) Math.min(len, Integer.MAX_VALUE - 8)];
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            raf.seek(start);
+            int read;
+            int offset = 0;
+            while (offset < buffer.length && (read = raf.read(buffer, offset, buffer.length - offset)) != -1) {
+                offset += read;
+            }
+            if (offset == buffer.length) {
+                return buffer;
+            }
+            byte[] trimmed = new byte[offset];
+            System.arraycopy(buffer, 0, trimmed, 0, offset);
+            return trimmed;
         }
     }
 
@@ -163,7 +204,7 @@ public final class FileReadTool extends BaseTool {
         return sb.toString();
     }
 
-    private void appendDirectory(StringBuilder builder, File dir, String parentPath, int[] count) {
+    private void appendDirectory(StringBuilder builder, File dir, String parentPath, int[] count, ToolContext context) {
         if (count[0] >= MAX_DIRECTORY_ITEMS) {
             return;
         }
@@ -179,14 +220,14 @@ public final class FileReadTool extends BaseTool {
         });
         for (File item : items) {
             if (count[0] >= MAX_DIRECTORY_ITEMS) {
-                builder.append("... (目录项过多，已截断)\n");
+                builder.append(context.getString(R.string.tool_file_read_dir_truncated));
                 return;
             }
             String relative = parentPath.length() == 0 ? item.getName() : parentPath + "/" + item.getName();
             if (item.isDirectory()) {
                 builder.append("[DIR]  ").append(relative).append("/\n");
                 count[0]++;
-                appendDirectory(builder, item, relative, count);
+                appendDirectory(builder, item, relative, count, context);
             } else {
                 builder.append("[FILE] ").append(relative).append('\n');
                 count[0]++;

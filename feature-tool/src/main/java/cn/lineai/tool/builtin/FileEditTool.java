@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
@@ -21,7 +22,7 @@ public final class FileEditTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "编辑文件内容。通过 old_string/new_string 搜索替换修改文件。";
+        return "Edit file contents. Search and replace via old_string/new_string.";
     }
 
     @Override
@@ -44,9 +45,9 @@ public final class FileEditTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("file_path", new JSONObject().put("type", "string").put("description", "文件的绝对或相对路径"))
-                        .put("old_string", new JSONObject().put("type", "string").put("description", "要搜索的原始文本，必须唯一或明确"))
-                        .put("new_string", new JSONObject().put("type", "string").put("description", "替换后的新文本")))
+                        .put("file_path", new JSONObject().put("type", "string").put("description", "Absolute or relative file path"))
+                        .put("old_string", new JSONObject().put("type", "string").put("description", "Original text to search for; must be unique or unambiguous"))
+                        .put("new_string", new JSONObject().put("type", "string").put("description", "Replacement text")))
                 .put("required", new org.json.JSONArray().put("file_path").put("old_string").put("new_string"));
     }
 
@@ -58,18 +59,18 @@ public final class FileEditTool extends BaseTool {
             String newString = input.optString("new_string");
             ToolArgs.requireNonEmpty(path, "file_path");
             if (oldString.length() == 0) {
-                return error("old_string 不能为空");
+                return error(context.getString(R.string.tool_file_edit_old_string_empty));
             }
             File file = FileToolPathPolicy.resolve(context, path);
             if (!file.exists()) {
-                return error("文件不存在: " + FileToolPathPolicy.displayPath(context.getHomePath(), file));
+                return error(context.getString(R.string.tool_file_edit_not_found, FileToolPathPolicy.displayPath(context.getHomePath(), file)));
             }
             if (file.isDirectory()) {
-                return error("路径是一个目录，无法编辑文件: " + path + "\n如需编辑文件，请指定具体文件路径。");
+                return error(context.getString(R.string.tool_file_edit_is_directory, path));
             }
             String content = FileIo.readUtf8(file);
             if (!content.contains(oldString)) {
-                return error("未找到匹配的文本");
+                return error(context.getString(R.string.tool_file_edit_no_match));
             }
             int count = countOccurrences(content, oldString);
             String next = content.replace(oldString, newString);
@@ -79,10 +80,9 @@ public final class FileEditTool extends BaseTool {
             } finally {
                 output.close();
             }
-            return ok("成功编辑文件 " + FileToolPathPolicy.displayPath(context.getHomePath(), file)
-                    + " (" + count + " 处匹配已替换)");
+            return ok(context.getString(R.string.tool_file_edit_success, FileToolPathPolicy.displayPath(context.getHomePath(), file), count));
         } catch (Exception e) {
-            return error("编辑文件失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_file_edit_failed, e.getMessage()));
         }
     }
 

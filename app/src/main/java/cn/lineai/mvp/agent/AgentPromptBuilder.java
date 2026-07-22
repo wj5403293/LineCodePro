@@ -6,19 +6,31 @@ import cn.lineai.data.repository.ExtensionRepository;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.ModelConfig;
-import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ToolInfo;
 import cn.lineai.tool.builtin.AgentTool;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 public final class AgentPromptBuilder {
+    private static final String MODE_LOCAL = "local";
+    private static final String MODE_REMOTE = "remote";
+
+    private static final Map<String, String> ROLE_TEMPLATE_MAP = new HashMap<>();
+    static {
+        ROLE_TEMPLATE_MAP.put(AgentTool.TYPE_EXPLORE + ":" + MODE_REMOTE, PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_REMOTE);
+        ROLE_TEMPLATE_MAP.put(AgentTool.TYPE_SUB_CODING + ":" + MODE_REMOTE, PromptTemplateRepository.ID_AGENT_ROLE_CODING_REMOTE);
+        ROLE_TEMPLATE_MAP.put(AgentTool.TYPE_EXPLORE + ":" + MODE_LOCAL, PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_LOCAL);
+        ROLE_TEMPLATE_MAP.put(AgentTool.TYPE_SUB_CODING + ":" + MODE_LOCAL, PromptTemplateRepository.ID_AGENT_ROLE_CODING_LOCAL);
+    }
+
     private final ExtensionRepository extensionRepository;
     private final ToolSettingsStore toolSettingsRepository;
     private final PromptTemplateRepository promptTemplateRepository;
     private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
+    private android.content.Context context;
 
     public AgentPromptBuilder(
             ExtensionRepository extensionRepository,
@@ -28,6 +40,18 @@ public final class AgentPromptBuilder {
         this.extensionRepository = extensionRepository;
         this.toolSettingsRepository = toolSettingsRepository;
         this.promptTemplateRepository = promptTemplateRepository;
+    }
+
+    public void setContext(android.content.Context context) {
+        this.context = context;
+    }
+
+    private String string(int resId, String fallback) {
+        return context != null ? context.getString(resId) : fallback;
+    }
+
+    public static void registerRoleTemplate(String type, String mode, String templateId) {
+        ROLE_TEMPLATE_MAP.put(type + ":" + mode, templateId);
     }
 
     public String agentSystemPrompt(
@@ -57,17 +81,12 @@ public final class AgentPromptBuilder {
     }
 
     public String agentRolePrompt(String type, boolean remoteMode) {
-        String templateId;
-        if (remoteMode) {
-            templateId = AgentTool.TYPE_EXPLORE.equals(type)
-                    ? PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_REMOTE
-                    : PromptTemplateRepository.ID_AGENT_ROLE_CODING_REMOTE;
-        } else {
-            templateId = AgentTool.TYPE_EXPLORE.equals(type)
-                    ? PromptTemplateRepository.ID_AGENT_ROLE_EXPLORE_LOCAL
-                    : PromptTemplateRepository.ID_AGENT_ROLE_CODING_LOCAL;
+        String mode = remoteMode ? MODE_REMOTE : MODE_LOCAL;
+        String templateId = ROLE_TEMPLATE_MAP.get(type + ":" + mode);
+        if (templateId == null) {
+            templateId = ROLE_TEMPLATE_MAP.get(AgentTool.TYPE_SUB_CODING + ":" + mode);
         }
-        if (promptTemplateRepository != null) {
+        if (promptTemplateRepository != null && templateId != null) {
             return promptTemplateRepository.getTemplateText(templateId);
         }
         return fallbackRolePrompt(type, remoteMode);
@@ -166,15 +185,19 @@ public final class AgentPromptBuilder {
         return dependencies;
     }
 
-    private static String fallbackRolePrompt(String type, boolean remoteMode) {
+    private String fallbackRolePrompt(String type, boolean remoteMode) {
         if (remoteMode) {
             return AgentTool.TYPE_EXPLORE.equals(type)
-                    ? "你是一个远程 Shell 环境下的探索 Agent。可以使用 shell_execute 执行只读命令。\n规则：\n- 只读取代码，不做任何修改。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。"
-                    : "你是一个远程 Shell 环境下的编程 Agent（当前工作区位于 SSH 远端或终端提供者容器内，本地 file_read / file_write / file_edit / glob / list_dir 不一定可用）。\n规则：\n- 必须通过 shell_execute 完成绝大多数工作：先 cat/ls/grep 读取，写入用 sed/awk/python heredoc 或 tee，确认 cat 验证。\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。";
+                    ? string(cn.lineai.R.string.agent_fallback_role_explore_remote,
+                    "You are an exploration Agent in a remote Shell environment. You can use shell_execute to execute read-only commands.\nRules:\n- Only read code, do not make any modifications.\n- Prefer read-only tools to search and read key files; you can use shell_execute to execute read-only commands.")
+                    : string(cn.lineai.R.string.agent_fallback_role_coding_remote,
+                    "You are a coding Agent in a remote Shell environment (the current workspace is on an SSH remote or terminal provider container; local file_read / file_write / file_edit / glob / list_dir may not be available).\nRules:\n- Most work must be done via shell_execute: read with cat/ls/grep, write with sed/awk/python heredoc or tee, verify with cat.\n- Only modify files or directories listed in write_scope; when there is no write_scope, writing to files is prohibited.");
         } else {
             return AgentTool.TYPE_EXPLORE.equals(type)
-                    ? "你是一个代码探索 Agent。你的任务是快速定位和分析代码。\n规则：\n- 只读取代码，不做任何修改，不调用任何写入类工具。\n- 优先使用只读工具搜索和读取关键文件；可以使用 shell_execute 执行只读命令。\n- 给出简洁准确的中文回答。"
-                    : "你是一个编程 Agent。你的任务是完成边界清晰的编程子任务。\n规则：\n- 只能修改 write_scope 中列出的文件或目录；没有 write_scope 时禁止写入文件。\n- 优先使用 file_read / file_write / file_edit / glob / list_dir 完成工作；只有 file 类工具确实无法满足时才使用 shell_execute。";
+                    ? string(cn.lineai.R.string.agent_fallback_role_explore_local,
+                    "You are a code exploration Agent. Your task is to quickly locate and analyze code.\nRules:\n- Only read code, do not make any modifications, and do not call any write tools.\n- Prefer read-only tools to search and read key files; you can use shell_execute to execute read-only commands.\n- Provide concise and accurate answers.")
+                    : string(cn.lineai.R.string.agent_fallback_role_coding_local,
+                    "You are a coding Agent. Your task is to complete well-scoped coding subtasks.\nRules:\n- Only modify files or directories listed in write_scope; when there is no write_scope, writing to files is prohibited.\n- Prefer file_read / file_write / file_edit / glob / list_dir to complete work; only use shell_execute when file tools truly cannot meet the need.");
         }
     }
 

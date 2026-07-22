@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.OutputSettings;
 
 public final class OutputSettingsRepository {
@@ -12,8 +11,8 @@ public final class OutputSettingsRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public OutputSettingsRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public OutputSettingsRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized OutputSettings get() {

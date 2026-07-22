@@ -1,5 +1,7 @@
 package cn.lineai.mvp.agent;
 
+import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionException;
 import cn.lineai.ai.ModelCompletionResponse;
@@ -41,6 +43,12 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.json.JSONObject;
 
 public final class AgentExecutionController {
@@ -58,8 +66,14 @@ public final class AgentExecutionController {
     private final ModelProtocolFactory modelProtocolFactory = new ModelProtocolFactory();
     private final AgentPromptBuilder promptBuilder;
     private final PipelineDependencyResolver dependencyResolver;
+    private final AgentResultRegistry agentResultRegistry = new AgentResultRegistry();
+    private Context context;
     private ToolReviewAwaiter toolReviewAwaiter;
     private java.util.function.BooleanSupplier bypassPathProtectionSupplier = () -> false;
+
+    public AgentResultRegistry getAgentResultRegistry() {
+        return agentResultRegistry;
+    }
 
     public interface Host {
         String projectPath();
@@ -79,6 +93,12 @@ public final class AgentExecutionController {
         void requestAgentToolReview(String displayToolCallId, ToolCall call, ToolResult pendingToolResult);
 
         void clearAgentToolReview(String displayToolCallId);
+
+        default void runInBackground(String name, Runnable runnable) {
+            if (runnable != null) {
+                runnable.run();
+            }
+        }
 
         default boolean isSshExecutionMode() {
             return false;
@@ -121,6 +141,15 @@ public final class AgentExecutionController {
         this.toolReviewAwaiter = toolReviewAwaiter;
     }
 
+    public void setContext(Context context) {
+        this.context = context;
+        this.promptBuilder.setContext(context);
+    }
+
+    private String string(int resId, String fallback) {
+        return context != null ? context.getString(resId) : fallback;
+    }
+
     public void setBypassPathProtectionSupplier(java.util.function.BooleanSupplier supplier) {
         this.bypassPathProtectionSupplier = supplier != null ? supplier : () -> false;
     }
@@ -143,27 +172,67 @@ public final class AgentExecutionController {
             int usedToolCallCount
     ) {
         if (selectedModel == null) {
-            return new ToolResult("", AgentTool.NAME, "当前没有可用模型，无法运行 Agent。", true);
+            return ToolResult.withReview("", AgentTool.NAME, "当前没有可用模型，无法运行 Agent。", true, "", "", "");
         }
         if (cancellationToken != null && cancellationToken.isCancelled()) {
-            return new ToolResult("", AgentTool.NAME, AGENT_TERMINATED_MESSAGE, true);
+            return ToolResult.withReview("", AgentTool.NAME, AGENT_TERMINATED_MESSAGE, true, "", "", "");
         }
         String type = AgentTool.normalizeType(input.optString("type"));
         String description = input.optString("description").trim();
         String prompt = input.optString("prompt").trim();
+        boolean asyncRequested = input != null && input.optBoolean("async", false);
+        if (asyncRequested && AgentTool.TYPE_SUB_CODING.equals(type)) {
+            return ToolResult.withReview(
+                    parentContext == null ? "" : parentContext.getToolCallId(),
+                    AgentTool.NAME,
+                    "async=true is not allowed for sub-coding agents.",
+                    true, "", "error", "");
+        }
         ArrayList<String> readScope = promptBuilder.scopeList(input.optJSONArray("read_scope"));
         ArrayList<String> writeScope = promptBuilder.scopeList(input.optJSONArray("write_scope"));
         Set<String> customToolNames = promptBuilder.scopeSet(input.optJSONArray("custom_tool_names"));
         Set<String> customMcpIds = promptBuilder.scopeSet(input.optJSONArray("custom_mcp_ids"));
         String homePath = parentContext == null ? host.projectPath() : parentContext.getHomePath();
+        String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
+        String agentId = agentResultRegistry.allocateId();
+        AgentResultRecord runningRecord = AgentResultRecord.running(
+                agentId, toolCallId, AgentTool.NAME, type, description, asyncRequested, generationId);
+        agentResultRegistry.put(runningRecord);
         AgentProgressSession progress = new AgentProgressSession(
                 generationId,
-                parentContext == null ? "" : parentContext.getToolCallId(),
+                toolCallId,
                 AgentTool.NAME,
                 type,
                 description
         );
-        int[] toolCallBudget = new int[]{Math.max(0, usedToolCallCount)};
+        AtomicInteger toolCallBudget = new AtomicInteger(Math.max(0, usedToolCallCount));
+        if (asyncRequested) {
+            String compactRunning = AgentResultRegistry.toCompactJson(runningRecord);
+            ToolResult runningResult = ToolResult.withReview(
+                    toolCallId, AgentTool.NAME, compactRunning, false, "", "running", "");
+            host.addOrReplaceToolResult(runningResult);
+            host.render();
+            host.runInBackground("linecode-agent-" + agentId, () -> {
+                AgentRunResult asyncResult = runAgentLoop(
+                        type,
+                        description,
+                        prompt,
+                        readScope,
+                        writeScope,
+                        homePath,
+                        selectedModel,
+                        cancellationToken,
+                        progress,
+                        host,
+                        customToolNames,
+                        customMcpIds,
+                        toolCallBudget
+                );
+                finishAgentWithCompact(
+                        agentId, toolCallId, AgentTool.NAME, progress, asyncResult, host);
+            });
+            return runningResult;
+        }
         AgentRunResult result = runAgentLoop(
                 type,
                 description,
@@ -179,16 +248,47 @@ public final class AgentExecutionController {
                 customMcpIds,
                 toolCallBudget
         );
-        StringBuilder builder = new StringBuilder();
-        builder.append("Agent 完成: ").append(description).append('\n')
-                .append("类型: ").append(type).append('\n')
-                .append("工具调用: ").append(result.getToolCallCount()).append('\n')
-                .append("输出:\n").append(result.getOutput());
-        progress.setTurnResult(result.getOutput(), "");
-        progress.setFinished(result.isError() ? "error" : "done", result.isError(), builder.toString().trim());
-        host.addOrReplaceToolResult(progress.snapshotResult());
+        return finishAgentWithCompact(agentId, toolCallId, AgentTool.NAME, progress, result, host);
+    }
+
+    private ToolResult finishAgentWithCompact(
+            String agentId,
+            String toolCallId,
+            String toolName,
+            AgentProgressSession progress,
+            AgentRunResult result,
+            Host host
+    ) {
+        String fullOutput = result.getOutput() == null ? "" : result.getOutput();
+        String progressJson = "";
+        try {
+            if (progress != null) {
+                progressJson = progress.snapshotResult().getContent();
+            }
+        } catch (Exception ignored) {
+        }
+        agentResultRegistry.setFullOutput(
+                agentId,
+                fullOutput,
+                "",
+                progressJson,
+                result.getToolCallCount(),
+                result.isError()
+        );
+        AgentResultRecord finished = agentResultRegistry.getRecord(agentId);
+        String compact = AgentResultRegistry.toCompactJson(finished);
+        ToolResult compactResult = ToolResult.withReview(
+                toolCallId,
+                toolName,
+                compact,
+                result.isError(),
+                "",
+                result.isError() ? "error" : "done",
+                ""
+        );
+        host.addOrReplaceToolResult(compactResult);
         host.render();
-        return new ToolResult("", AgentTool.NAME, progress.snapshotResult().getContent(), result.isError());
+        return compactResult;
     }
 
     public ToolResult runAgentPipelineTool(
@@ -201,27 +301,27 @@ public final class AgentExecutionController {
             int usedToolCallCount
     ) {
         if (selectedModel == null) {
-            return new ToolResult("", AgentPipelineTool.NAME, "当前没有可用模型，无法运行 Agent 流水线。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "当前没有可用模型，无法运行 Agent 流水线。", true, "", "", "");
         }
         if (cancellationToken != null && cancellationToken.isCancelled()) {
-            return new ToolResult("", AgentPipelineTool.NAME, AGENT_TERMINATED_MESSAGE, true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, AGENT_TERMINATED_MESSAGE, true, "", "", "");
         }
         ArrayList<PipelineAgent> agents = dependencyResolver.parsePipelineAgents(input.optJSONArray("agents"));
         if (agents.isEmpty()) {
-            return new ToolResult("", AgentPipelineTool.NAME, "agent_pipeline.agents 不能为空。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "agent_pipeline.agents 不能为空。", true, "", "", "");
         }
         String dependencyError = dependencyResolver.validatePipelineDependencies(agents);
         if (dependencyError.length() > 0) {
-            return new ToolResult("", AgentPipelineTool.NAME, dependencyError, true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, dependencyError, true, "", "", "");
         }
         ArrayList<ArrayList<PipelineAgent>> levels = dependencyResolver.dependencyLevels(agents);
         if (levels.isEmpty()) {
-            return new ToolResult("", AgentPipelineTool.NAME, "Agent 流水线存在循环依赖或重复 id，无法执行。", true);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, "Agent 流水线存在循环依赖或重复 id，无法执行。", true, "", "", "");
         }
 
         LinkedHashMap<String, AgentRunResult> results = new LinkedHashMap<>();
         StringBuilder summary = new StringBuilder();
-        summary.append("Agent 流水线完成: ").append(agents.size()).append(" 个任务");
+        summary.append(string(R.string.agent_pipeline_completed, "Agent pipeline completed: ")).append(agents.size()).append(" 个任务");
         PipelineProgressSession pipelineProgress = new PipelineProgressSession(
                 parentContext,
                 agents,
@@ -237,7 +337,7 @@ public final class AgentExecutionController {
                         }
                     } catch (Exception ignored) {
                     }
-                    host.addOrReplaceToolResult(new ToolResult(id, name, payload, nextError, "", reviewState, ""));
+                    host.addOrReplaceToolResult(ToolResult.withReview(id, name, payload, nextError, "", reviewState, ""));
                     host.render();
                 }
         );
@@ -246,73 +346,30 @@ public final class AgentExecutionController {
         int totalToolCalls = 0;
         long pipelineStartedAt = System.currentTimeMillis();
         long pipelineBudgetMs = (long) agents.size() * AGENT_TOTAL_BUDGET_MS;
-        int[] toolCallBudget = new int[]{Math.max(0, usedToolCallCount)};
+        AtomicInteger toolCallBudget = new AtomicInteger(Math.max(0, usedToolCallCount));
+        String homePath = parentContext == null ? host.projectPath() : parentContext.getHomePath();
         for (ArrayList<PipelineAgent> level : levels) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
-                pipelineProgress.terminate();
-                pipelineProgress.setFinalSummary("Agent 流水线已终止。");
-                pipelineProgress.setStatus("error", true);
-                pipelineProgress.publish(true);
-                ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, "Agent 流水线已终止。", true);
-                host.addOrReplaceToolResult(finalProgress);
-                return finalProgress;
+                return terminatePipeline(parentContext, host, pipelineProgress, "Agent 流水线已终止。");
             }
             if (System.currentTimeMillis() - pipelineStartedAt > pipelineBudgetMs) {
                 String message = "Agent 流水线达到总时长预算 " + (pipelineBudgetMs / 60000L) + " 分钟，已强制结束。";
-                pipelineProgress.terminate();
-                pipelineProgress.setFinalSummary(message);
-                pipelineProgress.setStatus("error", true);
-                pipelineProgress.publish(true);
-                ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, message, true);
-                host.addOrReplaceToolResult(finalProgress);
-                return finalProgress;
+                return terminatePipeline(parentContext, host, pipelineProgress, message);
             }
-            for (PipelineAgent agent : level) {
-                if (cancellationToken != null && cancellationToken.isCancelled()) {
-                    pipelineProgress.terminate();
-                    pipelineProgress.setFinalSummary("Agent 流水线已终止。");
-                    pipelineProgress.setStatus("error", true);
-                    pipelineProgress.publish(true);
-                    ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, "Agent 流水线已终止。", true);
-                    host.addOrReplaceToolResult(finalProgress);
-                    return finalProgress;
-                }
-                if (System.currentTimeMillis() - pipelineStartedAt > pipelineBudgetMs) {
-                    String message = "Agent 流水线达到总时长预算 " + (pipelineBudgetMs / 60000L) + " 分钟，已强制结束。";
-                    pipelineProgress.terminate();
-                    pipelineProgress.setFinalSummary(message);
-                    pipelineProgress.setStatus("error", true);
-                    pipelineProgress.publish(true);
-                    ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, message, true);
-                    host.addOrReplaceToolResult(finalProgress);
-                    return finalProgress;
-                }
-                String agentPrompt = agent.getPrompt() + dependencyResolver.dependencyOutputContext(agent, results);
-                pipelineProgress.beginAgent(agent);
-                AgentProgressSession agentProgress = new AgentProgressSession(
-                        generationId,
-                        "",
-                        AgentTool.NAME,
-                        agent.getType(),
-                        agent.getDescription(),
-                        (payload, progressError) -> pipelineProgress.updateAgent(agent, payload, progressError)
-                );
-                AgentRunResult result = runAgentLoop(
-                        agent.getType(),
-                        agent.getDescription(),
-                        agentPrompt,
-                        agent.getReadScope(),
-                        agent.getWriteScope(),
-                        parentContext == null ? host.projectPath() : parentContext.getHomePath(),
-                        selectedModel,
-                        cancellationToken,
-                        agentProgress,
-                        host,
-                        Collections.emptySet(),
-                        Collections.emptySet(),
-                        toolCallBudget
-                );
-                pipelineProgress.finishAgent(agent, result);
+            ArrayList<LevelAgentOutcome> levelOutcomes = runPipelineLevelParallel(
+                    level,
+                    results,
+                    homePath,
+                    selectedModel,
+                    cancellationToken,
+                    generationId,
+                    host,
+                    pipelineProgress,
+                    toolCallBudget
+            );
+            for (LevelAgentOutcome outcome : levelOutcomes) {
+                PipelineAgent agent = outcome.agent;
+                AgentRunResult result = outcome.result;
                 results.put(agent.getId(), result);
                 totalToolCalls += result.getToolCallCount();
                 hasError = hasError || result.isError();
@@ -336,10 +393,204 @@ public final class AgentExecutionController {
         String finalSummaryText = summary.toString().trim();
         pipelineProgress.setFinalSummary(finalSummaryText);
         pipelineProgress.setStatus(hasError ? "error" : "done", hasError);
-        pipelineProgress.publish(hasError);
-        ToolResult finalProgress = pipelineProgressFinalToolResult(parentContext, pipelineProgress, finalSummaryText, hasError);
+        String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
+        String agentId = agentResultRegistry.allocateId();
+        agentResultRegistry.put(AgentResultRecord.running(
+                agentId, toolCallId, AgentPipelineTool.NAME, "pipeline",
+                agents.size() + " agents", false, generationId));
+        agentResultRegistry.setFullOutput(
+                agentId, finalSummaryText, "", pipelineProgress.payload(), totalToolCalls, hasError);
+        AgentResultRecord finished = agentResultRegistry.getRecord(agentId);
+        String compact = AgentResultRegistry.toCompactJson(finished);
+        ToolResult finalProgress = ToolResult.withReview(
+                toolCallId,
+                AgentPipelineTool.NAME,
+                compact,
+                hasError,
+                "",
+                hasError ? "error" : "done",
+                ""
+        );
         host.addOrReplaceToolResult(finalProgress);
         return finalProgress;
+    }
+
+    private ToolResult terminatePipeline(
+            ToolContext parentContext,
+            Host host,
+            PipelineProgressSession pipelineProgress,
+            String message
+    ) {
+        pipelineProgress.terminate();
+        pipelineProgress.setFinalSummary(message);
+        pipelineProgress.setStatus("error", true);
+        String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
+        String agentId = agentResultRegistry.allocateId();
+        agentResultRegistry.put(AgentResultRecord.running(
+                agentId, toolCallId, AgentPipelineTool.NAME, "pipeline", "pipeline", false, 0));
+        agentResultRegistry.setFullOutput(agentId, message, "", "", 0, true);
+        String compact = AgentResultRegistry.toCompactJson(agentResultRegistry.getRecord(agentId));
+        ToolResult finalProgress = ToolResult.withReview(
+                toolCallId, AgentPipelineTool.NAME, compact, true, "", "error", "");
+        host.addOrReplaceToolResult(finalProgress);
+        return finalProgress;
+    }
+
+    private ArrayList<LevelAgentOutcome> runPipelineLevelParallel(
+            ArrayList<PipelineAgent> level,
+            LinkedHashMap<String, AgentRunResult> completedResults,
+            String homePath,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            int generationId,
+            Host host,
+            PipelineProgressSession pipelineProgress,
+            AtomicInteger toolCallBudget
+    ) {
+        ArrayList<LevelAgentOutcome> outcomes = new ArrayList<>(level.size());
+        if (level.isEmpty()) {
+            return outcomes;
+        }
+        if (level.size() == 1) {
+            PipelineAgent agent = level.get(0);
+            outcomes.add(new LevelAgentOutcome(agent, runOnePipelineAgent(
+                    agent,
+                    completedResults,
+                    homePath,
+                    selectedModel,
+                    cancellationToken,
+                    generationId,
+                    host,
+                    pipelineProgress,
+                    toolCallBudget
+            )));
+            return outcomes;
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(level.size(), runnable -> {
+            Thread thread = new Thread(runnable, "linecode-agent-pipeline");
+            thread.setDaemon(true);
+            return thread;
+        });
+        ArrayList<Future<LevelAgentOutcome>> futures = new ArrayList<>(level.size());
+        try {
+            for (PipelineAgent agent : level) {
+                futures.add(executor.submit(() -> new LevelAgentOutcome(
+                        agent,
+                        runOnePipelineAgent(
+                                agent,
+                                completedResults,
+                                homePath,
+                                selectedModel,
+                                cancellationToken,
+                                generationId,
+                                host,
+                                pipelineProgress,
+                                toolCallBudget
+                        )
+                )));
+            }
+            for (int i = 0; i < futures.size(); i++) {
+                Future<LevelAgentOutcome> future = futures.get(i);
+                PipelineAgent agent = level.get(i);
+                try {
+                    outcomes.add(future.get());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    if (cancellationToken != null) {
+                        cancellationToken.cancel();
+                    }
+                    cancelRemainingFutures(futures);
+                    AgentRunResult interrupted = new AgentRunResult(AGENT_TERMINATED_MESSAGE, 0, true);
+                    pipelineProgress.finishAgent(agent, interrupted);
+                    outcomes.add(new LevelAgentOutcome(agent, interrupted));
+                    for (int j = i + 1; j < level.size(); j++) {
+                        PipelineAgent remaining = level.get(j);
+                        AgentRunResult cancelled = new AgentRunResult(AGENT_TERMINATED_MESSAGE, 0, true);
+                        pipelineProgress.finishAgent(remaining, cancelled);
+                        outcomes.add(new LevelAgentOutcome(remaining, cancelled));
+                    }
+                    break;
+                } catch (ExecutionException e) {
+                    Throwable cause = e.getCause() == null ? e : e.getCause();
+                    String message = "Agent 执行失败：\n" + (cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage());
+                    AgentRunResult failed = new AgentRunResult(message, 0, true);
+                    pipelineProgress.finishAgent(agent, failed);
+                    outcomes.add(new LevelAgentOutcome(agent, failed));
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+            try {
+                executor.awaitTermination(5L, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return outcomes;
+    }
+
+    private AgentRunResult runOnePipelineAgent(
+            PipelineAgent agent,
+            LinkedHashMap<String, AgentRunResult> completedResults,
+            String homePath,
+            ModelConfig selectedModel,
+            ModelCancellationToken cancellationToken,
+            int generationId,
+            Host host,
+            PipelineProgressSession pipelineProgress,
+            AtomicInteger toolCallBudget
+    ) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            AgentRunResult terminated = new AgentRunResult(AGENT_TERMINATED_MESSAGE, 0, true);
+            pipelineProgress.finishAgent(agent, terminated);
+            return terminated;
+        }
+        String agentPrompt = agent.getPrompt() + dependencyResolver.dependencyOutputContext(agent, completedResults);
+        pipelineProgress.beginAgent(agent);
+        AgentProgressSession agentProgress = new AgentProgressSession(
+                generationId,
+                "",
+                AgentTool.NAME,
+                agent.getType(),
+                agent.getDescription(),
+                (payload, progressError) -> pipelineProgress.updateAgent(agent, payload, progressError)
+        );
+        AgentRunResult result = runAgentLoop(
+                agent.getType(),
+                agent.getDescription(),
+                agentPrompt,
+                agent.getReadScope(),
+                agent.getWriteScope(),
+                homePath,
+                selectedModel,
+                cancellationToken,
+                agentProgress,
+                host,
+                Collections.emptySet(),
+                Collections.emptySet(),
+                toolCallBudget
+        );
+        pipelineProgress.finishAgent(agent, result);
+        return result;
+    }
+
+    private static void cancelRemainingFutures(ArrayList<Future<LevelAgentOutcome>> futures) {
+        for (Future<LevelAgentOutcome> future : futures) {
+            if (future != null && !future.isDone()) {
+                future.cancel(true);
+            }
+        }
+    }
+
+    private static final class LevelAgentOutcome {
+        final PipelineAgent agent;
+        final AgentRunResult result;
+
+        LevelAgentOutcome(PipelineAgent agent, AgentRunResult result) {
+            this.agent = agent;
+            this.result = result;
+        }
     }
 
     private ToolResult pipelineProgressFinalToolResult(
@@ -350,9 +601,9 @@ public final class AgentExecutionController {
     ) {
         String toolCallId = parentContext == null ? "" : parentContext.getToolCallId();
         if (toolCallId.length() == 0) {
-            return new ToolResult("", AgentPipelineTool.NAME, summary, error);
+            return ToolResult.withReview("", AgentPipelineTool.NAME, summary, error, "", "", "");
         }
-        return new ToolResult(
+        return ToolResult.withReview(
                 toolCallId,
                 AgentPipelineTool.NAME,
                 pipelineProgress.payload(),
@@ -376,7 +627,7 @@ public final class AgentExecutionController {
             Host host,
             Set<String> customToolNames,
             Set<String> customMcpIds,
-            int[] toolCallBudget
+            AtomicInteger toolCallBudget
     ) {
         host.syncModePermission();
         ArrayList<BaseTool> agentTools = agentTools(type, host, customToolNames, customMcpIds);
@@ -389,6 +640,7 @@ public final class AgentExecutionController {
         String lastOutput = "";
         long startedAt = System.currentTimeMillis();
         int toolCallLimit = selectedModel == null ? -1 : selectedModel.getToolCallLimit();
+        AtomicInteger budget = toolCallBudget == null ? new AtomicInteger(0) : toolCallBudget;
 
         while (true) {
             if (cancellationToken != null && cancellationToken.isCancelled()) {
@@ -399,7 +651,7 @@ public final class AgentExecutionController {
                 }
                 return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
             }
-            if (toolCallLimit > 0 && toolCallBudget[0] >= toolCallLimit) {
+            if (toolCallLimit > 0 && budget.get() >= toolCallLimit) {
                 String message = AGENT_TOOL_LIMIT_MESSAGE + "\n" + lastOutput;
                 if (progress != null) {
                     progress.setFinished("error", true, message);
@@ -480,7 +732,7 @@ public final class AgentExecutionController {
                         }
                         return new AgentRunResult(AGENT_TERMINATED_MESSAGE, toolCallCount, true);
                     }
-                    if (toolCallLimit > 0 && toolCallBudget[0] >= toolCallLimit) {
+                    if (toolCallLimit > 0 && budget.get() >= toolCallLimit) {
                         String message = AGENT_TOOL_LIMIT_MESSAGE + "\n" + lastOutput;
                         if (progress != null) {
                             progress.setFinished("error", true, message);
@@ -491,7 +743,7 @@ public final class AgentExecutionController {
                     }
                     ToolResult toolResult = executeAgentToolCall(call, allowedToolNames, type, writeScope, homePath, progress, host, cancellationToken);
                     toolCallCount++;
-                    toolCallBudget[0]++;
+                    budget.incrementAndGet();
                     if (progress != null) {
                         progress.putToolResult(call, toolResult);
                         host.addOrReplaceToolResult(progress.snapshotResult());
@@ -538,7 +790,7 @@ public final class AgentExecutionController {
 
     public boolean isAgentToolAllowed(BaseTool tool, String type, Set<String> customToolNames, Set<String> allowedMcpToolNames) {
         String name = tool.getName();
-        if (AgentTool.NAME.equals(name) || AgentPipelineTool.NAME.equals(name)) {
+        if (getAgentExcludedToolNames().contains(name)) {
             return false;
         }
         if (!allowedMcpToolNames.isEmpty() && allowedMcpToolNames.contains(name)) {
@@ -554,14 +806,42 @@ public final class AgentExecutionController {
                 && tool.getDisplayCategory() == ToolDisplayCategory.DELETE) {
             return false;
         }
-        if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            return tool.getCategory() == ToolCategory.READ;
+        Set<ToolCategory> allowed = getAgentAllowedCategories(type);
+        boolean isRestrictedToRead = allowed.size() == 1 && allowed.contains(ToolCategory.READ);
+        if (isRestrictedToRead) {
+            return allowed.contains(tool.getCategory());
         }
         if (tool.isAllowedInReadonlyMode()) {
             return true;
         }
-        return tool.getCategory() == ToolCategory.READ
-                || tool.getCategory() == ToolCategory.WRITE;
+        return allowed.contains(tool.getCategory());
+    }
+
+    private Set<String> getAgentExcludedToolNames() {
+        if (toolSettingsRepository != null) {
+            return toolSettingsRepository.getAgentExcludedToolNames();
+        }
+        Set<String> names = new HashSet<>();
+        names.add(AgentTool.NAME);
+        names.add(AgentPipelineTool.NAME);
+        return names;
+    }
+
+    private Set<ToolCategory> getAgentAllowedCategories(String type) {
+        if (toolSettingsRepository != null) {
+            return toolSettingsRepository.getAgentAllowedCategories(type);
+        }
+        return defaultAgentAllowedCategories(type);
+    }
+
+    private static Set<ToolCategory> defaultAgentAllowedCategories(String type) {
+        if (AgentTool.TYPE_EXPLORE.equals(type)) {
+            return Collections.singleton(ToolCategory.READ);
+        }
+        Set<ToolCategory> categories = new HashSet<>();
+        categories.add(ToolCategory.READ);
+        categories.add(ToolCategory.WRITE);
+        return categories;
     }
 
     private boolean isRemoteExecutionMode() {
@@ -609,10 +889,10 @@ public final class AgentExecutionController {
     ) {
         host.syncModePermission();
         if (call == null) {
-            return new ToolResult("", "", "Agent 工具调用为空", true);
+            return ToolResult.error("Agent 工具调用为空");
         }
         if (!allowedToolNames.contains(call.getName())) {
-            return new ToolResult(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
+            return ToolResult.of(call.getId(), call.getName(), "Agent 不允许调用此工具: " + call.getName(), true);
         }
         ToolContext context = ToolContext.builder()
                 .homePath(homePath)
@@ -652,7 +932,7 @@ public final class AgentExecutionController {
             return toolExecutor.execute(call, context);
         }
         String displayToolCallId = progress.displayToolCallId(call);
-        ToolResult pending = new ToolResult(call.getId(), call.getName(), "", false, "", "pending", "");
+        ToolResult pending = ToolResult.withReview(call.getId(), call.getName(), "", false, "", "pending", "");
         progress.putToolResult(call, pending);
         progress.setFinished("pending", false, "");
         host.addOrReplaceToolResult(progress.snapshotResult());
@@ -662,17 +942,17 @@ public final class AgentExecutionController {
             String state = toolReviewAwaiter.awaitReview(displayToolCallId, call, cancellationToken);
             progress.setStatus("running", false);
             if ("rejected".equals(state)) {
-                ToolResult rejected = new ToolResult(call.getId(), call.getName(), "用户拒绝执行此工具。", true, "", "rejected", "");
+                ToolResult rejected = ToolResult.withReview(call.getId(), call.getName(), string(R.string.user_rejected_tool, "User rejected this tool."), true, "", "rejected", "");
                 progress.putToolResult(call, rejected);
                 host.addOrReplaceToolResult(progress.snapshotResult());
                 return rejected;
             }
-            progress.putToolResult(call, new ToolResult(call.getId(), call.getName(), "", false, "", "accepted", ""));
+            progress.putToolResult(call, ToolResult.withReview(call.getId(), call.getName(), "", false, "", "accepted", ""));
             host.addOrReplaceToolResult(progress.snapshotResult());
             return toolExecutor.executeConfirmed(call, context).withReview("accepted", "");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new ToolResult(call.getId(), call.getName(), "等待工具确认时被中断。", true);
+            return ToolResult.of(call.getId(), call.getName(), "等待工具确认时被中断。", true);
         } finally {
             host.clearAgentToolReview(displayToolCallId);
         }
@@ -716,13 +996,13 @@ public final class AgentExecutionController {
             return null;
         }
         if (AgentTool.TYPE_EXPLORE.equals(type)) {
-            return new ToolResult(call.getId(), call.getName(), "explore Agent 不允许写入文件。", true);
+            return ToolResult.of(call.getId(), call.getName(), "explore Agent 不允许写入文件。", true);
         }
         if (context != null && context.isBypassPathProtection()) {
             return null;
         }
         if (writeScope == null || writeScope.isEmpty()) {
-            return new ToolResult(call.getId(), call.getName(),
+            return ToolResult.of(call.getId(), call.getName(),
                     "Agent 未声明 write_scope，禁止写入文件。请让主模型重新分配明确的写入范围。", true);
         }
         try {
@@ -743,12 +1023,12 @@ public final class AgentExecutionController {
                     return null;
                 }
             }
-            return new ToolResult(call.getId(), call.getName(),
+            return ToolResult.of(call.getId(), call.getName(),
                     "Agent 写入路径超出 write_scope: " + filePath
                             + "\n允许写入范围: " + promptBuilder.scopeSummary(writeScope)
                             + "\n请停止写入并让主模型重新分配。", true);
         } catch (Exception e) {
-            return new ToolResult(call.getId(), call.getName(), "Agent 写入范围检查失败: " + e.getMessage(), true);
+            return ToolResult.of(call.getId(), call.getName(), "Agent 写入范围检查失败: " + e.getMessage(), true);
         }
     }
 

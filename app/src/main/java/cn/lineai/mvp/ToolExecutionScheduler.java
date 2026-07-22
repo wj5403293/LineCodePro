@@ -69,7 +69,7 @@ final class ToolExecutionScheduler {
                     resultById.put(call.getId(), result);
                 } catch (Exception e) {
                     restoreInterrupt(e);
-                    resultById.put(call.getId(), new ToolResult(call.getId(), call.getName(), "执行失败: " + describeException(e), true));
+                    resultById.put(call.getId(), ToolResult.of(call.getId(), call.getName(), "执行失败: " + describeException(e), true));
                 }
             }
         }

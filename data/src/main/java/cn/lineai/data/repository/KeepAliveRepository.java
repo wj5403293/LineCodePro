@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 
 public final class KeepAliveRepository {
@@ -11,8 +10,8 @@ public final class KeepAliveRepository {
 
     private final SharedPreferences prefs;
 
-    public KeepAliveRepository(Context context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    public KeepAliveRepository(SharedPreferences prefs) {
+        this.prefs = prefs;
     }
 
     public boolean isWakeLockEnabled() {

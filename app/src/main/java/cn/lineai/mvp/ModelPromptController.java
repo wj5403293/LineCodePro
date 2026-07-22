@@ -12,7 +12,7 @@ import cn.lineai.context.ContextManager;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ExtensionStore;
-import cn.lineai.data.repository.LearningContextStore;
+import cn.lineai.service.LearningContextService;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ToolSettingsStore;
 import cn.lineai.model.AiBehaviorSettings;
@@ -47,6 +47,26 @@ final class ModelPromptController {
         default String interruptedGenerationMessage() {
             return "上次生成已中断。";
         }
+
+        default String attachmentFilesHeader() {
+            return "## 附加文件位置";
+        }
+
+        default String attachmentFilesDescription() {
+            return "这些路径来自用户在输入框左侧选择的文件；除非用户明确要求，不要在回复中原样复述。";
+        }
+
+        default String toolsUnavailablePrompt() {
+            return "## 可用工具\n当前没有可用工具。";
+        }
+
+        default String userMessageLabel() {
+            return "用户消息 ";
+        }
+
+        default String attachedFilesLabel() {
+            return "已附加文件";
+        }
     }
 
     private final ArrayList<ChatMessage> messages;
@@ -54,7 +74,7 @@ final class ModelPromptController {
     private final AiBehaviorSettingsRepository aiBehaviorSettingsRepository;
     private final ChatModeRepository chatModeRepository;
     private final PromptTemplateRepository promptTemplateRepository;
-    private final LearningContextStore learningContextRepository;
+    private final LearningContextService learningContextService;
     private final ContextManager contextManager;
     private final ModelStore modelRepository;
     private final ExtensionStore extensionRepository;
@@ -71,7 +91,7 @@ final class ModelPromptController {
             AiBehaviorSettingsRepository aiBehaviorSettingsRepository,
             ChatModeRepository chatModeRepository,
             PromptTemplateRepository promptTemplateRepository,
-            LearningContextStore learningContextRepository,
+            LearningContextService learningContextService,
             ContextManager contextManager,
             ModelStore modelRepository,
             ExtensionStore extensionRepository,
@@ -86,7 +106,7 @@ final class ModelPromptController {
         this.aiBehaviorSettingsRepository = aiBehaviorSettingsRepository;
         this.chatModeRepository = chatModeRepository;
         this.promptTemplateRepository = promptTemplateRepository;
-        this.learningContextRepository = learningContextRepository;
+        this.learningContextService = learningContextService;
         this.contextManager = contextManager;
         this.modelRepository = modelRepository;
         this.extensionRepository = extensionRepository;
@@ -107,7 +127,7 @@ final class ModelPromptController {
         AiBehaviorSettings aiSettings = aiBehaviorSettingsRepository.get();
         String projectPath = host.projectPath();
         String learningContext = aiSettings.isLearningModeEnabled()
-                ? learningContextRepository.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
+                ? learningContextService.buildLearningContext(projectPath, userInput, chatSessionStore.getCurrentConversationId())
                 : "";
         ModelConfig selectedModel = modelRepository.getSelectedModel();
         String promptHomePath = promptHomePath();
@@ -139,9 +159,9 @@ final class ModelPromptController {
         if (source == null || source.isEmpty()) {
             return repaired;
         }
-        String fallbackContent = terminatedMessage == null || terminatedMessage.trim().length() == 0
-                ? "上次生成已中断。"
-                : terminatedMessage;
+        String fallbackContent = terminatedMessage != null && terminatedMessage.trim().length() > 0
+                ? terminatedMessage
+                : "";
         HashSet<String> toolCallIds = new HashSet<>();
         Map<String, ChatMessage> toolResultById = new HashMap<>();
         for (ChatMessage message : source) {
@@ -278,7 +298,7 @@ final class ModelPromptController {
     private String buildToolPrompt(ModelConfig selectedModel, int usedToolCallCount) {
         host.syncModePermission();
         if (!hasRemainingToolCalls(selectedModel, usedToolCallCount)) {
-            return "## 可用工具\n当前没有可用工具。";
+            return host.toolsUnavailablePrompt();
         }
         toolRegistry.reloadExtensions();
         return toolSettingsRepository.buildToolPrompt(new ArrayList<ToolInfo>(toolRegistry.getAll()), modelProtocolFactory.create(selectedModel.getProtocolType()).supportsNativeTools(selectedModel));
@@ -296,7 +316,7 @@ final class ModelPromptController {
             }
             String label = recallText(message.getContent(), message.getAttachments()).trim();
             if (label.length() == 0) {
-                label = "用户消息 " + (sectionCount + 1);
+                label = host.userMessageLabel() + (sectionCount + 1);
             }
             if (builder.length() > 0) {
                 builder.append("\n\n");
@@ -316,8 +336,8 @@ final class ModelPromptController {
         if (sectionCount == 0) {
             return "";
         }
-        return "## 附加文件位置\n"
-                + "这些路径来自用户在输入框左侧选择的文件；除非用户明确要求，不要在回复中原样复述。\n"
+        return host.attachmentFilesHeader() + "\n"
+                + host.attachmentFilesDescription() + "\n"
                 + builder.toString().trim();
     }
 
@@ -340,16 +360,16 @@ final class ModelPromptController {
 
     private String recallText(String content, List<InputAttachment> attachments) {
         String value = content == null ? "" : content;
-        // 剥离 ChatInteractionController.composeUserContent 追加的引用文件块，
-        // 这里需要的是用户原始输入作为「附加文件位置」段落的 label
-        int idx = value.indexOf(ATTACHMENT_BLOCK_HEADER);
+        // 兼容旧消息：旧版 composeUserContent 曾追加 [引用文件] 块
+        int idx = value.indexOf("\n\n[引用文件]\n");
         String base = idx >= 0 ? value.substring(0, idx) : value;
-        if ("已附加文件".equals(base.trim()) && attachments != null && !attachments.isEmpty()) {
+        String attachedLabel = host.attachedFilesLabel();
+        if (attachedLabel.equals(base.trim()) && attachments != null && !attachments.isEmpty()) {
+            return "";
+        }
+        if (base.trim().length() == 0 && attachments != null && !attachments.isEmpty()) {
             return "";
         }
         return base;
     }
-
-    /** 与 ChatInteractionController.ATTACHMENT_BLOCK_HEADER 保持一致 */
-    private static final String ATTACHMENT_BLOCK_HEADER = "\n\n[引用文件]\n";
 }

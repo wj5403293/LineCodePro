@@ -12,6 +12,7 @@ import cn.lineai.model.ModelConfig;
 import cn.lineai.model.ModelStore;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ModelServiceProvider;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -50,14 +51,14 @@ public final class ImageUnderstandingTool extends BaseTool {
     @Override
     public String promptSupplement(String executionMode, boolean isSsh) {
         if (isSsh) {
-            return "image_understanding 通过 SFTP 读取 SSH 工作区图片，再由应用侧视觉模型配置执行。";
+            return "image_understanding reads images from the SSH workspace via SFTP, then runs via the app-side vision model configuration.";
         }
-        return "image_understanding 通过 IPC 读取终端提供者环境图片，再由应用侧视觉模型配置执行。";
+        return "image_understanding reads images from the terminal provider environment via IPC, then runs via the app-side vision model configuration.";
     }
 
     @Override
     public String getDescription() {
-        return "读取本地或 SSH 工作区图片文件并调用工具设置里选择的视觉模型理解图片内容。支持 OpenAI 兼容、Codex Responses 和 Anthropic Messages 协议。";
+        return "Read a local or SSH workspace image file and call the vision model selected in tool settings to understand its content. Supports OpenAI compatible, Codex Responses, and Anthropic Messages protocols.";
     }
 
     @Override
@@ -71,16 +72,26 @@ public final class ImageUnderstandingTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_image_understanding);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_PAINTBRUSH;
+    }
+
+    @Override
     public JSONObject getParameters() throws org.json.JSONException {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
                         .put("path", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "图片路径，相对当前工作区或已授权目录；SSH 模式下相对 SSH 工作区，也可以是远端绝对路径"))
+                                .put("description", "Image path, relative to the current workspace or an authorized directory; in SSH mode relative to the SSH workspace, or a remote absolute path"))
                         .put("prompt", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "希望视觉模型回答的问题或分析要求")))
+                                .put("description", "Question or analysis request for the vision model to answer")))
                 .put("required", new org.json.JSONArray().put("path").put("prompt"));
     }
 
@@ -92,37 +103,37 @@ public final class ImageUnderstandingTool extends BaseTool {
         PromptTemplateRepository promptTemplateRepository = context != null ? context.getPromptTemplateRepository() : null;
         SshFileTreeStore sshFileTreeRepository = context != null ? context.getSshFileTreeRepository() : null;
         if (settingsRepository == null || modelRepository == null) {
-            return error("图片理解工具未接入应用上下文。");
+            return error(context.getString(R.string.tool_img_under_no_context));
         }
         String path = first(input, "path", "image_path", "file_path");
         if (path.length() == 0) {
-            return error("图片路径不能为空。");
+            return error(context.getString(R.string.tool_img_under_path_empty));
         }
         String prompt = input.optString("prompt").trim();
         if (prompt.length() == 0) {
-            prompt = "请描述这张图片的内容。";
+            prompt = "Please describe the content of this image.";
         }
         ModelConfig model = selectedModel(settingsRepository, modelRepository);
         if (model == null) {
-            return error("图片理解未选择模型。请在 设置 -> 工具设置 -> 图片操作 中选择视觉模型。");
+            return error(context.getString(R.string.tool_img_under_no_model));
         }
         if (modelServiceProvider == null) {
-            return error("图片理解工具未接入模型服务。");
+            return error(context.getString(R.string.tool_img_under_no_model_service));
         }
         if (!modelServiceProvider.supportsImageUnderstanding(model.getProtocolType())) {
-            return error("本地 GGUF 协议暂不支持图片理解工具。请选择 OpenAI、Codex 或 Anthropic 协议模型。");
+            return error(context.getString(R.string.tool_img_under_unsupported_protocol));
         }
         try {
             ImageBytes image = readImageBytes(path, context, sshFileTreeRepository, settingsRepository);
             String mimeType = mimeType(image.path);
             if (!isSupportedMimeType(mimeType)) {
-                return error("不支持的图片格式: " + image.path + "。支持 PNG、JPEG、WebP 和 GIF。");
+                return error(context.getString(R.string.tool_img_under_unsupported_format, image.path));
             }
             String rawInput = rawInputJson(prompt, mimeType, android.util.Base64.encodeToString(image.bytes, android.util.Base64.NO_WRAP));
             String text = modelServiceProvider.completeImageUnderstanding(model, systemPrompt(promptTemplateRepository), prompt, rawInput).trim();
-            return ok(text.length() == 0 ? "视觉模型没有返回内容。" : text);
+            return ok(text.length() == 0 ? context.getString(R.string.tool_img_under_no_content) : text);
         } catch (Exception e) {
-            return error("图片理解失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_img_under_failed, e.getMessage()));
         }
     }
 
@@ -130,7 +141,7 @@ public final class ImageUnderstandingTool extends BaseTool {
         if (promptTemplateRepository != null) {
             return promptTemplateRepository.getTemplateText(PromptTemplateRepository.ID_IMAGE_UNDERSTANDING_TOOL_SYSTEM);
         }
-        return "你是 LineCode 的图片理解工具。根据用户提示分析图片，只返回与图片和提示相关的内容。不要提及工具调用、base64 或文件路径；无法确定时说明不确定。";
+        return "You are LineCode's image understanding tool. Analyze the image based on the user's prompt and return only content relevant to the image and the prompt. Do not mention tool calls, base64, or file paths; when uncertain, state the uncertainty.";
     }
 
     private ModelConfig selectedModel(ToolSettingsStore settingsRepository, ModelStore modelRepository) {
@@ -156,39 +167,39 @@ public final class ImageUnderstandingTool extends BaseTool {
     private ImageBytes readImageBytes(String path, ToolContext context, SshFileTreeStore sshFileTreeRepository, ToolSettingsStore settingsRepository) throws Exception {
         if (isTerminalProviderMode(settingsRepository)) {
             if (ipcProviderManager == null) {
-                throw new IllegalStateException("终端提供者图片理解未接入应用上下文。");
+                throw new IllegalStateException("Image understanding via terminal provider is not connected to the app context.");
             }
             TerminalIpcProvider provider = ipcProviderManager.getProviderByType(IpcProviderType.TERMINAL) instanceof TerminalIpcProvider
                     ? (TerminalIpcProvider) ipcProviderManager.getProviderByType(IpcProviderType.TERMINAL)
                     : null;
             if (provider == null || !provider.isBound()) {
-                throw new IllegalStateException("没有已绑定的终端提供者。");
+                throw new IllegalStateException("No bound terminal provider.");
             }
             String remotePath = resolveSshPath(path, context == null ? "" : context.getHomePath());
             if (context != null) {
-                context.reportToolProgress(getName(), "正在通过 IPC 读取图片...", false);
+                context.reportToolProgress(getName(), context.getString(R.string.tool_img_under_ipc_reading), false);
             }
             return new ImageBytes(remotePath, provider.readFile(remotePath));
         }
         if (isSshMode(settingsRepository)) {
             if (sshFileTreeRepository == null) {
-                throw new IllegalStateException("SSH 图片理解未接入应用上下文。");
+                throw new IllegalStateException("Image understanding via SSH is not connected to the app context.");
             }
             String remotePath = resolveSshPath(path, context == null ? "" : context.getHomePath());
             if (context != null) {
-                context.reportToolProgress(getName(), "正在通过 SFTP 读取图片...", false);
+                context.reportToolProgress(getName(), context.getString(R.string.tool_img_under_sftp_reading), false);
             }
             return new ImageBytes(remotePath, sshFileTreeRepository.readFileBytes(remotePath, MAX_IMAGE_BYTES));
         }
         File file = resolveLocalImage(path, context);
         if (!file.exists()) {
-            throw new IllegalStateException("图片文件不存在: " + path);
+            throw new IllegalStateException("Image file not found: " + path);
         }
         if (file.isDirectory()) {
-            throw new IllegalStateException("路径是目录，无法作为图片理解: " + path);
+            throw new IllegalStateException("Path is a directory, cannot process as image: " + path);
         }
         if (file.length() > MAX_IMAGE_BYTES) {
-            throw new IllegalStateException("图片过大，当前上限为 10 MB: " + path);
+            throw new IllegalStateException("Image too large, current limit is 10 MB: " + path);
         }
         return new ImageBytes(file.getAbsolutePath(), readBytes(file));
     }

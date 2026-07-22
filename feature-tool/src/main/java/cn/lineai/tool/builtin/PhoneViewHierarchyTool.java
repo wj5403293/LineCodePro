@@ -1,9 +1,9 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -13,12 +13,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.)
- * and LineCodeAccessibilityService in :app. See PhoneClickTool for full barrier notes.
- * No direct dependency on cn.lineai.ui.* classes.
+ * Phone control tool: get the current window View hierarchy.
  */
 public final class PhoneViewHierarchyTool extends BaseTool {
     public static final String NAME = "phone_view_hierarchy";
+    private static final String VIEW_HIERARCHY_DESC = "Get the current window View hierarchy, including class names, resource ids, text, content descriptions, and screen bounds.";
     private final Context context;
 
     public PhoneViewHierarchyTool(Context context) {
@@ -32,7 +31,7 @@ public final class PhoneViewHierarchyTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return context == null ? "Get the current window View hierarchy." : context.getString(R.string.phone_tool_view_hierarchy_description);
+        return context == null ? VIEW_HIERARCHY_DESC : VIEW_HIERARCHY_DESC;
     }
 
     @Override
@@ -43,6 +42,11 @@ public final class PhoneViewHierarchyTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
     }
 
     @Override
@@ -65,7 +69,7 @@ public final class PhoneViewHierarchyTool extends BaseTool {
 
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
+        PhoneControlService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, this.context);
         }

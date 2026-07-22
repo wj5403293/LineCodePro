@@ -3,7 +3,6 @@ package cn.lineai.ai.protocol;
 import cn.lineai.ai.ModelCompletionException;
 import cn.lineai.ai.ModelCompletionResponse;
 import cn.lineai.ai.ModelCancellationToken;
-import cn.lineai.ai.ImageInputPayload;
 import cn.lineai.ai.ModelRequestOptions;
 import cn.lineai.ai.ModelStreamCallback;
 import cn.lineai.ai.message.ModelMessage;
@@ -29,6 +28,7 @@ import org.json.JSONObject;
 
 public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
 
+    private final OpenAiMessageSerializer messageSerializer = new OpenAiMessageSerializer();
     private final ReasoningStrategyRegistry reasoningStrategyRegistry = createDefaultRegistry();
     private final ReasoningDeltaExtractor reasoningDeltaExtractor = new ReasoningDeltaExtractor();
 
@@ -63,7 +63,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
         try {
             JSONObject body = new JSONObject();
             body.put("model", ModelContextParser.apiModelId(config));
-            body.put("messages", messagesJson(messages));
+            body.put("messages", messageSerializer.messagesJson(messages));
             body.put("temperature", 0.2);
 
             HashMap<String, String> headers = new HashMap<>();
@@ -80,7 +80,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
             throw e;
         } catch (Exception e) {
             logParseError("parse_openai_complete", raw, e);
-            throw new ModelCompletionException("OpenAI 兼容协议解析失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("OpenAI compatible protocol parse failed: " + e.getMessage(), e);
         }
     }
 
@@ -96,7 +96,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
             ModelRequestOptions requestOptions = options == null ? ModelRequestOptions.defaults() : options;
             JSONObject body = new JSONObject();
             body.put("model", ModelContextParser.apiModelId(config));
-            body.put("messages", messagesJson(messages, requestOptions.isPreserveReasoning()));
+            body.put("messages", messageSerializer.messagesJson(messages, requestOptions.isPreserveReasoning()));
             body.put("temperature", 0.2);
             body.put("stream", true);
             if (!requestOptions.getTools().isEmpty()) {
@@ -119,7 +119,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
                 }
                 JSONObject event = new JSONObject(data);
                 if (event.has("error")) {
-                    throw new ModelCompletionException("OpenAI 流式错误: " + describeError(event.opt("error")));
+                    throw new ModelCompletionException("OpenAI stream error: " + describeError(event.opt("error")));
                 }
                 JSONArray choices = event.optJSONArray("choices");
                 if (choices == null || choices.length() == 0) {
@@ -130,7 +130,7 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
                     return;
                 }
                 if ("content_filter".equals(choice.optString("finish_reason"))) {
-                    throw new ModelCompletionException("OpenAI 流式错误: 输出被内容安全策略拦截");
+                    throw new ModelCompletionException("OpenAI stream error: output blocked by content safety policy");
                 }
                 JSONObject delta = choice.optJSONObject("delta");
                 if (delta == null) {
@@ -161,71 +161,8 @@ public final class OpenAiCompatibleProtocol extends AbstractHttpModelProtocol {
         } catch (ModelCompletionException e) {
             throw e;
         } catch (Exception e) {
-            throw new ModelCompletionException("OpenAI 兼容协议流式解析失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("OpenAI compatible protocol stream parse failed: " + e.getMessage(), e);
         }
-    }
-
-    private JSONArray messagesJson(List<ModelMessage> messages) throws Exception {
-        return messagesJson(messages, false);
-    }
-
-    private JSONArray messagesJson(List<ModelMessage> messages, boolean preserveReasoning) throws Exception {
-        JSONArray array = new JSONArray();
-        for (ModelMessage message : messages) {
-            JSONObject object = new JSONObject();
-            object.put("role", message.getRole());
-            if ("tool".equals(message.getRole())) {
-                object.put("tool_call_id", message.getToolCallId());
-                object.put("content", message.getContent());
-                array.put(object);
-                continue;
-            }
-            if ("assistant".equals(message.getRole()) && !message.getToolCalls().isEmpty()) {
-                object.put("content", message.getContent().length() == 0 ? JSONObject.NULL : message.getContent());
-                JSONArray toolCalls = new JSONArray();
-                for (ToolCall call : message.getToolCalls()) {
-                    JSONObject function = new JSONObject()
-                            .put("name", call.getName())
-                            .put("arguments", call.getArguments());
-                    toolCalls.put(new JSONObject()
-                            .put("id", call.getId())
-                            .put("type", "function")
-                            .put("function", function));
-                }
-                object.put("tool_calls", toolCalls);
-            } else if ("user".equals(message.getRole()) && ImageInputPayload.fromRawInputJson(message.getRawInputJson()) != null) {
-                object.put("content", imageContent(message));
-            } else {
-                object.put("content", message.getContent());
-            }
-            if (preserveReasoning
-                    && "assistant".equals(message.getRole())
-                    && message.getReasoningContent().length() > 0) {
-                object.put("reasoning_content", message.getReasoningContent());
-            }
-            array.put(object);
-        }
-        return array;
-    }
-
-    JSONArray messagesJsonForTest(List<ModelMessage> messages) throws Exception {
-        return messagesJson(messages);
-    }
-
-    private JSONArray imageContent(ModelMessage message) throws Exception {
-        ImageInputPayload.Payload payload = ImageInputPayload.fromRawInputJson(message.getRawInputJson());
-        if (payload == null) {
-            return new JSONArray().put(new JSONObject().put("type", "text").put("text", message.getContent()));
-        }
-        String prompt = payload.getPrompt().length() == 0 ? message.getContent() : payload.getPrompt();
-        return new JSONArray()
-                .put(new JSONObject()
-                        .put("type", "text")
-                        .put("text", prompt == null ? "" : prompt))
-                .put(new JSONObject()
-                        .put("type", "image_url")
-                        .put("image_url", new JSONObject()
-                                .put("url", payload.dataUrl())));
     }
 
     private void appendToolCallDeltas(Map<Integer, ToolCallBuilder> builders, JSONArray toolCalls) {

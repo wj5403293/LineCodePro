@@ -1,5 +1,110 @@
 # 更新日志
 
+## v1.2.3
+
+### 国际化与多语言
+
+- **全量 i18n 替换与术语统一** - 将项目内全部硬编码中文提示、日志、枚举标签、错误文案统一替换为英文，覆盖 `feature-model`、`core-model`、`feature-tool`、`data`、`core-security`、`app` 等模块：包含 `ChatMode.promptContext` 中 Chat / Plan / Control / Agent 四种会话模式说明、`SystemPromptProvider` 调用的全部 `feature-model/src/main/assets/prompts/*.txt` 模板（`system-prompt-template.txt`、`agent-role-coding-local.txt` / `agent-role-coding-remote.txt` / `agent-role-explore-local.txt` / `agent-role-explore-remote.txt`、`memory-extraction-template.txt`、`learning-context-template.txt`、`work-directory-template.txt`、`tone-chat-template.txt`、`tone-coding-template.txt`、`todo-usage-template.txt`、`todo-state-template.txt`、`model-identity-template.txt`、`image-understanding-tool-system.txt`、`skill-extraction-template.txt`）、`ModelProtocolType` 协议标签（OpenAI / Codex / Anthropic / Local）、`SheetOption.getDeleteActionLabel`、协议层错误描述、分享格式前缀、工具异常提示、工具提示词渲染等
+- **`:app` 新增 50+ 条多语言字符串** - 在 `app/src/main/res/values/strings.xml` 与 `values-zh/strings.xml` 同步补充 `model_provider_preset_*_label/desc/hint` 系列（custom / deepseek / glm / mimo / mimo-token-plan / kimi / qwen / openai / claude / gemini / openrouter / codex 共 12 套）、`memory_extraction_json_only`、`agent_execution_completed`、`agent_pipeline_completed`、`user_rejected_tool`、`remote_file_tree_loading`、`skill_source_not_found`、`skill_ssh_directory_hint`、`skill_zip_entry_out_of_bounds`、`extension_draft_missing_fields`、`extension_draft_invalid_json` 等
+- **`:app` 新增俄文资源** - `app/src/main/res/values-ru/strings.xml` 一次性补齐 1251 行，覆盖模型预设、内存抽取、Agent 执行、技能草稿等所有英文新增文案
+- **`:feature-tool` 新建模块级资源** - 全新 `feature-tool/src/main/res/values/strings.xml`、`values-zh/strings.xml`、`values-ru/strings.xml`（228 / 228 / 55 行）：按工具分组为 `FileReadTool` / `FileEditTool` / `FileWriteTool` / `FileDeleteTool` / `GlobTool` / `ListDirectoryTool` / `AgentTool` / `AgentPipelineTool` / `TodoUpdateTool` / `ImageGenerationTool` / `ImageUnderstandingTool` / `WebSearchTool` / `WebFetchTool` / `WebSearchService` / `CustomMcpHttpTool` / `CustomAgentExtensionTool` / `ImageResponseParser` / `ShellExecuteTool` / `FileToolPathPolicy` / `ToolArgs` / `ExceptionUtils` 共 21 组错误与状态文案，以及 7 个工具动作标签（`tool_call_action_read` / `search` / `fetch` / `match` / `list_dir` / `image_generation` / `image_understanding`）
+- **Phone 工具俄文补齐** - `feature-tool/src/main/res/values-ru/strings.xml` 补充 55 行：phone 工具动作名（`tool_call_phone_action_screenshot` / `click` / `swipe` / `long_press` / `view_hierarchy` / `click_view` / `global_action` / `default`）、phone 工具摘要、全局动作本地化名（back / home / exit_app / recents / notifications / quick_settings / power_dialog / lock_screen / unknown）、`phone_tool_accessibility_*` 提示与 `phone_tool_screenshot/click/swipe/long_press/view_hierarchy/click_view/global_action_*` 等描述/成功/失败文案
+- **模型预设抽取为资源键** - `ModelProviderPreset` 移除 `label` / `desc` / `hint` 内置字符串字段，改用新增的 `cn.lineai.ui.util.ModelProviderPresetStrings` 注册表（`register(id, labelResId, descResId, hintResId)` + `getLabel/Desc/Hint(Context, id)`），由 `:app` 在 strings.xml 提供多语言文案，`ModelProviderPresets` 同步移除文本构造参数
+- **`ToolContext` 字符串解析** - `ToolContext` 新增 `StringResolver` 字段与 `getString` 优先走 `stringResolver`，避免在无 Android Context 场景下文案无法解析；内置工具全部 `getDescription` / `getActionName` / `promptSupplement` / 错误返回改用英文；`FileReadTool` / `ImageGenerationTool` / `ImageUnderstandingTool` 错误返回全部经 `context.getString(R.string.tool_*)` 解析
+- **Bing RSS 搜索 market 动态化** - `BingRssSearchProvider` 的 `mkt` 参数从硬编码 `zh-CN` 改为 `Locale.getDefault().toLanguageTag()`，缺失回退 `en-US`，跟随系统语言
+- **`FakeResourceContext` 测试桩** - 新增 `feature-tool/src/test/java/cn/lineai/tool/FakeResourceContext` 解析 `feature-tool/src/main/res/values/strings.xml` 并通过 `R.string.*` 反射查表，单元测试中可替代 `Context.getString`（被 Robolectric/Android 框架默认 stub 抛 "not mocked"），`ToolBuiltinsTest` 全面接入
+
+### 模型协议与配置
+
+- **`ModelProtocolType` 携带协议能力** - 枚举增加 `dedicatedCompression` 字段与 `supportsDedicatedCompression()` 方法；`OPENAI_COMPATIBLE` / `CODEX_RESPONSES` 标记为 `true`，`ANTHROPIC_MESSAGES` / `LOCAL_GGUF` 标记为 `false`，`ModelConfig` 删除 `@Deprecated public static boolean supportsDedicatedCompression(ModelProtocolType)`，统一通过枚举属性判断
+- **`ModelConfig` 构造器收敛** - 移除 3 个 `@Deprecated` 旧构造器（含 `compressionModelEnabled` / `compressionModelAuto` / `compressionModelId` / `contextSize` 全字段版），保留 `Builder` 模式；`compressionModelEnabled` 在构造时直接按 `protocolType.supportsDedicatedCompression()` 二次校正
+- **模型目录拉取接口化** - 新增 `cn.lineai.ai.protocol.CatalogFetcher` 接口与 `OpenAiCatalogFetcher` / `AnthropicCatalogFetcher` / `CodexCatalogFetcher` 三个实现；`ModelCatalogClient` 重构为注册表 + 通用 `fetch(...)` 调度，删除 78 行硬编码分支
+- **Codex 协议拆分** - 从 `CodexResponsesProtocol` 抽离 `CodexRequestBuilder`（149 行，请求体拼装）和 `CodexOutputMerger`（191 行，SSE 输出合并 + `function_call` / `custom_tool_call` / `reasoning` / `output_text` 归并），`CodexResponsesProtocol` 大幅缩减；`OpenAiCompatibleProtocol` 同步拆出 `OpenAiMessageSerializer`（74 行，消息序列化）
+- **`ModelAddOptionsScreenView` / `ModelAddScreenView` 拆分** - 模型添加页 716 → 缩减，新增 `ModelCompressionSectionView`（333 行，压缩模型配置区：query 按钮、loading 态、picker 选择、custom id 切换）、`ModelFormHelper`（88 行，label / input / toggle / switch tint / value / detachFromParent 复用工具）、`ModelPickerDialog`（106 行，底部弹窗，列出目录模型 + 自定义 id 选项）
+
+### 推理策略与模型搜索
+
+- **统一 thinking 参数格式** - 各 `ReasoningRequestStrategy` 统一按 `context.isEnabled()` 与 `context.getEffort()` 写入请求体；`DeepseekReasoningStrategy` 移除对 `AiBehaviorSettings.REASONING_MAX` 的硬编码判断，直接 `body.put("reasoning_effort", context.getEffort())`；`DefaultReasoningStrategy` 在 `AiBehaviorSettings.REASONING_MAX.equals(effort)` 时映射为 `"xhigh"`，否则原样写 `effort`；`MinimaxReasoningStrategy` 额外写入 `body.put("thinking", new JSONObject().put("type", enabled ? "adaptive" : "disabled"))`
+- **ComposerView 模型搜索** - `/model` 命令候选列表新增大小写不敏感子串匹配：`name` / `modelId` / `id` / `providerLabel` 任意字段包含查询词即保留；模型下拉候选项从只显示 id 改为 `modelDisplayName`（name 优先，回退 apiId，再回退 providerLabel）+ `modelDisplayDetail`（`providerLabel · apiId`），无 apiId 时只显示 providerLabel
+
+### 工具系统重构
+
+- **`ToolResult` 工厂化** - 统一 `ToolResult.success(output)` / `error(error)` / `withReview(...)` / `of(...)` 静态方法替代 `new ToolResult(...)`；`ToolExecutor` 内部错误返回改用 `ToolResult.error` / `ToolResult.of`
+- **工具默认权限配置** - 新增 `cn.lineai.data.repository.ToolSettingsStore` 默认实现细节（`toolSettingsRepository = new ToolSettingsRepository(resourceProvider, settingsRepository, webSearchConfigRepository, phoneControlRepository, categoryResolver)`），`ToolPermissionService` 新增（86 行）将权限判断从 `ToolExecutor` 中拆出
+- **DiffRecorder 抽离** - 新增 `cn.lineai.tool.DiffRecorder`（57 行），把 `shouldRecordDiff(tool)` 与 `executeWithDiff(tool, input, context)` 从 `ToolExecutor` 抽出；`ToolExecutor` 持有 `DiffRecorder` 引用，需要时委托；`ToolExecutor` 构造签名同步调整为 7 参数版 + 8 参数（多 `learningContextStore` 注入），`MainDependencies` 接入新签名
+- **`PhoneControlToolSupport` 拆分与接口化** - 原 `app/.../tool/builtin/PhoneControlToolSupport` 工具类（37 行壳）拆为 `:feature-tool` 模块的 `PhoneControlToolSupport`（85 行，绑定无障碍服务 `LineCodeAccessibilityService.getReadyInstance(ctx)`），新增 `cn.lineai.tool.PhoneControlService` 接口（28 行）解耦手机工具与无障碍服务实现；`AccessibilityStateProvider` 接口（9 行）由 `LineCodeAccessibilityService.isServiceEnabled` 实现
+- **内置工具操作名/图标** - 25+ 个内置工具统一新增 `getActionName(Context)` 返回 `R.string.tool_call_action_*` 多语言资源与 `getActionIcon()` 返回 `ICON_*` 常量；`FileReadTool` 错误提示从硬编码中文改为 `context.getString(R.string.tool_file_read_*)` 共 10 个资源
+- **`ToolRegistry` 扩展** - 接受 `ExtensionStore` 注入并对外暴露 `setExtensionStore`；`BuiltInToolProviders` 注册新内置工具时同步带 `NAME` 常量
+- **`ToolContext` 字段扩展** - 构造器新增 `LearningContextStore` 与 `StringResolver` 字段及对应 Builder 方法；`BaseTool.isConcurrencySafe` / `BaseTool.execute` 路径与 `ToolSettingsRepository` / `LearningContextStore` 全部接入新字段
+
+### Agent 系统增强
+
+- **`agent_output` 工具** - 新增 `cn.lineai.tool.builtin.AgentOutputTool`（185 行，`NAME = ToolNames.AGENT_OUTPUT`），通过 `ToolContext.getAgentResultStore()` 按 `agent_id` 拉取会话内已存的 Agent 结果；参数 `include: output` 返回完整正文（受 `ToolResult.MAX_TOOL_RESULT_CHARS` 截断），`include: meta` 返回 `agent_id / status / type / description / preview / error / async / tool_call_count` 字段；Agent 仍 running 时返回结构化 `running` 状态 JSON；`isAllowedInReadonlyMode = true`，`isConcurrencySafe = true`，`getDisplayCategory = READ`，`getActionIcon = ICON_BOT`
+- **异步 Agent 执行** - `AgentTool` 参数新增 `async: boolean`（仅 explore Agent 允许；sub-coding 传 `async=true` 时立即返回错误）；`AgentExecutionController.runAgentTool` 检测 `async` 时 `agentResultRegistry.allocateId()` + `runningRecord` 落库 → 写入 `ToolResult.reviewState = "running"` + `host.runInBackground(...)` 异步跑 `runAgentLoop`，完成后用 `finishAgentWithCompact` 落定结果并把 `compact` JSON 替换原 tool result
+- **Agent 结果注册表** - 新增 `cn.lineai.mvp.agent.AgentResultRegistry`（170 行，会话级 `LinkedHashMap<String, AgentResultRecord>` + `AtomicInteger id` 分配器，提供 `allocateId / put / getRecord / get / setFullOutput / toCompactJson`），`AgentResultRecord`（220 行，含 `agentId / toolCallId / status / type / description / preview / fullOutput / thinking / progressJson / toolCallCount / error / async / generationId / updatedAtMs` + `running(...)` 工厂 + `withPreview/withStatus/withFullOutput` 不可变更新）；`ToolContext.AgentResultStore` 抽象由 `agentResultRegistry` 实现并由 `GenerationFlowController` 通过 `ToolContext.Builder.agentResultStore(...)` 注入
+- **Agent 工具返回压缩** - `finishAgentWithCompact` 把原本"任务标题 + 类型 + 工具调用次数 + 输出"的长字符串结果替换为 `linecode_agent_ref` 精简 JSON（`agent_id / status / type / description / preview / async / tool_call_count`），完整正文留在 `agentResultRegistry`，由后续 `agent_output` 拉取
+- **PipelineProgressSession 线程安全** - `PipelineProgressSession` 所有 setter / `publish` / `payload` 增加 `synchronized (lock)` 块；新增 `Object lock` 字段；`setStatus` / `setFinalSummary` / `beginAgent` / `updateAgent` / `finishAgent` / `terminate` / `publish` / `payload` 等方法全部加锁，`buildPayload` 拆为 `buildPayloadLocked`，`countStatus` / `countFailed` 拆为 `*Locked`
+- **工具预算原子化** - `runAgentTool` / `runAgentPipelineTool` / `runAgentLoop` 中 `int[] toolCallBudget` 替换为 `AtomicInteger toolCallBudget`，跨 sub-agent 调用时 `toolCallBudget.incrementAndGet()` 共享主流程 `toolCallLimit`
+- **AgentTool 显示与图标** - `AgentTool` 新增 `getActionIcon = ICON_BOT`、`getActionName = "Agent"`；`BaseTool` 新增 `ICON_BOT` 常量；`ToolCallAgentView` 卡片元信息新增 `agent_id` 标签，title 文本由 `AgentToolResultDisplay.description` 提供避免显示空内容
+
+### 记忆与上下文压缩
+
+- **`MemoryUpdateTool` 持久化用户偏好** - 新增 `cn.lineai.tool.builtin.MemoryUpdateTool`（133 行，`NAME = "memory_update"`），参数 `content`（≤ `MAX_CONTENT_CHARS = 320`，超出截断 + `。`）+ `scope: user / project / environment`；通过 `ToolContext.getLearningContextStore().saveMemory("", scope, homePath, content)` 写入；拒绝包含 `api key` / `password` / `secret` / `cookie` / `token` / `私钥` / `密码` / `密钥` / `sk-` 等敏感关键词的内容（`tool_memory_sensitive_rejected`）；返回 `tool_memory_updated`；`isConcurrencySafe = true`，`getDisplayCategory = READ`，`getActionIcon = ICON_BOOK_OPEN`
+- **记忆批量删除** - `LearningContextStore` 接口新增 `deleteMemories(List<String> ids)`；`MemorySettingsScreenView` 从 `ScreenScaffoldView` 重构为 `LinearLayout`，`Listener` 新增 `onMemoriesDeleted(List<String> ids)`；长按 / 点击多选按钮进入 `multiSelectedIds` 状态，顶部切换为 `ScreenHeaderView("Selected: N")` + 关闭 + `TRASH_2` 按钮；确认弹窗 `screen_memory_delete_selected_message` 批量删除；`setBackgroundColor(LineTheme.ACCENT_MUTED)` 高亮已选
+- **记忆提取优化** - `MemoryExtractionService` 重构：构造函数改为 `MemoryExtractionService(ResourceProvider, LearningContextStore, ExtensionStore, PromptTemplateRepository)`，移除 `Context` 硬依赖；`MAX_MEMORIES` 由 5 改为 3；新增 `MIN_KEEP_CONFIDENCE = 0.78` / `RULE_CONFIDENCE = 0.88` / `MODEL_DEFAULT_CONFIDENCE = 0.82` 常量；新增 `hasDurableSignal(userInput, transcript)` 触发条件，关键词包括"记住/长期/始终/永远/禁止/必须/偏好/习惯/全局/这个项目/本项目"等 30+ 个中英文长效信号；未命中时跳过模型调用与规则抽取，直接走技能提取；`scope` 解析新增 `normalizeScopeOrEmpty` 区分"未知"与"user"，未知 scope 不再默认 user；`modelContent` 提取改用 `R.string.memory_extraction_json_only`
+- **记忆提取调度迁移** - `GenerationFlowController.scheduleMemoryExtractionIfNeeded` 整段删除（含 `memoryExtractionService` 字段、构造器注入与 `linecode-memory-extract` 后台任务），记忆提取由 `MainCoordinator` 单独调度，控制器字段收敛
+
+### MVP / 工具调用视图
+
+- **修复后台切到前台时强制中断生成** - 新增 `cn.lineai.mvp.ActivityGenerationLifecyclePolicy` 策略类：`shouldStopGenerationOnStop(isFinishing)` 仅当 `Activity.isFinishing()` 为 true 时返回 true；`shouldStopGenerationOnStart()` 恒为 false；`MainActivity.onStop` / `onStart` 改为通过策略判断后调用 `presenter.resetGenerationState()`，避免 Home / 多任务切回杀掉正在进行的 LLM 流、auto-reject 待审工具、关闭 keep-alive；`onDestroy` 仍无条件 `presenter.destroy()`；`MainCoordinator.resetGenerationState` Javadoc 明确只在用户主动停止 / Activity finishing / destroy 三个场景调用
+- **`AgentToolResultDisplay` 工具类** - 新增 `cn.lineai.ui.component.toolcall.AgentToolResultDisplay`（113 行），统一解析 `linecode_agent_progress` / `linecode_agent_pipeline_progress` / `linecode_agent_ref` 三种结构化 JSON；提供 `progressPayload / displayOutput / progressStatus / nestedToolCalls / toolCallCount / description / type / thinking` 8 个静态方法；`displayOutput` 在 JSON 包裹时优先返回 `output` 字段再回退 `model_content`，避免 Markdown 块直接渲染原始 JSON；非 JSON 文本中检测到 `"输出:\n"` 前缀则取其后正文
+- **`ToolCallAgentView` 改用 `AgentToolResultDisplay`** - 删除 60+ 行手写 `progressPayload` 私有解析逻辑，全部改用 `AgentToolResultDisplay` 工具方法；`running` 状态判定新增 `outerReviewState == "running"`；`toolCount` 优先从 progress JSON 拿，其次解析 `工具调用:` 文本标签
+- **`ToolCallGenericView` 同样接入** - 当结果内容是 `linecode_agent_*_progress` 结构时改走 `AgentToolResultDisplay.displayOutput` 取人类可读正文，避免 generic view 把 raw JSON 整段塞进 Markdown；空内容时回退 `tool_call_agent_failed` / `tool_call_agent_done` 提示
+- **`ToolDisplayResolver` 内置 agent 分类** - `fallbackDisplayCategory` 命中 `"agent"` 返回 `ToolDisplayCategory.AGENT`；命中 `"agent_pipeline"` 返回 `ToolDisplayCategory.AGENT_PIPELINE`；`agentx_` 前缀继续返回 `AGENT`；`mcpx_` 仍为 `GENERIC`
+
+### 数据层接口抽象（DIP）
+
+- **新增 8 个解耦接口** - `cn.lineai.ai.PromptTemplateProvider`（11 行）、`cn.lineai.ai.SkillPromptProvider`（9 行）、`cn.lineai.resource.ResourceProvider`（13 行，`openAsset/getString`）、`cn.lineai.resource.SystemConfigProvider`（13 行，`isDarkModeEnabled/getSdkInt/getFilesDirPath`）、`cn.lineai.service.AccessibilityStateProvider`（9 行，`isAccessibilityEnabled`）、`cn.lineai.tool.ToolCategoryResolver`（9 行）、`cn.lineai.tool.ToolPromptRenderer`（9 行）、`cn.lineai.tool.PhoneControlService`（28 行）；仓库层不再依赖具体实现，可由测试桩或 DI 容器替换
+- **仓库层解构 Android Context** - `KeepAliveRepository` / `UserAgreementRepository` / `SshConfigRepository` / `AiBehaviorSettingsRepository` / `ChatModeRepository` / `InputSettingsRepository` / `OutputSettingsRepository` / `ThemeSettingsRepository` / `ExtensionRepository` / `IpcProviderRepository` / `ProjectRepository` / `PromptTemplateRepository` / `WebSearchConfigRepository` / `SettingsRepository` / `ConversationRepository` / `DiffRepository` / `ModelRepository` 全部改为构造注入 `LineCodeDatabase` / `ResourceProvider` / `SystemConfigProvider` / `WorkspacePaths`；`MainDependencies` 一次性 `LineCodeDatabase.getInstance(appContext)` + 构造 `ContextResourceProvider` / `ContextSystemConfigProvider` 共享
+- **`LearningContextStore` 拆分** - 接口新增 `deleteMemories(List<String> ids)`；业务编排 `buildLearningContext` / `getOverview` 抽到 `cn.lineai.service.LearningContextService`（51 行）；`MemoryPromptBuilder` 由 `cn.lineai.ai.prompt` 包移至 `cn.lineai.ai.prompt` 并接受 `WorkspacePaths` / `PromptTemplateRepository` 注入
+- **`DiffStore` 接口扩展** - 新增 `markReverted(String diffId)` 方法；`DiffRepository` 实现迁移到 `cn.lineai.data.service.FileRestorer`（36 行，文件恢复），`DiffRepository.revertDiff` 不再直接写文件
+- **`UrlPolicy` 实例化扩展** - 从 `final class` + 全部 `static` 方法改为可继承实例类（`public class UrlPolicy`），持有 `DEFAULT` 单例；`cleartextHosts` / `privateNetworkPredicates` 通过 `addCleartextHost(String)` / `addPrivateNetworkPredicate(Predicate<String>)` 注册；`registerDefaultCleartextHosts` 默认注册 localhost / 127.0.0.1 / 10.0.2.2 / ::1；`registerDefaultPrivateNetworkPredicates` 默认注册 192.168.* / 10.* / 172.16-31.*；`checkNormalizeHttpOrHttpsUrl` / `checkNormalizeHttpOrLocalCleartextUrl` / `checkRequireHttpOrLocalCleartextUrl` / `checkIsAllowedCleartextHttpUrl` 由静态方法改为实例方法（保留兼容调用）
+
+### 模型自动重试
+
+- **重试机制** - `GenerationFlowController` 引入 `MAX_RETRIES = 3` / `RETRY_DELAY_MS = 5000L`；新增私有 `retryableModelStream(generationId, model, cancellationToken, messages, usedToolCallCount, attempt, userInput)` 方法；`ModelCompletionException` 触发时进入 `handleModelError`：取消或已用满 3 次则 `failGeneration(generationId, id, host.formatModelFailed(error))`；否则从 `messages` 列表移除失败的 assistant 消息，插入 `ChatMessage.retryNotice(id, host.formatRetryNotice(attempt+1, MAX_RETRIES, error))` 通知气泡，主线程 `postDelayed(RETRY_DELAY_MS)` 后再次调用 `retryableModelStream(..., attempt+1, ...)`；后台任务名按 `attempt == 0` 区分 `linecode-model-stream` / `linecode-model-stream-retry`
+- **Host 回调扩展** - `GenerationFlowController.Host` 新增 `String formatRetryNotice(int attempt, int maxRetries, String error)` / `String formatModelFailed(String error)`；`GenerationFlowHost` 实现走 `coordinator.context().getString(R.string.model_retry_attempt / model_retry_failed, ..., StringUtils.decodeUnicodeEscapes(error))`，错误文本先经 Unicode 转义解码
+- **ChatMessage 新增重试通知类型** - `ChatMessage.retryNotice(id, content)` 工厂方法；`modelSwitchNotice` 文案从中文 "模型已从 ... 更改为 ..." 改为 "Model changed from ... to ..."；`ChatMessageListView` 通知视图创建方法 `createModelSwitchNotice` 改名为通用 `createNoticeView`，ViewType 常量 `VIEW_TYPE_MODEL_SWITCH` 改名为 `VIEW_TYPE_NOTICE`，同时支持模型切换与重试通知
+- **三语资源** - `app/src/main/res/values/strings.xml` / `values-zh/strings.xml` / `values-ru/strings.xml` 同步新增 `model_retry_attempt` / `model_retry_failed` 两条
+
+### 工具调用系统
+
+- **导入导出数据库依赖注入** - `LineCodeArchiveService` / `LineCodeImportService` 构造注入 `LineCodeDatabase` 而非依赖 `Context`；`ArchiveSecretRedactor`（124 行）增补可注册敏感字段与命名关键字
+- **StorageStatsRepository** - 36 行调整，统计口径从 `MessageTextChunkStore.totalLength` 聚合
+- **`MemoryRanker` 适配** - BM25 排序器 22 行调整，配合 `LearningContextService` 业务编排分离
+- **`SkillRepository` 业务编排扩展** - 123 行扩展，把 Skill 文件 IO 委托给 `SkillFileManager`，自身只保留数据库 CRUD
+- **`ChatModeRepository.applyMode`** - 权限申请与模式应用解耦，新增 `applyPermissionForMode` 单独处理权限；`SettingsManagementController` 透传回调
+
+### 测试
+
+- 新增 `ActivityGenerationLifecyclePolicyTest`（22 行）覆盖 home / 任务切换 / 退出 / 回前台 4 种生命周期的生成终止策略
+- 新增 `ToolDisplayResolverFallbackTest`（26 行）覆盖 `agent` / `agent_pipeline` / `agentx_*` 的 fallback 分类
+- 新增 `AgentToolResultDisplayTest`（57 行）覆盖结构化 JSON 解析、`output` 字段优先级、未知 JSON 安全降级
+- 扩展 `AgentOutputToolTest`（115 行）覆盖 agent_id 缺失、store 不可用、未知 id、运行中、含错误、空正文、超大输出截断、include=meta 等场景
+- 扩展 `AgentResultRegistryTest`（149 行）覆盖 id 分配、状态变更、压缩 JSON 输出
+- 扩展 `PipelineProgressSessionTest`（92 行）覆盖多线程并发下状态变更与最终 payload 构建
+- 新增 `PipelineDependencyResolverTest`（72 行）覆盖 Pipeline 依赖图与并行层划分
+- 扩展 `ToolBuiltinsTest`（65 行）覆盖英文文案下的全部内置工具描述、参数、动作名；接入 `FakeResourceContext` 解决单元测试无 Context 问题
+- 扩展 `GenerationFlowControllerTest`（+11 行）覆盖 `MemoryExtractionService` 字段移除后的构造器签名变化
+- 扩展 `ToolSettingsRepositoryTest`（+56 行）覆盖 `ToolCategoryResolver` / `WebSearchConfigRepository` / `PhoneControlRepository` 注入后的权限与分类解析
+
+### 版本
+
+- 版本号升级到 `1.2.3`
+- `versionCode` 升级到 `26`
+
+---
+
 ## v1.2.2
 
 ### 项目模块化拆分

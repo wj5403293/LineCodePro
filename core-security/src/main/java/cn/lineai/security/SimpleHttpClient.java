@@ -69,7 +69,7 @@ public final class SimpleHttpClient {
             connection.setReadTimeout(readTimeoutMs);
             int code = connection.getResponseCode();
             if (code < 200 || code >= 300) {
-                throw new Exception("HTTP 下载失败: " + code);
+                throw new Exception("HTTP download failed: " + code);
             }
             String mimeType = connection.getContentType();
             if (mimeType == null || !mimeType.toLowerCase(java.util.Locale.ROOT).startsWith("image/")) {
@@ -153,7 +153,7 @@ public final class SimpleHttpClient {
             while ((read = input.read(buffer)) >= 0) {
                 total += read;
                 if (total > maxBytes) {
-                    throw new Exception("数据过大，当前上限为 " + (maxBytes / 1024 / 1024) + " MB。");
+                    throw new Exception("Data too large, current limit is " + (maxBytes / 1024 / 1024) + " MB.");
                 }
                 output.write(buffer, 0, read);
             }

@@ -52,6 +52,44 @@ public final class ToolBuiltinsTest {
     }
 
     @Test
+    public void fileReadLargeFileWithKbRangeDoesNotError() throws Exception {
+        // A file larger than 1MB must be readable via start_kb/end_kb without
+        // being rejected outright.
+        File file = folder.newFile("big.txt");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 200000; i++) {
+            sb.append("line ").append(i).append("\n");
+        }
+        Files.write(file.toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
+        Assert.assertTrue(file.length() > 1024 * 1024);
+
+        ToolResult result = new FileReadTool().execute(new JSONObject()
+                .put("file_path", "big.txt")
+                .put("start_kb", 0)
+                .put("end_kb", 50), context());
+
+        Assert.assertFalse(result.isError());
+        Assert.assertTrue(result.getContent().contains("1\tline 0"));
+    }
+
+    @Test
+    public void fileReadRangeWithoutKbOnLargeFileErrors() throws Exception {
+        // Without a KB range, a >= 50KB file must still be rejected.
+        File file = folder.newFile("medium.txt");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 20000; i++) {
+            sb.append("line ").append(i).append("\n");
+        }
+        Files.write(file.toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
+        Assert.assertTrue(file.length() > 50 * 1024);
+
+        ToolResult result = new FileReadTool().execute(new JSONObject()
+                .put("file_path", "medium.txt"), context());
+
+        Assert.assertTrue(result.isError());
+    }
+
+    @Test
     public void fileWriteCreatesParentDirectories() throws Exception {
         ToolResult result = new FileWriteTool().execute(new JSONObject()
                 .put("file_path", "src/main.txt")
@@ -82,7 +120,7 @@ public final class ToolBuiltinsTest {
                 .put("content", "bad"), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("超出当前工作区"));
+        Assert.assertTrue(result.getContent().contains("Path is outside the current workspace"));
     }
 
     @Test
@@ -93,7 +131,7 @@ public final class ToolBuiltinsTest {
                 .put("paths", new org.json.JSONArray().put("delete-me.txt")), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("reason"));
+        Assert.assertTrue(result.getContent().contains("Deletion reason cannot be empty"));
         Assert.assertTrue(file.exists());
     }
 
@@ -109,7 +147,7 @@ public final class ToolBuiltinsTest {
 
         Assert.assertFalse(result.isError());
         Assert.assertFalse(dir.exists());
-        Assert.assertTrue(result.getContent().contains("成功删除"));
+        Assert.assertTrue(result.getContent().contains("Successfully deleted"));
     }
 
     @Test
@@ -123,7 +161,7 @@ public final class ToolBuiltinsTest {
         ToolResult result = new WebSearchTool(tavilyRepo).execute(new JSONObject().put("query", "LineAI"), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("网页搜索未配置"));
+        Assert.assertTrue(result.getContent().contains("Web search not configured"));
     }
 
     @Test
@@ -131,7 +169,7 @@ public final class ToolBuiltinsTest {
         ToolResult result = new WebFetchTool().execute(new JSONObject().put("url", "http://example.com"), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("HTTP 明文"));
+        Assert.assertTrue(result.getContent().contains("cleartext"));
     }
 
     @Test
@@ -142,7 +180,7 @@ public final class ToolBuiltinsTest {
                 .put("prompt", "读取入口文件"), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("Agent 执行器未接入"));
+        Assert.assertTrue(result.getContent().contains("Agent runner not available"));
     }
 
     @Test
@@ -154,7 +192,7 @@ public final class ToolBuiltinsTest {
                 .put("write_scope", new org.json.JSONArray().put("app/src/main/java")), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("explore Agent 不能声明 write_scope"));
+        Assert.assertTrue(result.getContent().contains("explore Agent cannot declare write_scope"));
     }
 
     @Test
@@ -169,7 +207,7 @@ public final class ToolBuiltinsTest {
                                 .put("depends_on", new org.json.JSONArray().put("scan")))), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("Agent 不能依赖自身: scan"));
+        Assert.assertTrue(result.getContent().contains("Agent cannot depend on itself: scan"));
     }
 
     @Test
@@ -183,7 +221,7 @@ public final class ToolBuiltinsTest {
                                 .put("prompt", "实现按钮样式"))), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("sub-coding Agent 必须声明 write_scope"));
+        Assert.assertTrue(result.getContent().contains("sub-coding Agent must declare write_scope"));
     }
 
     @Test
@@ -205,7 +243,7 @@ public final class ToolBuiltinsTest {
         ToolResult result = new AgentPipelineTool().execute(new JSONObject().put("agents", agents), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("多个 Agent 不能写同一文件或重叠目录"));
+        Assert.assertTrue(result.getContent().contains("Multiple Agents cannot write the same file"));
     }
 
     @Test
@@ -227,10 +265,13 @@ public final class ToolBuiltinsTest {
         ToolResult result = new AgentPipelineTool().execute(new JSONObject().put("agents", agents), context());
 
         Assert.assertTrue(result.isError());
-        Assert.assertTrue(result.getContent().contains("多个 Agent 不能写同一文件或重叠目录"));
+        Assert.assertTrue(result.getContent().contains("Multiple Agents cannot write the same file"));
     }
 
     private ToolContext context() {
-        return ToolContext.builder().homePath(folder.getRoot().getAbsolutePath()).build();
+        return ToolContext.builder()
+            .homePath(folder.getRoot().getAbsolutePath())
+            .stringResolver(new FakeResourceContext())
+            .build();
     }
 }

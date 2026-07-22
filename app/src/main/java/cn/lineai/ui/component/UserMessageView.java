@@ -124,6 +124,9 @@ public final class UserMessageView extends LinearLayout {
             return "";
         }
         String content = message.getContent();
+        if (content.length() == 0 && message.hasAttachments()) {
+            return "";
+        }
         if (getContext().getString(R.string.message_user_attached_files).equals(content.trim()) && message.hasAttachments()) {
             return "";
         }

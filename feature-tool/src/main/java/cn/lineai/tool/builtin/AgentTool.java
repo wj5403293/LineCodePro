@@ -1,6 +1,7 @@
 package cn.lineai.tool.builtin;
 
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -25,7 +26,22 @@ public final class AgentTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "分派一个子 Agent 处理任务。explore 只能只读探索；sub-coding 必须有明确且唯一的写入范围，不能和其他 Agent 操纵同一文件。";
+        return "Dispatch a sub-Agent to handle a task. explore is read-only; sub-coding must have a clear and unique write scope. "
+                + "Returns a compact ref with agent_id (not full transcript). Use agent_output(agent_id) to fetch full output when needed. "
+                + "Optional async=true returns immediately for explore agents.";
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_BOT;
+    }
+
+    @Override
+    public String getActionName(android.content.Context context) {
+        if (context == null) {
+            return "Agent";
+        }
+        return context.getString(R.string.tool_agent_action);
     }
 
     @Override
@@ -46,21 +62,24 @@ public final class AgentTool extends BaseTool {
                         .put("type", new JSONObject()
                                 .put("type", "string")
                                 .put("enum", new JSONArray().put(TYPE_EXPLORE).put(TYPE_SUB_CODING))
-                                .put("description", "Agent 类型：explore 只读探索，sub-coding 编程子任务"))
+                                .put("description", "Agent type: explore for read-only exploration, sub-coding for programming subtasks"))
                         .put("description", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "3-8 个词的任务标题"))
+                                .put("description", "Task title of 3-8 words"))
                         .put("prompt", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "分派给 Agent 的详细任务、范围、限制和验收方式。必须写明不能修改未授权文件；如需修改范围外文件必须停止并汇报"))
+                                .put("description", "Detailed task assigned to the Agent, including scope, constraints, and acceptance criteria. Must state that unauthorized files must not be modified; if out-of-scope files must be modified, stop and report."))
                         .put("read_scope", new JSONObject()
                                 .put("type", "array")
                                 .put("items", new JSONObject().put("type", "string"))
-                                .put("description", "允许读取的文件或目录路径列表。为空时仍应只读取完成任务所需的最小范围"))
+                                .put("description", "List of files or directories allowed to read. When empty, still read only the minimum scope needed to complete the task"))
                         .put("write_scope", new JSONObject()
                                 .put("type", "array")
                                 .put("items", new JSONObject().put("type", "string"))
-                                .put("description", "sub-coding 允许写入的唯一文件或目录路径列表；explore 必须留空。不要把同一文件分配给多个 Agent")))
+                                .put("description", "Unique list of files or directories sub-coding is allowed to write; explore must be empty. Do not assign the same file to multiple Agents"))
+                        .put("async", new JSONObject()
+                                .put("type", "boolean")
+                                .put("description", "If true, return immediately with agent_id (explore only; default false). Fetch full output later via agent_output.")))
                 .put("required", new JSONArray().put("type").put("description").put("prompt"));
     }
 
@@ -70,19 +89,19 @@ public final class AgentTool extends BaseTool {
         String description = input.optString("description").trim();
         String prompt = input.optString("prompt").trim();
         if (!TYPE_EXPLORE.equals(type) && !TYPE_SUB_CODING.equals(type)) {
-            return error("Agent 类型只能是 explore 或 sub-coding。");
+            return error(context.getString(R.string.tool_agent_invalid_type));
         }
         if (TYPE_EXPLORE.equals(type) && hasScope(input.optJSONArray("write_scope"))) {
-            return error("explore Agent 不能声明 write_scope，也不能写入文件。");
+            return error(context.getString(R.string.tool_agent_explore_no_write));
         }
         if (description.length() == 0) {
-            return error("Agent description 不能为空。");
+            return error(context.getString(R.string.tool_agent_description_empty));
         }
         if (prompt.length() == 0) {
-            return error("Agent prompt 不能为空。");
+            return error(context.getString(R.string.tool_agent_prompt_empty));
         }
         if (context == null || context.getAgentRunner() == null) {
-            return error("Agent 执行器未接入，无法运行子 Agent。");
+            return error(context.getString(R.string.tool_agent_runner_not_available));
         }
         try {
             JSONObject normalized = new JSONObject(input.toString())
@@ -91,7 +110,7 @@ public final class AgentTool extends BaseTool {
                     .put("prompt", prompt);
             return context.getAgentRunner().runAgent(normalized, context);
         } catch (Exception e) {
-            return error("Agent 参数解析失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_agent_parse_failed, e.getMessage()));
         }
     }
 

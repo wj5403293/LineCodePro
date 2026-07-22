@@ -5,7 +5,7 @@ import cn.lineai.R;
 import cn.lineai.ai.ModelCancellationToken;
 import cn.lineai.context.ContextCompactionService;
 import cn.lineai.context.ContextManager;
-import cn.lineai.context.MemoryExtractionService;
+
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.ChatModeRepository;
 import cn.lineai.data.repository.ConversationStore;
@@ -16,6 +16,7 @@ import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.IpcFileTreeStore;
 import cn.lineai.data.repository.IpcProviderStore;
 import cn.lineai.data.repository.LearningContextStore;
+import cn.lineai.service.LearningContextService;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.ProjectStore;
 import cn.lineai.data.repository.PromptTemplateRepository;
@@ -50,6 +51,7 @@ final class MainControllerInitializer {
         InputSettingsRepository inputSettingsRepository = dependencies.inputSettingsRepository;
         PromptTemplateRepository promptTemplateRepository = dependencies.promptTemplateRepository;
         LearningContextStore learningContextRepository = dependencies.learningContextRepository;
+        LearningContextService learningContextService = dependencies.learningContextService;
         OutputSettingsRepository outputSettingsRepository = dependencies.outputSettingsRepository;
         ThemeSettingsRepository themeSettingsRepository = dependencies.themeSettingsRepository;
         ExtensionStore extensionRepository = dependencies.extensionRepository;
@@ -58,7 +60,6 @@ final class MainControllerInitializer {
         FileTreeStore fileTreeRepository = dependencies.fileTreeRepository;
         IpcFileTreeStore ipcFileTreeRepository = dependencies.ipcFileTreeRepository;
         SshFileTreeStore sshFileTreeRepository = dependencies.sshFileTreeRepository;
-        MemoryExtractionService memoryExtractionService = dependencies.memoryExtractionService;
         ContextManager contextManager = dependencies.contextManager;
         ContextCompactionService contextCompactionService = dependencies.contextCompactionService;
         cn.lineai.ai.ModelClient modelClient = dependencies.modelClient;
@@ -178,6 +179,7 @@ final class MainControllerInitializer {
                 inputSettingsRepository,
                 promptTemplateRepository,
                 learningContextRepository,
+                learningContextService,
                 outputSettingsRepository,
                 themeSettingsRepository,
                 toolSettingsRepository,
@@ -395,7 +397,7 @@ final class MainControllerInitializer {
                 aiBehaviorSettingsRepository,
                 chatModeRepository,
                 promptTemplateRepository,
-                learningContextRepository,
+                learningContextService,
                 contextManager,
                 modelRepository,
                 extensionRepository,
@@ -569,7 +571,6 @@ final class MainControllerInitializer {
                 chatSessionStore,
                 modelClient,
                 aiBehaviorSettingsRepository,
-                memoryExtractionService,
                 extensionRepository,
                 toolRegistry,
                 toolExecutor,

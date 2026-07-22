@@ -49,7 +49,7 @@ public final class SheetOption {
     }
 
     public String getDeleteActionLabel() {
-        return deleteActionLabel.length() == 0 ? "删除" : deleteActionLabel;
+        return deleteActionLabel.length() == 0 ? "Delete" : deleteActionLabel;
     }
 
     public boolean hasDeleteAction() {

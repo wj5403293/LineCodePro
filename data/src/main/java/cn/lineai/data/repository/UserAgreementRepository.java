@@ -1,7 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
-
 public final class UserAgreementRepository {
 
     public static final int CURRENT_VERSION = 1;
@@ -11,8 +9,8 @@ public final class UserAgreementRepository {
 
     private final SettingsRepository settings;
 
-    public UserAgreementRepository(Context context) {
-        this.settings = new SettingsRepository(context);
+    public UserAgreementRepository(SettingsRepository settings) {
+        this.settings = settings;
     }
 
     public boolean isAccepted() {

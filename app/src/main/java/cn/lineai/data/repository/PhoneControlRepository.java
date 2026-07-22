@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.service.AccessibilityStateProvider;
 
 public final class PhoneControlRepository {
 
@@ -27,12 +26,12 @@ public final class PhoneControlRepository {
             PERMISSION_GLOBAL_ACTION
     };
 
-    private final Context context;
     private final SettingsRepository settingsRepository;
+    private final AccessibilityStateProvider accessibilityStateProvider;
 
-    public PhoneControlRepository(Context context) {
-        this.context = context.getApplicationContext();
-        this.settingsRepository = new SettingsRepository(this.context);
+    public PhoneControlRepository(SettingsRepository settingsRepository, AccessibilityStateProvider accessibilityStateProvider) {
+        this.settingsRepository = settingsRepository;
+        this.accessibilityStateProvider = accessibilityStateProvider;
     }
 
     public boolean isDisclaimerAccepted() {
@@ -48,7 +47,7 @@ public final class PhoneControlRepository {
     }
 
     public boolean isAccessibilityEnabled() {
-        return LineCodeAccessibilityService.isServiceEnabled(context);
+        return accessibilityStateProvider.isAccessibilityEnabled();
     }
 
     public boolean isExplicitlyEnabled() {

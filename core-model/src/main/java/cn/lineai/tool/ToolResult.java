@@ -17,12 +17,6 @@ public final class ToolResult {
     /** 中间截断时保留的首/尾各半字符数。 */
     private static final int TRUNCATION_HALF = MAX_TOOL_RESULT_CHARS / 2;
 
-    @Deprecated
-    public ToolResult(String toolCallId, String toolName, String content, boolean error) {
-        this(toolCallId, toolName, content, error, "", "", "");
-    }
-
-    @Deprecated
     public ToolResult(
             String toolCallId,
             String toolName,
@@ -41,6 +35,10 @@ public final class ToolResult {
         this.reviewMessage = Strings.nullToEmpty(reviewMessage);
     }
 
+    public static ToolResult of(String toolCallId, String toolName, String content, boolean error) {
+        return new ToolResult(toolCallId, toolName, content, error, "", "", "");
+    }
+
     public static ToolResult success(String output) {
         return new ToolResult("", "", output, false, "", "", "");
     }
@@ -52,6 +50,11 @@ public final class ToolResult {
     public static ToolResult withReview(String output, String toolCallId, String toolName,
                                          String diffId, String reviewState, String reviewMessage) {
         return new ToolResult(toolCallId, toolName, output, false, diffId, reviewState, reviewMessage);
+    }
+
+    public static ToolResult withReview(String toolCallId, String toolName, String content,
+                                         boolean error, String diffId, String reviewState, String reviewMessage) {
+        return new ToolResult(toolCallId, toolName, content, error, diffId, reviewState, reviewMessage);
     }
 
     public String getToolCallId() {

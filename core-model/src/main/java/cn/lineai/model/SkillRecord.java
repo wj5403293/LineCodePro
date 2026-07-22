@@ -75,12 +75,12 @@ public final class SkillRecord {
 
     public String getLocationLabel() {
         if (LOCATION_PROJECT.equals(location)) {
-            return "当前工作区 .linecode/skills";
+            return "Current workspace .linecode/skills";
         }
         if (LOCATION_SSH.equals(location)) {
             return "SSH ~/.linecode/skills";
         }
-        return "应用 .linecode/skills";
+        return "App .linecode/skills";
     }
 
     public static String normalizeLocation(String value) {

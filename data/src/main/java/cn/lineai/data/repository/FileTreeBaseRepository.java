@@ -14,10 +14,10 @@ public abstract class FileTreeBaseRepository {
     protected String cleanName(String name) {
         String value = name == null ? "" : name.trim();
         if (value.length() == 0) {
-            throw new IllegalArgumentException("名称不能为空");
+            throw new IllegalArgumentException("Name cannot be empty");
         }
         if (value.contains("/") || value.contains("\\") || ".".equals(value) || "..".equals(value)) {
-            throw new IllegalArgumentException("名称不能包含路径分隔符");
+            throw new IllegalArgumentException("Name cannot contain path separators");
         }
         return value;
     }
@@ -57,7 +57,7 @@ public abstract class FileTreeBaseRepository {
         String value = path == null ? "" : path.trim();
         int index = value.lastIndexOf('/');
         if (index <= 0) {
-            throw new IllegalArgumentException("无法解析父目录: " + path);
+            throw new IllegalArgumentException("Cannot resolve parent directory: " + path);
         }
         return value.substring(0, index);
     }

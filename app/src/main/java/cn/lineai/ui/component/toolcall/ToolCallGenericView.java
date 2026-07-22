@@ -86,7 +86,23 @@ public final class ToolCallGenericView extends BaseToolCallView implements ToolC
             addSection(getContext().getString(R.string.tool_call_input), inputText, LineTheme.TEXT_SECONDARY, 2);
         }
         if (hasResult) {
-            addSection(running ? getContext().getString(R.string.tool_call_progress) : getContext().getString(R.string.tool_call_output), result.getContent(), error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY, running ? 3 : 8);
+            // If content is structured agent progress but we fell through to generic
+            // (missing registry), prefer human output over raw JSON dump.
+            String rawContent = result.getContent();
+            String displayContent = AgentToolResultDisplay.progressPayload(rawContent) != null
+                    ? AgentToolResultDisplay.displayOutput(rawContent)
+                    : rawContent;
+            if (displayContent == null || displayContent.trim().length() == 0) {
+                displayContent = error
+                        ? getContext().getString(R.string.tool_call_agent_failed)
+                        : getContext().getString(R.string.tool_call_agent_done);
+            }
+            addSection(
+                    running ? getContext().getString(R.string.tool_call_progress)
+                            : getContext().getString(R.string.tool_call_output),
+                    displayContent,
+                    error ? LineTheme.DANGER : LineTheme.TEXT_SECONDARY,
+                    running ? 3 : 8);
         }
     }
 

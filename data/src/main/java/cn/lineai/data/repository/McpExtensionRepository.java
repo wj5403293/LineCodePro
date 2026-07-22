@@ -113,13 +113,13 @@ public final class McpExtensionRepository extends BaseRepository {
         }
         List<McpToolSummary> tools = parseMcpToolResponse(response.body);
         if (tools.isEmpty()) {
-            throw new IllegalStateException("没有在 MCP 响应中找到 tools 列表。");
+            throw new IllegalStateException("No tools list found in MCP response.");
         }
         return tools;
     }
 
     private String normalizeHttpUrl(String raw) {
-        String value = UrlPolicy.requireHttpOrLocalCleartextUrl(raw, "MCP 地址");
+        String value = UrlPolicy.requireHttpOrLocalCleartextUrl(raw, "MCP URL");
         while (value.endsWith("/") && value.length() > "https://x".length()) {
             value = value.substring(0, value.length() - 1);
         }

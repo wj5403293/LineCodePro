@@ -1,5 +1,7 @@
 package cn.lineai.mvp;
 
+import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.model.FileTreeNode;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +31,7 @@ public abstract class RemoteFileTreeController {
     private final DirectoryStore directoryStore;
     private final BackgroundRunner backgroundRunner;
     private final UiDispatcher uiDispatcher;
+    private Context context;
 
     protected RemoteFileTreeController(
             DirectoryStore directoryStore,
@@ -38,6 +41,10 @@ public abstract class RemoteFileTreeController {
         this.directoryStore = directoryStore;
         this.backgroundRunner = backgroundRunner;
         this.uiDispatcher = uiDispatcher;
+    }
+
+    public void setContext(Context context) {
+        this.context = context;
     }
 
     protected abstract boolean isExecutionMode();
@@ -302,7 +309,8 @@ public abstract class RemoteFileTreeController {
                 }
             }
             if (loadingPaths.contains(path) && indexedChildren == null) {
-                children.add(new FileTreeNode("正在读取...", path + "#loading", false, false, Collections.emptyList()));
+                String loadingText = context != null ? context.getString(R.string.remote_file_tree_loading) : "Loading…";
+                children.add(new FileTreeNode(loadingText, path + "#loading", false, false, Collections.emptyList()));
             }
             if (error.length() > 0 && path.equals(rootPath) && indexedChildren == null) {
                 children.add(new FileTreeNode(error, path + "#error", false, false, Collections.emptyList()));

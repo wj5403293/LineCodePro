@@ -9,6 +9,7 @@ import cn.lineai.model.ModelProtocolType;
 import cn.lineai.model.ModelStore;
 import cn.lineai.tool.BaseTool;
 import cn.lineai.tool.ModelServiceProvider;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -37,14 +38,14 @@ public final class ImageGenerationTool extends BaseTool {
 
     @Override
     public String promptSupplement(String executionMode, boolean isSsh) {
-        return "image_generation 由应用侧生图模型配置执行，不依赖"
-                + (isSsh ? "SSH 主机环境" : "终端提供者环境")
-                + "；结果会以内联 Markdown 图片返回。";
+        return "image_generation is executed by the app-side image generation model configuration, independent of "
+                + (isSsh ? "the SSH host environment" : "the terminal provider environment")
+                + "; the result is returned as an inline Markdown image.";
     }
 
     @Override
     public String getDescription() {
-        return "根据提示词调用工具设置里选择的生图模型生成图片，成功后返回可直接嵌入 Markdown 的图片。支持 OpenAI Images API 和 Responses image_generation 工具。";
+        return "Generate an image using the image generation model selected in tool settings based on the prompt; on success returns an image that can be embedded directly in Markdown. Supports the OpenAI Images API and the Responses image_generation tool.";
     }
 
     @Override
@@ -55,6 +56,16 @@ public final class ImageGenerationTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.IMAGE_GENERATION;
+    }
+
+    @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_image_generation);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SPARKLES;
     }
 
     @Override
@@ -69,16 +80,16 @@ public final class ImageGenerationTool extends BaseTool {
                 .put("properties", new JSONObject()
                         .put("prompt", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "图片生成提示词，包含主体、风格、构图、文字要求和限制"))
+                                .put("description", "Image generation prompt, including subject, style, composition, text requirements, and constraints"))
                         .put("size", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "图片尺寸，默认 1024x1024；常见值: 1024x1024、1024x1536、1536x1024、auto"))
+                                .put("description", "Image size, default 1024x1024; common values: 1024x1024, 1024x1536, 1536x1024, auto"))
                         .put("quality", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "质量选项，可留空；常见值: auto、low、medium、high、standard、hd"))
+                                .put("description", "Quality option, may be empty; common values: auto, low, medium, high, standard, hd"))
                         .put("background", new JSONObject()
                                 .put("type", "string")
-                                .put("description", "背景选项，可留空；常见值: auto、transparent、opaque")))
+                                .put("description", "Background option, may be empty; common values: auto, transparent, opaque")))
                 .put("required", new JSONArray().put("prompt"));
     }
 
@@ -88,32 +99,32 @@ public final class ImageGenerationTool extends BaseTool {
         ModelStore modelRepository = context != null ? context.getModelRepository() : null;
         ModelServiceProvider modelServiceProvider = context != null ? context.getModelServiceProvider() : null;
         if (settingsRepository == null || modelRepository == null) {
-            return error("图片生成工具未接入应用上下文。");
+            return error(context.getString(R.string.tool_img_gen_no_context));
         }
         String prompt = input == null ? "" : input.optString("prompt").trim();
         if (prompt.length() == 0) {
-            return error("图片生成提示词不能为空。");
+            return error(context.getString(R.string.tool_img_gen_prompt_empty));
         }
         ModelConfig model = selectedModel(settingsRepository, modelRepository);
         if (model == null) {
-            return error("图片生成未选择模型。请在 设置 -> 工具设置 -> 图片操作 中选择生图模型。");
+            return error(context.getString(R.string.tool_img_gen_no_model));
         }
         if (modelServiceProvider == null) {
-            return error("图片生成工具未接入模型服务。");
+            return error(context.getString(R.string.tool_img_gen_no_model_service));
         }
         if (!modelServiceProvider.supportsImageGeneration(model.getProtocolType())) {
-            return error("图片生成当前仅支持 OpenAI 兼容或 Codex 协议模型。请添加或选择一个 Images API 兼容模型。");
+            return error(context.getString(R.string.tool_img_gen_unsupported_protocol));
         }
         try {
             if (context != null) {
-                context.reportToolProgress(getName(), "正在生成图片...", false);
+                context.reportToolProgress(getName(), context.getString(R.string.tool_img_gen_progress), false);
             }
             ImageResponseParser.GeneratedImage image = model.getProtocolType() == ModelProtocolType.CODEX_RESPONSES
-                    ? generateWithResponsesApi(model, input, prompt)
+                    ? generateWithResponsesApi(model, input, prompt, context)
                     : generateWithImagesApi(model, input, prompt, context);
-            String displayMarkdown = "![" + markdownAlt(prompt) + "](" + image.dataUrl + ")";
-            String modelContent = "图片已生成并已在对话中显示。提示词: " + trimForModel(prompt)
-                    + (image.revisedPrompt.length() == 0 ? "" : "\n修订提示词: " + trimForModel(image.revisedPrompt));
+            String displayMarkdown = "![" + markdownAlt(prompt, context) + "](" + image.dataUrl + ")";
+            String modelContent = context.getString(R.string.tool_img_gen_result, trimForModel(prompt))
+                    + (image.revisedPrompt.length() == 0 ? "" : context.getString(R.string.tool_img_gen_revised_prompt, trimForModel(image.revisedPrompt)));
             JSONObject result = new JSONObject()
                     .put("linecode_image_generation", true)
                     .put("display_markdown", displayMarkdown)
@@ -123,7 +134,7 @@ public final class ImageGenerationTool extends BaseTool {
                     .put("revised_prompt", image.revisedPrompt);
             return ok(result.toString());
         } catch (Exception e) {
-            return error("图片生成失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_img_gen_failed, e.getMessage()));
         }
     }
 
@@ -148,10 +159,10 @@ public final class ImageGenerationTool extends BaseTool {
         return responseParser.parseImagesResponse(raw, context);
     }
 
-    private ImageResponseParser.GeneratedImage generateWithResponsesApi(ModelConfig model, JSONObject input, String prompt) throws Exception {
+    private ImageResponseParser.GeneratedImage generateWithResponsesApi(ModelConfig model, JSONObject input, String prompt, ToolContext context) throws Exception {
         JSONObject body = apiClient.responsesRequestBody(model, input, prompt);
         String raw = apiClient.postJson(apiClient.responsesEndpoint(model.getBaseUrl()), body, apiClient.codexHeaders(model));
-        return responseParser.parseResponsesImage(raw);
+        return responseParser.parseResponsesImage(raw, context);
     }
 
     private String responsesEndpoint(String baseUrl) {
@@ -170,8 +181,8 @@ public final class ImageGenerationTool extends BaseTool {
         return apiClient.imagesRequestBody(model, input, prompt, requestBase64);
     }
 
-    private ImageResponseParser.GeneratedImage parseResponsesImage(String raw) throws Exception {
-        return responseParser.parseResponsesImage(raw);
+    private ImageResponseParser.GeneratedImage parseResponsesImage(String raw, ToolContext context) throws Exception {
+        return responseParser.parseResponsesImage(raw, context);
     }
 
     private ImageResponseParser.GeneratedImage parseImagesResponse(String raw, ToolContext context) throws Exception {
@@ -185,12 +196,12 @@ public final class ImageGenerationTool extends BaseTool {
         return !(id.startsWith("gpt-image-") || "chatgpt-image-latest".equals(id));
     }
 
-    private String markdownAlt(String prompt) {
+    private String markdownAlt(String prompt, ToolContext context) {
         String value = prompt == null ? "" : prompt.replace('\n', ' ').replace('\r', ' ').replace('[', ' ').replace(']', ' ').trim();
         if (value.length() > 80) {
             value = value.substring(0, 77) + "...";
         }
-        return value.length() == 0 ? "生成图片" : value;
+        return value.length() == 0 ? context.getString(R.string.tool_img_gen_default_alt) : value;
     }
 
     private String trimForModel(String value) {

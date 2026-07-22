@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.AiBehaviorSettings;
 
 public final class AiBehaviorSettingsRepository {
@@ -13,8 +12,8 @@ public final class AiBehaviorSettingsRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public AiBehaviorSettingsRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public AiBehaviorSettingsRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized AiBehaviorSettings get() {

@@ -46,7 +46,7 @@ public final class PdfRenderer {
         for (ChatMessage msg : messages) {
             if (msg.getContent() == null || msg.getContent().isEmpty()) continue;
 
-            String label = msg.getRole() == ChatMessage.Role.USER ? "我" : "AI";
+            String label = msg.getRole() == ChatMessage.Role.USER ? "Me" : "AI";
 
             // Draw title
             if (y + TITLE_SIZE > pageHeight - margin) {

@@ -59,8 +59,6 @@ final class ChatInteractionController {
     private final Host host;
     private String lastMessageModelId = "";
 
-    private static final String ATTACHMENT_BLOCK_HEADER = "\n\n[引用文件]\n";
-
     ChatInteractionController(
             ArrayList<ChatMessage> messages,
             ChatSessionStore chatSessionStore,
@@ -279,7 +277,8 @@ final class ChatInteractionController {
         if (chatSessionStore.isStreaming()) {
             return;
         }
-        chatModeRepository.applyMode(mode, toolSettingsRepository);
+        chatModeRepository.applyMode(mode);
+        chatModeRepository.applyPermissionForMode(mode, toolSettingsRepository);
         host.syncModePermission();
         host.render();
     }
@@ -334,49 +333,23 @@ final class ChatInteractionController {
     }
 
     /**
-     * 把用户输入文本与附件路径合并为最终发送给模型的 user 消息内容。
-     *
-     * <p>当用户从输入框左下角的 + 号引用了文件时，必须让模型在 user 消息正文里
-     * 直接看到引用的文件路径，否则模型只能依赖 system prompt 末尾的「附加文件位置」
-     * 段落，在长上下文或弱模型下容易被忽略，表现为「AI 不知道文件被引用」。</p>
-     *
-     * <p>引用块使用 {@link #ATTACHMENT_BLOCK_HEADER} 作为唯一分隔符，便于
-     * {@link #recallText(String, List)} 在用户召回消息时剥离该块，回填到输入框
-     * 的内容只包含用户原始输入。</p>
+     * 返回用户输入文本，不再将附件路径拼接到消息正文中。
+     * 附件信息仅通过 ChatMessage.attachments 元数据传递。
      */
     private String composeUserContent(String text, List<InputAttachment> attachments) {
         String trimmed = text == null ? "" : text.trim();
-        if (attachments == null || attachments.isEmpty()) {
-            return trimmed;
-        }
-        StringBuilder attachmentInfo = new StringBuilder();
-        for (InputAttachment attachment : attachments) {
-            if (attachment == null || attachment.getPath().length() == 0) {
-                continue;
-            }
-            if (attachmentInfo.length() > 0) {
-                attachmentInfo.append('\n');
-            }
-            attachmentInfo.append("- ").append(attachment.getPath());
-        }
-        if (attachmentInfo.length() == 0) {
-            return trimmed.length() > 0 ? trimmed : "已附加文件";
-        }
-        String attachmentBlock = ATTACHMENT_BLOCK_HEADER + attachmentInfo.toString();
-        if (trimmed.length() == 0) {
-            return "已附加文件" + attachmentBlock;
-        }
-        return trimmed + attachmentBlock;
+        return trimmed;
     }
 
     private String recallText(String content, List<InputAttachment> attachments) {
         String value = content == null ? "" : content;
-        // 剥离 composeUserContent 追加的引用文件块，回填到输入框的只是用户原始输入
-        int idx = value.indexOf(ATTACHMENT_BLOCK_HEADER);
-        String base = idx >= 0 ? value.substring(0, idx) : value;
-        if ("已附加文件".equals(base.trim()) && attachments != null && !attachments.isEmpty()) {
+        // 兼容旧消息：旧版 composeUserContent 在只有附件无文本时会写入 "已附加文件"
+        if ("已附加文件".equals(value.trim()) && attachments != null && !attachments.isEmpty()) {
             return "";
         }
-        return base;
+        if (value.trim().length() == 0 && attachments != null && !attachments.isEmpty()) {
+            return "";
+        }
+        return value;
     }
 }

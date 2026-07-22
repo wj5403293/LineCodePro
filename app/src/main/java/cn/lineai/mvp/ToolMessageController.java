@@ -264,7 +264,7 @@ final class ToolMessageController {
                 }
                 int resultIndex = findToolMessageIndex(call.getId());
                 if (resultIndex < 0 || isUnfinishedToolMessage(messages.get(resultIndex))) {
-                    results.add(new ToolResult(call.getId(), call.getName(), terminatedContent, true));
+                    results.add(ToolResult.of(call.getId(), call.getName(), terminatedContent, true));
                 }
             }
         }

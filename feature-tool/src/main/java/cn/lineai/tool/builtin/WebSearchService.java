@@ -34,10 +34,10 @@ final class WebSearchService {
         WebSearchConfig value = config == null ? WebSearchConfig.defaultConfig() : config;
         if (value.requiresApiKey()) {
             if (value.getBaseUrl().length() == 0 || value.getApiKey().length() == 0) {
-                throw new IllegalStateException("网页搜索未配置。请在 MCP 工具设置中填写搜索 API、模型/搜索源和密钥。");
+                throw new IllegalStateException("Web search not configured. Please fill in the search API, model/search source and key in MCP tool settings.");
             }
         } else if (value.getBaseUrl().length() == 0 && !WebSearchConfig.PROVIDER_BING_RSS_FREE.equals(value.getProvider())) {
-            throw new IllegalStateException("网页搜索未配置。请在 MCP 工具设置中填写搜索 API 地址。");
+            throw new IllegalStateException("Web search not configured. Please fill in the search API URL in MCP tool settings.");
         }
         int maxResults = Math.max(1, Math.min(limit <= 0 ? 5 : limit, 10));
         String providerId = WebSearchConfig.normalizeProvider(value.getProvider());
@@ -49,7 +49,7 @@ final class WebSearchService {
         httpRequest.headers.putAll(searchRequest.headers);
         SimpleHttpClient.Response response = SimpleHttpClient.execute(httpRequest);
         if (response.code < 200 || response.code >= 300) {
-            throw new IllegalStateException("搜索 API " + response.code + ": " + extractErrorText(response.body));
+            throw new IllegalStateException("Search API " + response.code + ": " + extractErrorText(response.body));
         }
         List<SearchResultItem> results = parseResults(provider, response.body);
         return results.size() > maxResults ? new ArrayList<>(results.subList(0, maxResults)) : results;
@@ -74,15 +74,15 @@ final class WebSearchService {
         request.headers.put("User-Agent", "LineCode/1.0");
         SimpleHttpClient.Response response = SimpleHttpClient.execute(request);
         if (response.code < 200 || response.code >= 300) {
-            throw new IllegalStateException("网页请求失败 " + response.code + ": " + response.message);
+            throw new IllegalStateException("Web request failed " + response.code + ": " + response.message);
         }
         String normalized = response.contentType.toLowerCase(java.util.Locale.ROOT).contains("html") ? htmlToText(response.body) : response.body;
         String compact = normalized.replaceAll("\\n{3,}", "\n\n").trim();
         if (compact.length() == 0) {
-            return "网页内容为空或无法提取正文。";
+            return "Web page content is empty or could not extract body text.";
         }
         if (compact.length() > limit) {
-            return compact.substring(0, limit) + "\n\n[内容已截断，原始长度约 " + compact.length() + " 字符]";
+            return compact.substring(0, limit) + "\n\n[Content truncated, original length approx. " + compact.length() + " characters]";
         }
         return compact;
     }
@@ -108,7 +108,7 @@ final class WebSearchService {
 
     private String extractErrorText(String text) {
         if (text == null || text.length() == 0) {
-            return "请求失败";
+            return "Request failed";
         }
         try {
             JSONObject object = new JSONObject(text);

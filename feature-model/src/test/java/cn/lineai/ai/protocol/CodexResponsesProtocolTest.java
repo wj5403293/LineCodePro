@@ -94,15 +94,14 @@ public final class CodexResponsesProtocolTest {
                 .toString()));
         server.start();
         try {
-            ModelConfig config = new ModelConfig(
+            ModelConfig config = ModelConfig.builder(
                     "m1",
                     "Codex",
                     ModelProtocolType.CODEX_RESPONSES,
                     "Codex",
                     "http://127.0.0.1:" + server.port() + "/v1/chat/completions",
                     "sk-test",
-                    "gpt-5-codex"
-            );
+                    "gpt-5-codex").build();
             ArrayList<ModelMessage> messages = new ArrayList<>();
             messages.add(new SystemModelMessage("system prompt"));
             messages.add(new UserModelMessage("read README"));
@@ -157,15 +156,14 @@ public final class CodexResponsesProtocolTest {
                 true);
         server.start();
         try {
-            ModelConfig config = new ModelConfig(
+            ModelConfig config = ModelConfig.builder(
                     "m1",
                     "Codex",
                     ModelProtocolType.CODEX_RESPONSES,
                     "Codex",
                     "http://127.0.0.1:" + server.port() + "/v1/chat/completions",
                     "sk-test",
-                    "gpt-5-codex"
-            );
+                    "gpt-5-codex").build();
             ArrayList<ModelMessage> messages = new ArrayList<>();
             messages.add(new UserModelMessage("say hello"));
             RecordingCallback callback = new RecordingCallback();
@@ -288,15 +286,14 @@ public final class CodexResponsesProtocolTest {
     }
 
     private ModelConfig codexConfig(int port) {
-        return new ModelConfig(
+        return ModelConfig.builder(
                 "m1",
                 "Codex",
                 ModelProtocolType.CODEX_RESPONSES,
                 "Codex",
                 "http://127.0.0.1:" + port + "/v1/chat/completions",
                 "sk-test",
-                "gpt-5-codex"
-        );
+                "gpt-5-codex").build();
     }
 
     private String sse(String event, String data) {
@@ -468,7 +465,7 @@ public final class CodexResponsesProtocolTest {
 
         @Override
         public ToolResult execute(JSONObject input, ToolContext context) {
-            return new ToolResult("", getName(), "", false);
+            return ToolResult.withReview("", getName(), "", false, "", "", "");
         }
     }
 }

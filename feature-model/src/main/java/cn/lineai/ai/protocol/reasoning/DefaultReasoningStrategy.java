@@ -2,6 +2,7 @@ package cn.lineai.ai.protocol.reasoning;
 
 import cn.lineai.ai.protocol.ReasoningRequestContext;
 import cn.lineai.ai.protocol.ReasoningRequestStrategy;
+import cn.lineai.model.AiBehaviorSettings;
 import org.json.JSONObject;
 
 public final class DefaultReasoningStrategy implements ReasoningRequestStrategy {
@@ -13,7 +14,11 @@ public final class DefaultReasoningStrategy implements ReasoningRequestStrategy 
     @Override
     public void apply(JSONObject body, ReasoningRequestContext context) throws Exception {
         if (context.isEnabled()) {
-            body.put("reasoning", new JSONObject().put("effort", context.getEffort()));
+            String effort = context.getEffort();
+            if (AiBehaviorSettings.REASONING_MAX.equals(effort)) {
+                effort = "xhigh";
+            }
+            body.put("reasoning", new JSONObject().put("effort", effort));
         }
     }
 }

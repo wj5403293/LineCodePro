@@ -11,7 +11,7 @@ public final class ClipboardFormat implements ExportFormat {
     private static final int WARN_LENGTH = 5000;
 
     @Override
-    public String displayName() { return "复制到剪贴板"; }
+    public String displayName() { return "Copy to clipboard"; }
 
     @Override
     public ExportResult execute(Context context, List<ChatMessage> messages) {

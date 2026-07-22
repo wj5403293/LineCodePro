@@ -9,7 +9,7 @@ import java.util.List;
 
 public final class PlainTextFormat implements ExportFormat {
     @Override
-    public String displayName() { return "纯文本分享"; }
+    public String displayName() { return "Plain text share"; }
 
     @Override
     public ExportResult execute(Context context, List<ChatMessage> messages) {

@@ -84,11 +84,11 @@ public final class ContextCompactionService {
             ModelCancellationToken cancellationToken
     ) throws ModelCompletionException {
         if (selectedModel == null) {
-            throw new ModelCompletionException("没有可用模型，无法压缩上下文");
+            throw new ModelCompletionException("No model available, cannot compact context");
         }
         ArrayList<ChatMessage> contextMessages = compactableMessages(messages);
         if (contextMessages.isEmpty()) {
-            throw new ModelCompletionException("当前上下文不足，无需压缩");
+            throw new ModelCompletionException("Context too small, no need to compact");
         }
         try {
             if (shouldUseResponsesCompaction(selectedModel)) {
@@ -103,7 +103,7 @@ public final class ContextCompactionService {
             // 这里释放本次调用中已经累积的大对象，再向上抛出可读的失败信息，
             // 让 ContextCompactionController 走降级路径而不是进程被杀。
             contextMessages.clear();
-            throw new ModelCompletionException("上下文过大，压缩时内存不足，请手动清理早期对话后重试", oom);
+            throw new ModelCompletionException("Context too large, out of memory during compaction. Please manually clear early messages and retry", oom);
         }
     }
 

@@ -1,15 +1,17 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import cn.lineai.ai.prompt.SkillPromptBuilder;
+import cn.lineai.R;
+import cn.lineai.ai.SkillPromptProvider;
 import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.data.service.SkillFileManager;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
+import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.SkillRecord;
+import cn.lineai.resource.ResourceProvider;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,19 +23,23 @@ import org.json.JSONObject;
 
 /**
  * Skill 仓库，负责 Skill 的 CRUD 与业务编排。
- * 文件系统操作委托给 {@link SkillFileManager}，提示词拼装委托给 {@link SkillPromptBuilder}。
+ * 文件系统操作委托给 {@link SkillFileManager}，提示词拼装委托给 {@link SkillPromptProvider}。
  */
 public final class SkillRepository extends BaseRepository {
 
+    private static final int MAX_SKILL_PROMPT_CHARS = 18000;
+
+    private final ResourceProvider resourceProvider;
     private final SkillFileManager fileManager;
-    private final SkillPromptBuilder promptBuilder;
+    private final SkillPromptProvider promptProvider;
     private final AgentExtensionRepository agentRepository;
     private final McpExtensionRepository mcpRepository;
 
-    public SkillRepository(Context context, AgentExtensionRepository agentRepository, McpExtensionRepository mcpRepository) {
-        super(LineCodeDatabase.getInstance(context.getApplicationContext()));
-        this.fileManager = new SkillFileManager(context);
-        this.promptBuilder = new SkillPromptBuilder(fileManager);
+    public SkillRepository(LineCodeDatabase database, ResourceProvider resourceProvider, SkillFileManager fileManager, AgentExtensionRepository agentRepository, McpExtensionRepository mcpRepository, SkillPromptProvider promptProvider) {
+        super(database);
+        this.resourceProvider = resourceProvider;
+        this.fileManager = fileManager;
+        this.promptProvider = promptProvider;
         this.agentRepository = agentRepository;
         this.mcpRepository = mcpRepository;
     }
@@ -67,7 +73,7 @@ public final class SkillRepository extends BaseRepository {
         fileManager.ensureSkillRoots(homePath);
         File source = new File(safe(sourcePath).trim()).getCanonicalFile();
         if (!source.exists()) {
-            throw new IllegalArgumentException("Skill 来源不存在: " + sourcePath);
+            throw new IllegalArgumentException(resourceProvider.getString(R.string.skill_source_not_found, sourcePath));
         }
         String normalizedLocation = SkillRecord.normalizeLocation(location);
         File root = fileManager.localSkillRoot(homePath, normalizedLocation);
@@ -122,7 +128,103 @@ public final class SkillRepository extends BaseRepository {
         List<ExtensionAgentConfig> agents = agentRepository.getAgentExtensions();
         List<ExtensionMcpConfig> mcps = mcpRepository.getMcpExtensions();
         List<SkillRecord> skills = getSkills(homePath);
-        return promptBuilder.buildExtensionPrompt(agents, mcps, skills);
+        StringBuilder builder = new StringBuilder();
+        boolean hasContent = false;
+        builder.append("## 扩展\n以下扩展来自设置里的\u300c扩展\u300d页面。自定义 Agent、HTTP MCP 和 Skills 都由 SQLite 配置动态注入。\n");
+
+        ArrayList<ExtensionAgentConfig> enabledAgents = new ArrayList<>();
+        for (ExtensionAgentConfig agent : agents) {
+            if (agent.isEnabled()) {
+                enabledAgents.add(agent);
+            }
+        }
+        if (!enabledAgents.isEmpty()) {
+            hasContent = true;
+            builder.append("\n### 自定义 Agent\n");
+            for (ExtensionAgentConfig agent : enabledAgents) {
+                builder.append("- ").append(agent.getName()).append(" (").append(agent.getSlug()).append(")\n");
+                if (agent.getTrigger().length() > 0) {
+                    builder.append("  - 触发条件: ").append(agent.getTrigger()).append('\n');
+                }
+                if (agent.getPrompt().length() > 0) {
+                    builder.append("  - Agent 提示词: ").append(limitInline(agent.getPrompt(), 1600)).append('\n');
+                }
+                builder.append("  - 工具: ").append(join(agent.getToolNames(), ", ", "无")).append('\n');
+                builder.append("  - MCP: ").append(join(agent.getMcpIds(), ", ", "无")).append('\n');
+            }
+        }
+
+        ArrayList<ExtensionMcpConfig> enabledMcps = new ArrayList<>();
+        for (ExtensionMcpConfig mcp : mcps) {
+            if (mcp.isEnabled()) {
+                enabledMcps.add(mcp);
+            }
+        }
+        if (!enabledMcps.isEmpty()) {
+            hasContent = true;
+            builder.append("\n### 自定义 HTTP MCP\n");
+            for (ExtensionMcpConfig mcp : enabledMcps) {
+                builder.append("- ").append(mcp.getName()).append(": ").append(mcp.getUrl())
+                        .append(" (").append(enabledToolNames(mcp)).append(")\n");
+            }
+        }
+
+        ArrayList<SkillRecord> enabledSkills = new ArrayList<>();
+        for (SkillRecord skill : skills) {
+            if (skill.isEnabled()) {
+                enabledSkills.add(skill);
+            }
+        }
+        if (!enabledSkills.isEmpty()) {
+            hasContent = true;
+            builder.append("\n### 已安装 Skills\n");
+            int usedChars = 0;
+            for (SkillRecord skill : enabledSkills) {
+                String skillContent = fileManager.readSkillPrompt(skill);
+                String block = promptProvider.buildExtensionPrompt(
+                        skill.getName(), skillContent, skill.getRootPath());
+                if (usedChars + block.length() > MAX_SKILL_PROMPT_CHARS) {
+                    builder.append("#### Skills 提示词已截断\n已达到提示词长度上限，剩余 Skills 仅按路径和工具描述处理。\n");
+                    break;
+                }
+                builder.append(block).append("\n\n");
+                usedChars += block.length();
+            }
+        }
+
+        return hasContent ? builder.toString().trim() : "";
+    }
+
+    private String enabledToolNames(ExtensionMcpConfig mcp) {
+        ArrayList<String> names = new ArrayList<>();
+        for (McpToolSummary tool : mcp.getTools()) {
+            if (tool.isEnabled()) {
+                names.add(tool.getName());
+            }
+        }
+        return join(names, ", ", "未启用 tools");
+    }
+
+    private String join(List<String> values, String separator, String empty) {
+        if (values == null || values.isEmpty()) {
+            return empty;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.length() == 0) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(separator);
+            }
+            builder.append(value);
+        }
+        return builder.length() == 0 ? empty : builder.toString();
+    }
+
+    private String limitInline(String value, int maxChars) {
+        String text = safe(value).replace('\r', '\n').replace("\n", "\\n").trim();
+        return text.length() <= maxChars ? text : text.substring(0, maxChars) + "...";
     }
 
     public ArrayList<String> skillWriteRoots(String homePath) {

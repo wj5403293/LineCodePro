@@ -29,14 +29,17 @@ public final class MessageContentSanitizer {
                 JSONObject object = new JSONObject(content);
                 if (object.optBoolean("linecode_image_generation")) {
                     String modelContent = object.optString("model_content");
-                    return modelContent.trim().length() > 0 ? modelContent : "图片已生成并已在对话中显示。";
+                    return modelContent.trim().length() > 0 ? modelContent : "Image generated and displayed in conversation.";
                 }
             } catch (Exception ignored) {
-                return "图片已生成并已在对话中显示。";
+                return "Image generated and displayed in conversation.";
             }
         }
         try {
             JSONObject object = new JSONObject(content);
+            if (object.optBoolean("linecode_agent_ref")) {
+                return stripInlineDataImages(content);
+            }
             if (!object.optBoolean("linecode_agent_progress")) {
                 return stripInlineDataImages(content);
             }
@@ -45,7 +48,7 @@ public final class MessageContentSanitizer {
                 return modelContent;
             }
             String output = object.optString("output");
-            return output.trim().length() > 0 ? output : "Agent 仍在运行，尚未生成最终结果。";
+            return output.trim().length() > 0 ? output : "Agent is still running, final result not yet generated.";
         } catch (Exception ignored) {
             return stripInlineDataImages(content);
         }

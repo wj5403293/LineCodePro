@@ -360,7 +360,13 @@ public final class ChatMessage {
     }
 
     public static ChatMessage modelSwitchNotice(String id, String fromModel, String toModel) {
-        String content = "模型已从 " + fromModel + " 更改为 " + toModel + "。";
+        String content = "Model changed from " + fromModel + " to " + toModel + ".";
+        return new ChatMessage(id, Role.ASSISTANT, "", "", false, false, true,
+                Collections.emptyList(), Collections.emptyList(), "", "", false,
+                "", "", "", "", "", Collections.emptyList(), content);
+    }
+
+    public static ChatMessage retryNotice(String id, String content) {
         return new ChatMessage(id, Role.ASSISTANT, "", "", false, false, true,
                 Collections.emptyList(), Collections.emptyList(), "", "", false,
                 "", "", "", "", "", Collections.emptyList(), content);

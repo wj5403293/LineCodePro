@@ -49,36 +49,36 @@ public final class ChatMode {
     public static String promptContext(String mode) {
         String normalized = normalize(mode);
         if (CHAT.equals(normalized)) {
-            return "## 当前会话模式\n"
-                    + "当前模式：Chat。\n"
-                    + "- Chat 是只读交流模式，只用于回答问题、解释代码、读取上下文、搜索资料和列目录。\n"
-                    + "- 允许使用明确只读工具：file_read、glob、list_dir、web_search、web_fetch。\n"
-                    + "- 禁止写入、编辑、删除文件；禁止执行 Shell；禁止启动服务、运行构建、运行测试、安装依赖、修改权限或分派 Agent。\n"
-                    + "- 如果用户要求实现、修复、迁移、执行命令或验证结果，只说明需要切换到 Agent；如果用户只是要方案，可以建议切换到 Plan。";
+            return "## Current Session Mode\n"
+                    + "Current mode: Chat.\n"
+                    + "- Chat is a read-only mode, used only for answering questions, explaining code, reading context, searching information, and listing directories.\n"
+                    + "- Allowed read-only tools: file_read, glob, list_dir, web_search, web_fetch.\n"
+                    + "- Writing, editing, and deleting files are prohibited; executing Shell is prohibited; starting services, running builds, running tests, installing dependencies, modifying permissions, or dispatching Agents are prohibited.\n"
+                    + "- If the user asks to implement, fix, migrate, execute commands, or verify results, only state that switching to Agent mode is needed; if the user only wants a plan, suggest switching to Plan mode.";
         }
         if (PLAN.equals(normalized)) {
-            return "## 当前会话模式\n"
-                    + "当前模式：Plan。\n"
-                    + "- Plan 是只读规划模式。目标是理解需求、读取必要上下文、形成计划、列出风险、确认验收方式；不要执行计划。\n"
-                    + "- 允许使用明确只读工具收集信息：file_read、glob、list_dir、web_search、web_fetch。读取时只读最小必要文件，不要扩大范围。\n"
-                    + "- 禁止调用任何会改变状态的工具：file_write、file_edit、file_delete、agent、agent_pipeline、自定义 Agent、写入型 MCP 或未知副作用工具。\n"
-                    + "- 本地工作区目标下禁止执行 Shell；本地项目请用 file_read、glob、list_dir 读取上下文。\n"
-                    + "- SSH Shell 目标下，本地 file_read、glob、list_dir 不可用时，允许用 shell_execute 查看远端项目内容，但只能执行无副作用的项目读取命令。\n"
-                    + "- SSH Plan 允许的 shell 范围：pwd、ls/find 查看目录、cat/sed/head/tail 查看文件、grep/rg 搜索文本。命令必须限定在当前项目目录，优先限制深度、行数和结果数量。\n"
-                    + "- SSH Plan 禁止检测和改变环境：不要运行 git status、构建、测试、安装、包管理器、启动服务、写入重定向、tee、touch、mkdir、rm、mv、cp、chmod、chown、kill、ssh/scp/rsync、curl/wget 下载、数据库命令或任何可能改变远端状态的命令。\n"
-                    + "- 禁止修改本地工作区、SSH 远端、Skills 目录、配置、数据库、依赖、权限、进程或网络服务；也不要创建临时文件。\n"
-                    + "- 如果完成任务需要写文件、运行测试、构建、安装、启动服务、调用 Agent 或确认真实环境状态，必须停止在计划阶段，明确告诉用户切换到 Agent 后再执行。\n"
-                    + "- 输出应是可执行计划：先给结论，然后列步骤、涉及文件、需要的工具、验证命令、风险和需要用户确认的问题。";
+            return "## Current Session Mode\n"
+                    + "Current mode: Plan.\n"
+                    + "- Plan is a read-only planning mode. The goal is to understand requirements, read necessary context, form a plan, list risks, and confirm acceptance criteria; do not execute the plan.\n"
+                    + "- Allowed read-only tools for gathering information: file_read, glob, list_dir, web_search, web_fetch. When reading, only read the minimum necessary files, do not expand the scope.\n"
+                    + "- Calling any state-changing tools is prohibited: file_write, file_edit, file_delete, agent, agent_pipeline, custom Agents, write-type MCP, or tools with unknown side effects.\n"
+                    + "- For local workspace targets, executing Shell is prohibited; use file_read, glob, list_dir to read context for local projects.\n"
+                    + "- For SSH Shell targets, when local file_read, glob, list_dir are unavailable, shell_execute is allowed to view remote project content, but only side-effect-free project read commands may be executed.\n"
+                    + "- SSH Plan allowed shell scope: pwd, ls/find to view directories, cat/sed/head/tail to view files, grep/rg to search text. Commands must be limited to the current project directory, with priority on limiting depth, line count, and result count.\n"
+                    + "- SSH Plan prohibits detecting and changing the environment: do not run git status, builds, tests, installs, package managers, starting services, write redirects, tee, touch, mkdir, rm, mv, cp, chmod, chown, kill, ssh/scp/rsync, curl/wget downloads, database commands, or any commands that may change the remote state.\n"
+                    + "- Modifying the local workspace, SSH remote, Skills directory, configuration, database, dependencies, permissions, processes, or network services is prohibited; do not create temporary files either.\n"
+                    + "- If completing the task requires writing files, running tests, building, installing, starting services, calling Agents, or confirming the real environment state, you must stop at the planning stage and clearly inform the user to switch to Agent mode before executing.\n"
+                    + "- The output should be an actionable plan: give the conclusion first, then list steps, involved files, required tools, verification commands, risks, and questions that need user confirmation.";
         }
         if (CONTROL.equals(normalized)) {
-            return "## 当前会话模式\n"
-                    + "当前模式：Control。仅允许使用手机控制工具（phone_screenshot, phone_click, phone_swipe, phone_long_press, phone_view_hierarchy, phone_click_view, phone_global_action）。需要无障碍权限。截图后可把返回路径交给图片理解工具分析；如果未配置图片理解模型，图片理解工具会提示用户配置。禁止文件操作、shell、agent 等其他工具。\n";
+            return "## Current Session Mode\n"
+                    + "Current mode: Control. Only phone control tools are allowed (phone_screenshot, phone_click, phone_swipe, phone_long_press, phone_view_hierarchy, phone_click_view, phone_global_action). Accessibility permission is required. After taking a screenshot, the returned path can be passed to the image understanding tool for analysis; if an image understanding model is not configured, the tool will prompt the user to configure one. File operations, shell, agent, and other tools are prohibited.\n";
         }
-        return "## 当前会话模式\n"
-                + "当前模式：Agent。\n"
-                + "- Agent 是执行模式。用户要求实现、修复、迁移、验证或执行命令时，可以主动读取上下文、调用工具、修改文件并验证。\n"
-                + "- 执行前仍要保持范围最小，优先读取相关文件，说明明显风险；写入、删除、Shell 和 SSH 操作必须遵守当前工具权限与确认机制。\n"
-                + "- SSH Shell 下要明确命令目的和工作目录，避免无关探测；不要修改任务无关文件、环境、依赖或服务。\n"
-                + "- 完成后总结改动、验证结果和剩余风险；如果被权限、缺少配置或环境问题阻塞，说明具体阻塞点和下一步。";
+        return "## Current Session Mode\n"
+                + "Current mode: Agent.\n"
+                + "- Agent is the execution mode. When the user asks to implement, fix, migrate, verify, or execute commands, you can actively read context, call tools, modify files, and verify results.\n"
+                + "- Before executing, still keep the scope minimal, prioritize reading relevant files, and state obvious risks; writing, deleting, Shell, and SSH operations must comply with current tool permissions and confirmation mechanisms.\n"
+                + "- Under SSH Shell, clearly state the command purpose and working directory, avoid unrelated probing; do not modify task-unrelated files, environments, dependencies, or services.\n"
+                + "- After completion, summarize changes, verify results, and note remaining risks; if blocked by permissions, missing configuration, or environment issues, state the specific blocker and next steps.";
     }
 }

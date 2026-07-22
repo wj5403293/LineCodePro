@@ -4,6 +4,17 @@ import android.content.Context;
 import org.json.JSONObject;
 
 public abstract class BaseTool implements ToolInfo {
+    // Icon constants for getActionIcon(), values matching IconButtonView in the app module.
+    public static final int ICON_EXPAND = 36;
+    public static final int ICON_SEARCH = 65;
+    public static final int ICON_GLOBE = 39;
+    public static final int ICON_FOLDER_OPEN = 9;
+    public static final int ICON_PAINTBRUSH = 48;
+    public static final int ICON_SPARKLES = 38;
+    public static final int ICON_SMARTPHONE = 57;
+    public static final int ICON_BOOK_OPEN = 30;
+    public static final int ICON_BOT = 71;
+
     public abstract String getName();
 
     public abstract String getDescription();
@@ -38,6 +49,10 @@ public abstract class BaseTool implements ToolInfo {
         return null;
     }
 
+    public int getActionIcon() {
+        return 0;
+    }
+
     public boolean isConcurrencySafe() {
         return false;
     }
@@ -51,11 +66,11 @@ public abstract class BaseTool implements ToolInfo {
     }
 
     protected ToolResult ok(String content) {
-        return new ToolResult("", getName(), content, false);
+        return ToolResult.of("", getName(), content, false);
     }
 
     protected ToolResult error(String message) {
-        return new ToolResult("", getName(), message, true);
+        return ToolResult.of("", getName(), message, true);
     }
 
     public final JSONObject toJson() throws org.json.JSONException {

@@ -14,14 +14,14 @@ public final class FileToolPathPolicy {
 
     public static File resolve(ToolContext context, String inputPath) throws IOException {
         if (context == null) {
-            throw new IOException("工具上下文为空");
+            throw new IOException("Tool context is empty");
         }
         return resolve(context.getHomePath(), context.getExtraWriteRoots(), inputPath, context.isBypassPathProtection());
     }
 
     private static File resolve(String homePath, java.util.List<String> extraRoots, String inputPath, boolean bypassProtection) throws IOException {
         if (homePath == null || homePath.trim().length() == 0) {
-            throw new IOException("工作区路径为空");
+            throw new IOException("Workspace path is empty");
         }
         String rawPath = inputPath == null ? "" : inputPath.trim();
         File root = new File(homePath).getCanonicalFile();
@@ -35,7 +35,7 @@ public final class FileToolPathPolicy {
         if (!isInside(root, canonical)) {
             File allowedRoot = matchingExtraRoot(extraRoots, canonical);
             if (allowedRoot == null) {
-                throw new IOException("路径超出当前工作区和已授权 Skills 目录: " + rawPath);
+                throw new IOException("Path is outside the current workspace and authorized Skills directory: " + rawPath);
             }
         }
         return canonical;

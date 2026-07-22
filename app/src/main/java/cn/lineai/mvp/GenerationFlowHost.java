@@ -1,6 +1,8 @@
 package cn.lineai.mvp;
 
+import cn.lineai.R;
 import cn.lineai.ai.ModelCancellationToken;
+import cn.lineai.util.StringUtils;
 
 class GenerationFlowHost implements GenerationFlowController.Host {
     private final MainCoordinator coordinator;
@@ -62,5 +64,23 @@ class GenerationFlowHost implements GenerationFlowController.Host {
     @Override
     public boolean isTerminalProviderExecutionMode() {
         return coordinator.isTerminalProviderExecutionMode();
+    }
+
+    @Override
+    public String formatRetryNotice(int attempt, int maxRetries, String error) {
+        return coordinator.context().getString(
+                R.string.model_retry_attempt,
+                attempt,
+                maxRetries,
+                StringUtils.decodeUnicodeEscapes(error)
+        );
+    }
+
+    @Override
+    public String formatModelFailed(String error) {
+        return coordinator.context().getString(
+                R.string.model_retry_failed,
+                StringUtils.decodeUnicodeEscapes(error)
+        );
     }
 }

@@ -210,7 +210,7 @@ final class ToolConfirmationController {
         String normalizedState = "rejected".equals(state) ? "rejected" : "accepted";
         pendingToolExecution = null;
         if ("rejected".equals(normalizedState)) {
-            ToolResult rejected = new ToolResult(
+            ToolResult rejected = ToolResult.withReview(
                     pending.getToolCall().getId(),
                     pending.getToolCall().getName(),
                     rejectedToolMessage(pending.getToolCall()),
@@ -236,7 +236,7 @@ final class ToolConfirmationController {
             rememberSessionAutoConfirmation(pending.getToolCall());
         }
 
-        ToolResult accepted = new ToolResult(
+        ToolResult accepted = ToolResult.withReview(
                 pending.getToolCall().getId(),
                 pending.getToolCall().getName(),
                 "",

@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.WebSearchConfig;
 
 public class WebSearchConfigRepository {
@@ -8,8 +7,8 @@ public class WebSearchConfigRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public WebSearchConfigRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public WebSearchConfigRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     /**

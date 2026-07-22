@@ -27,15 +27,9 @@ public final class GenerationControllerTest {
     }
 
     private ModelConfig model(int toolCallLimit) {
-        return new ModelConfig(
-                "m1",
-                "Model",
-                ModelProtocolType.OPENAI_COMPATIBLE,
-                "OpenAI",
-                "https://example.invalid",
-                "key",
-                "gpt",
-                toolCallLimit
-        );
+        return ModelConfig.builder("m1", "Model", ModelProtocolType.OPENAI_COMPATIBLE,
+                "OpenAI", "https://example.invalid", "key", "gpt")
+                .toolCallLimit(toolCallLimit)
+                .build();
     }
 }

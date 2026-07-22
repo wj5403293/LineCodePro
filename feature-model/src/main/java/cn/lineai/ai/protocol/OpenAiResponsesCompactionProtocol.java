@@ -16,7 +16,7 @@ import org.json.JSONObject;
 public final class OpenAiResponsesCompactionProtocol extends AbstractHttpModelProtocol {
     @Override
     public ModelCompletionResponse complete(ModelConfig config, List<ModelMessage> messages) throws ModelCompletionException {
-        throw new ModelCompletionException("OpenAI Responses compact 协议只能用于上下文压缩");
+        throw new ModelCompletionException("OpenAI Responses compact protocol can only be used for context compaction");
     }
 
     @Override
@@ -27,7 +27,7 @@ public final class OpenAiResponsesCompactionProtocol extends AbstractHttpModelPr
             ModelCancellationToken cancellationToken,
             ModelRequestOptions options
     ) throws ModelCompletionException {
-        throw new ModelCompletionException("OpenAI Responses compact 协议只能用于上下文压缩");
+        throw new ModelCompletionException("OpenAI Responses compact protocol can only be used for context compaction");
     }
 
     public String compact(
@@ -50,14 +50,14 @@ public final class OpenAiResponsesCompactionProtocol extends AbstractHttpModelPr
             JSONObject response = new JSONObject(raw);
             String item = findCompactionItem(response);
             if (item.length() == 0) {
-                throw new ModelCompletionException("OpenAI 压缩 API 未返回 compaction item");
+                throw new ModelCompletionException("OpenAI compaction API did not return a compaction item");
             }
             return item;
         } catch (ModelCompletionException e) {
             throw e;
         } catch (Exception e) {
             logParseError("parse_openai_compact", raw, e);
-            throw new ModelCompletionException("OpenAI 压缩 API 解析失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("OpenAI compaction API parse failed: " + e.getMessage(), e);
         }
     }
 

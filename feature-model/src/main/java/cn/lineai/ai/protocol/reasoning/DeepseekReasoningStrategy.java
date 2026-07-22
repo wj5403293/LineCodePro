@@ -2,7 +2,6 @@ package cn.lineai.ai.protocol.reasoning;
 
 import cn.lineai.ai.protocol.ReasoningRequestContext;
 import cn.lineai.ai.protocol.ReasoningRequestStrategy;
-import cn.lineai.model.AiBehaviorSettings;
 import org.json.JSONObject;
 
 public final class DeepseekReasoningStrategy implements ReasoningRequestStrategy {
@@ -15,7 +14,7 @@ public final class DeepseekReasoningStrategy implements ReasoningRequestStrategy
     public void apply(JSONObject body, ReasoningRequestContext context) throws Exception {
         body.put("thinking", new JSONObject().put("type", context.isEnabled() ? "enabled" : "disabled"));
         if (context.isEnabled()) {
-            body.put("reasoning_effort", AiBehaviorSettings.REASONING_MAX.equals(context.getEffort()) ? "max" : "high");
+            body.put("reasoning_effort", context.getEffort());
         }
     }
 }

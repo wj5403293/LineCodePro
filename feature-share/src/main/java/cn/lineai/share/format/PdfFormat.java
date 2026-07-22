@@ -12,7 +12,7 @@ import java.util.List;
 
 public final class PdfFormat implements ExportFormat {
     @Override
-    public String displayName() { return "PDF 文件"; }
+    public String displayName() { return "PDF file"; }
 
     @Override
     public ExportResult execute(Context context, List<ChatMessage> messages) {

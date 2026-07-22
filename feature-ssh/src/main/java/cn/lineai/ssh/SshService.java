@@ -47,7 +47,7 @@ public final class SshService {
      */
     public SshService(Context context, SshConnectionPool sharedPool) {
         this.context = context.getApplicationContext();
-        repository = new SshConfigRepository(this.context);
+        repository = new SshConfigRepository(new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this.context)));
         termuxHelper = new TermuxHelper(this.context);
         if (sharedPool != null) {
             connectionPool = sharedPool;

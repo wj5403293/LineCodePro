@@ -69,7 +69,7 @@ public final class ChatBitmapRenderer {
                 if (msg.getContent() == null || msg.getContent().isEmpty()) continue;
 
                 boolean isUser = msg.getRole() == ChatMessage.Role.USER;
-                String name = isUser ? "我" : "AI";
+                String name = isUser ? "Me" : "AI";
                 String wrapped = ChatMessages.wrapText(msg.getContent(), textPaint, contentMaxWidth);
                 String[] lineArray = wrapped.split("\n");
                 List<String> lines = new ArrayList<>();

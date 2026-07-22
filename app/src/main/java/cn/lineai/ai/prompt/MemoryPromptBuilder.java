@@ -1,6 +1,7 @@
-package cn.lineai.data.repository;
+package cn.lineai.ai.prompt;
 
-import cn.lineai.ai.prompt.StringTemplate;
+import cn.lineai.data.repository.MemoryRanker;
+import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.model.Strings;
 import cn.lineai.workspace.WorkspacePaths;
 import java.io.File;

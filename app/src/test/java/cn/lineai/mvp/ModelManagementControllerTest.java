@@ -129,15 +129,7 @@ public final class ModelManagementControllerTest {
     }
 
     private static ModelConfig model(String id, String name) {
-        return new ModelConfig(
-                id,
-                name,
-                ModelProtocolType.OPENAI_COMPATIBLE,
-                "OpenAI",
-                "https://example.invalid",
-                "key",
-                "gpt",
-                ModelConfig.DEFAULT_TOOL_CALL_LIMIT
-        );
+        return ModelConfig.builder(id, name, ModelProtocolType.OPENAI_COMPATIBLE,
+                "OpenAI", "https://example.invalid", "key", "gpt").build();
     }
 }

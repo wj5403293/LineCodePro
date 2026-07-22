@@ -17,7 +17,7 @@ public final class LocalGgufProtocol implements ModelProtocol {
 
     @Override
     public ModelCompletionResponse complete(ModelConfig config, List<ModelMessage> messages) throws ModelCompletionException {
-        throw new ModelCompletionException("本地 GGUF 推理接口还没有接入。请先使用 OpenAI 兼容、Codex 或 Anthropic 模型。");
+        throw new ModelCompletionException("Local GGUF inference is not yet integrated. Please use an OpenAI compatible, Codex, or Anthropic model first.");
     }
 
     @Override
@@ -28,6 +28,6 @@ public final class LocalGgufProtocol implements ModelProtocol {
             ModelCancellationToken cancellationToken,
             ModelRequestOptions options
     ) throws ModelCompletionException {
-        throw new ModelCompletionException("本地 GGUF 推理接口还没有接入。请先使用 OpenAI 兼容、Codex 或 Anthropic 模型。");
+        throw new ModelCompletionException("Local GGUF inference is not yet integrated. Please use an OpenAI compatible, Codex, or Anthropic model first.");
     }
 }

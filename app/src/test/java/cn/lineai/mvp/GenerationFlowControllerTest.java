@@ -23,7 +23,6 @@ public final class GenerationFlowControllerTest {
                 null,
                 null,
                 null,
-                null,
                 toolMessages,
                 null,
                 null,
@@ -34,7 +33,7 @@ public final class GenerationFlowControllerTest {
                 new FakeHost()
         );
 
-        agentHost(controller).addOrReplaceToolResult(new ToolResult("call_1", "agent", "done", false));
+        agentHost(controller).addOrReplaceToolResult(ToolResult.withReview("call_1", "agent", "done", false, "", "", ""));
 
         Assert.assertEquals(1, messages.size());
         Assert.assertEquals(ChatMessage.Role.TOOL, messages.get(0).getRole());
@@ -102,6 +101,16 @@ public final class GenerationFlowControllerTest {
 
         @Override
         public void setCurrentCancellationToken(ModelCancellationToken cancellationToken) {
+        }
+
+        @Override
+        public String formatRetryNotice(int attempt, int maxRetries, String error) {
+            return "retry " + attempt + "/" + maxRetries + ": " + (error == null ? "" : error);
+        }
+
+        @Override
+        public String formatModelFailed(String error) {
+            return error == null ? "" : error;
         }
     }
 }

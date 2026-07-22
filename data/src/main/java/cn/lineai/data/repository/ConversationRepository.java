@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import cn.lineai.data.db.LineCodeDatabase;
@@ -33,8 +32,8 @@ public final class ConversationRepository extends BaseRepository implements Conv
 
     private final MessageTextChunkStore textChunks;
 
-    public ConversationRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context));
+    public ConversationRepository(LineCodeDatabase database) {
+        super(database);
         textChunks = new MessageTextChunkStore(database);
     }
 

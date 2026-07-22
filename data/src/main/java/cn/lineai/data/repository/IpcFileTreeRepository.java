@@ -47,12 +47,12 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
         long actualSize = provider.getFileSize(cleanPath);
         if (maxBytes > 0 && actualSize > maxBytes) {
             throw new IllegalStateException(
-                    "文件过大，文件大小 " + actualSize + " 字节超出上限 " + maxBytes + " 字节: " + path);
+                    "File too large, file size " + actualSize + " bytes exceeds limit " + maxBytes + " bytes: " + path);
         }
         byte[] data = provider.readFile(cleanPath);
         if (maxBytes > 0 && data.length > maxBytes) {
             throw new IllegalStateException(
-                    "文件过大，文件大小 " + data.length + " 字节超出上限 " + maxBytes + " 字节: " + path);
+                    "File too large, file size " + data.length + " bytes exceeds limit " + maxBytes + " bytes: " + path);
         }
         return data;
     }
@@ -63,10 +63,10 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
         String cleanName = cleanName(name);
         String targetPath = join(parentPath, cleanName);
         if (provider.fileExists(targetPath)) {
-            throw new IllegalStateException("文件已存在: " + cleanName);
+            throw new IllegalStateException("File already exists: " + cleanName);
         }
         if (!provider.writeFile(targetPath, new byte[0])) {
-            throw new IllegalStateException("无法创建文件: " + cleanName);
+            throw new IllegalStateException("Cannot create file: " + cleanName);
         }
     }
 
@@ -76,11 +76,11 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
         String cleanName = cleanName(name);
         String targetPath = join(parentPath, cleanName);
         if (provider.fileExists(targetPath)) {
-            throw new IllegalStateException("目录已存在: " + cleanName);
+            throw new IllegalStateException("Directory already exists: " + cleanName);
         }
         TerminalShellResult result = provider.executeShell("mkdir -p " + shellQuote(targetPath), null, 30000, null);
         if (!result.isSuccess()) {
-            throw new IllegalStateException("无法创建目录: " + cleanName);
+            throw new IllegalStateException("Cannot create directory: " + cleanName);
         }
     }
 
@@ -91,12 +91,12 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
         String parent = parentPath(path);
         String targetPath = join(parent, cleanName);
         if (provider.fileExists(targetPath)) {
-            throw new IllegalStateException("目标已存在: " + cleanName);
+            throw new IllegalStateException("Target already exists: " + cleanName);
         }
         TerminalShellResult result = provider.executeShell(
                 "mv " + shellQuote(path) + " " + shellQuote(targetPath), null, 30000, null);
         if (!result.isSuccess()) {
-            throw new IllegalStateException("重命名失败: " + path);
+            throw new IllegalStateException("Rename failed: " + path);
         }
         return targetPath;
     }
@@ -105,12 +105,12 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
     public void delete(String path) throws Exception {
         TerminalIpcProvider provider = requireProvider();
         if (!provider.fileExists(path)) {
-            throw new IllegalStateException("路径不存在: " + path);
+            throw new IllegalStateException("Path does not exist: " + path);
         }
         TerminalShellResult result = provider.executeShell(
                 "rm -rf " + shellQuote(path), null, 120000, null);
         if (!result.isSuccess()) {
-            throw new IllegalStateException("删除失败: " + path);
+            throw new IllegalStateException("Delete failed: " + path);
         }
     }
 
@@ -121,7 +121,7 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
         TerminalShellResult result = provider.executeShell(
                 "cp -R " + shellQuote(sourcePath) + " " + shellQuote(targetPath), null, 120000, null);
         if (!result.isSuccess()) {
-            throw new IllegalStateException("复制失败: " + sourcePath);
+            throw new IllegalStateException("Copy failed: " + sourcePath);
         }
         return targetPath;
     }
@@ -189,7 +189,7 @@ public final class IpcFileTreeRepository extends FileTreeBaseRepository implemen
     private TerminalIpcProvider requireProvider() {
         TerminalIpcProvider provider = (TerminalIpcProvider) ipcProviderManager.getProviderByType(IpcProviderType.TERMINAL);
         if (provider == null) {
-            throw new IllegalStateException("终端提供者服务未绑定");
+            throw new IllegalStateException("Terminal provider service not bound");
         }
         return provider;
     }

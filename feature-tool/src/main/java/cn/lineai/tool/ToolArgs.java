@@ -6,7 +6,7 @@ public final class ToolArgs {
 
     public static void requireNonEmpty(String value, String paramName) {
         if (value == null || value.trim().length() == 0) {
-            throw new IllegalArgumentException(paramName + " 不能为空");
+            throw new IllegalArgumentException(paramName + " cannot be empty");
         }
     }
 }

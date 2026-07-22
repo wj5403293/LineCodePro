@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -21,11 +22,14 @@ import cn.lineai.R;
 import cn.lineai.model.MemoryOverviewState;
 import cn.lineai.ui.theme.LineTheme;
 import java.text.DateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
-public final class MemorySettingsScreenView extends ScreenScaffoldView {
+public final class MemorySettingsScreenView extends LinearLayout {
     public interface Listener {
         void onBack();
 
@@ -34,31 +38,73 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         void onMemorySaved(String id, String scope, String content);
 
         void onMemoryDeleted(String id);
+
+        void onMemoriesDeleted(List<String> ids);
     }
 
     private final Listener listener;
+    private final FrameLayout headerHost;
+    private final LinearLayout content;
+    private final Set<String> multiSelectedIds = new HashSet<>();
     private MemoryOverviewState overview;
 
     public MemorySettingsScreenView(Context context, Listener listener) {
-        super(context, context.getString(R.string.screen_memory_title), listener::onBack, addButton(context));
+        super(context);
         this.listener = listener;
-        View rightAction = getRightAction();
-        if (rightAction != null) {
-            rightAction.setOnClickListener(v -> showEditor(null));
-        }
+        setOrientation(VERTICAL);
+        setBackgroundColor(LineTheme.BG);
+
+        headerHost = new FrameLayout(context);
+        addView(headerHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        ScrollView scrollView = new ScrollView(context);
+        scrollView.setFillViewport(false);
+        content = new LinearLayout(context);
+        content.setOrientation(VERTICAL);
+        LineTheme.padding(content, 0, 0, 0, 100);
+        scrollView.addView(content, new ScrollView.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(scrollView, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+
+        renderHeader();
         refresh();
     }
 
-    private static IconButtonView addButton(Context context) {
-        IconButtonView button = new IconButtonView(context, IconButtonView.PLUS);
-        button.setIconColor(LineTheme.ACCENT);
-        button.setIconSizeDp(36, 20);
-        return button;
+    private void renderHeader() {
+        Context context = getContext();
+        headerHost.removeAllViews();
+        if (!multiSelectedIds.isEmpty()) {
+            IconButtonView close = new IconButtonView(context, IconButtonView.CLOSE);
+            close.setIconColor(LineTheme.TEXT);
+            close.setIconSizeDp(36, 20);
+            close.setOnClickListener(v -> {
+                multiSelectedIds.clear();
+                renderHeader();
+                refresh();
+            });
+
+            IconButtonView trash = new IconButtonView(context, IconButtonView.TRASH_2);
+            trash.setIconColor(LineTheme.DANGER);
+            trash.setIconSizeDp(36, 20);
+            trash.setOnClickListener(v -> showBatchDeleteConfirm());
+            headerHost.addView(
+                    new ScreenHeaderView(context, context.getString(R.string.screen_memory_selected_count, multiSelectedIds.size()), close, trash),
+                    new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            );
+            return;
+        }
+
+        IconButtonView add = new IconButtonView(context, IconButtonView.PLUS);
+        add.setIconColor(LineTheme.ACCENT);
+        add.setIconSizeDp(36, 20);
+        add.setOnClickListener(v -> showEditor(null));
+        headerHost.addView(
+                new ScreenHeaderView(context, context.getString(R.string.screen_memory_title), listener::onBack, add),
+                new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        );
     }
 
     private void refresh() {
         overview = listener.getMemoryOverview();
-        LinearLayout content = getContent();
         content.removeAllViews();
         addProjectHint(content);
         addMemorySection(getContext().getString(R.string.screen_memory_section_long_term), IconButtonView.DATABASE, overview.getLongTerm());
@@ -68,8 +114,8 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         addHistorySection();
     }
 
-    private void addProjectHint(LinearLayout content) {
-        Context context = content.getContext();
+    private void addProjectHint(LinearLayout host) {
+        Context context = host.getContext();
         String project = overview == null || overview.getProjectId().length() == 0
                 ? context.getString(R.string.screen_memory_project_unselected)
                 : overview.getProjectId();
@@ -80,7 +126,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         hintParams.leftMargin = LineTheme.dp(context, LineTheme.LG);
         hintParams.rightMargin = LineTheme.dp(context, LineTheme.LG);
         hintParams.topMargin = LineTheme.dp(context, LineTheme.MD);
-        content.addView(hint, hintParams);
+        host.addView(hint, hintParams);
     }
 
     private void addMemorySection(String title, int iconType, List<MemoryOverviewState.Memory> rows) {
@@ -90,23 +136,37 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         } else {
             for (int i = 0; i < rows.size(); i++) {
                 MemoryOverviewState.Memory memory = rows.get(i);
+                boolean checked = multiSelectedIds.contains(memory.getId());
                 ActionRowView row = new ActionRowView(
                         getContext(),
                         iconType,
                         preview(memory.getContent(), 80),
                         memoryDesc(memory),
                         false,
-                        true,
-                        () -> showTextDialog(title, memoryDetail(memory))
+                        multiSelectedIds.isEmpty(),
+                        () -> {
+                            if (!multiSelectedIds.isEmpty()) {
+                                toggleMultiSelected(memory.getId());
+                                return;
+                            }
+                            showTextDialog(title, memoryDetail(memory));
+                        }
                 );
+                if (checked) {
+                    row.setBackgroundColor(LineTheme.ACCENT_MUTED);
+                }
                 row.setOnLongClickListener(v -> {
-                    showMemoryActions(memory);
+                    if (!multiSelectedIds.isEmpty()) {
+                        toggleMultiSelected(memory.getId());
+                    } else {
+                        showMemoryActions(memory);
+                    }
                     return true;
                 });
                 section.addRow(row, i < rows.size() - 1);
             }
         }
-        getContent().addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        content.addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     private void addWorkingMemorySection() {
@@ -129,7 +189,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
                 section.addRow(row, i < rows.size() - 1);
             }
         }
-        getContent().addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        content.addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     private void addHistorySection() {
@@ -152,7 +212,7 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
                 section.addRow(row, i < rows.size() - 1);
             }
         }
-        getContent().addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        content.addView(section, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }
 
     private TextView emptyView() {
@@ -169,6 +229,10 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         panel.addView(actionText(getContext().getString(R.string.screen_memory_action_edit), LineTheme.TEXT, () -> {
             dialog.dismiss();
             showEditor(memory);
+        }));
+        panel.addView(actionText(getContext().getString(R.string.screen_memory_action_multi_select), LineTheme.TEXT, () -> {
+            dialog.dismiss();
+            startMultiSelect(memory.getId());
         }));
         panel.addView(actionText(getContext().getString(R.string.screen_memory_action_delete), LineTheme.DANGER, () -> {
             dialog.dismiss();
@@ -189,10 +253,52 @@ public final class MemorySettingsScreenView extends ScreenScaffoldView {
         actions.addView(dialogButton(getContext().getString(R.string.common_delete), LineTheme.DANGER, () -> {
             listener.onMemoryDeleted(memory.getId());
             dialog.dismiss();
+            multiSelectedIds.remove(memory.getId());
+            renderHeader();
             refresh();
         }));
         panel.addView(actions);
         showPanel(dialog, panel);
+    }
+
+    private void showBatchDeleteConfirm() {
+        if (multiSelectedIds.isEmpty()) {
+            return;
+        }
+        Dialog dialog = createDialog();
+        LinearLayout panel = dialogPanel(getContext());
+        panel.addView(titleView(getContext().getString(R.string.screen_memory_delete_title)));
+        TextView body = bodyView(getContext().getString(R.string.screen_memory_delete_selected_message, multiSelectedIds.size()));
+        panel.addView(body);
+        LinearLayout actions = actionRow();
+        actions.addView(dialogButton(getContext().getString(R.string.common_cancel), LineTheme.TEXT_SECONDARY, dialog::dismiss));
+        actions.addView(dialogButton(getContext().getString(R.string.common_delete), LineTheme.DANGER, () -> {
+            ArrayList<String> ids = new ArrayList<>(multiSelectedIds);
+            dialog.dismiss();
+            listener.onMemoriesDeleted(ids);
+            multiSelectedIds.clear();
+            renderHeader();
+            refresh();
+        }));
+        panel.addView(actions);
+        showPanel(dialog, panel);
+    }
+
+    private void startMultiSelect(String id) {
+        multiSelectedIds.clear();
+        multiSelectedIds.add(id);
+        renderHeader();
+        refresh();
+    }
+
+    private void toggleMultiSelected(String id) {
+        if (multiSelectedIds.contains(id)) {
+            multiSelectedIds.remove(id);
+        } else {
+            multiSelectedIds.add(id);
+        }
+        renderHeader();
+        refresh();
     }
 
     private void showEditor(MemoryOverviewState.Memory memory) {

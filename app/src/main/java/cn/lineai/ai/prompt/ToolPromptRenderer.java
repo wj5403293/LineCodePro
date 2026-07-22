@@ -31,7 +31,7 @@ public class ToolPromptRenderer {
             boolean nativeToolProtocol
     ) {
         if (enabled.isEmpty()) {
-            return "## 可用工具\n当前没有可用工具。未配置模型工具、工具组被关闭或当前权限模式禁用了所有工具。";
+            return "## Available Tools\nNo tools are available. No model tools configured, tool groups disabled, or all tools restricted by current permission mode.";
         }
         String mode = ToolSettingsRepository.normalizeExecutionMode(executionMode);
         if (ToolSettingsStore.EXECUTION_SSH.equals(mode)) {
@@ -41,7 +41,7 @@ public class ToolPromptRenderer {
             return renderRemoteToolPrompt(mode, configs, enabled, toolByName, nativeToolProtocol);
         }
         StringBuilder builder = new StringBuilder();
-        builder.append("## 可用工具\n以下工具列表由当前 MCP 设置、权限模式、执行目标和已注册工具动态生成。未列出的工具不可用，工具执行必须遵守当前权限模式。\n\n");
+        builder.append("## Available Tools\nThe following tool list is dynamically generated from current MCP settings, permission mode, execution target, and registered tools. Unlisted tools are unavailable; tool execution must comply with the current permission mode.\n\n");
         List<McpToolConfig> promptConfigs = configs == null ? new ArrayList<>() : configs;
         HashSet<String> renderedTools = new HashSet<>();
         for (McpToolConfig config : promptConfigs) {
@@ -62,13 +62,13 @@ public class ToolPromptRenderer {
                 if (tool != null) {
                     builder.append(" [").append(categoryLabel(tool.getCategory()));
                     if (tool.needsConfirmation()) {
-                        builder.append(", 需要确认");
+                        builder.append(", needs confirmation");
                     }
-                    builder.append("]：").append(tool.getDescription()).append('\n');
+                    builder.append("]: ").append(tool.getDescription()).append('\n');
                     try {
-                        builder.append("    参数: ").append(tool.getParameters().toString()).append('\n');
+                        builder.append("    Parameters: ").append(tool.getParameters().toString()).append('\n');
                     } catch (Exception ignored) {
-                        builder.append("    参数: {}\n");
+                        builder.append("    Parameters: {}\n");
                     }
                 } else {
                     builder.append('\n');
@@ -78,11 +78,11 @@ public class ToolPromptRenderer {
         }
         appendExtensionTools(builder, enabled, renderedTools, toolByName);
         if (nativeToolProtocol) {
-            builder.append("工具调用由当前模型协议的原生 tools/function calling 机制提供。需要读取、写入、搜索、生成图片或列目录时，必须使用原生工具调用，不要把工具调用 JSON、XML、<tool_calls> 或 Markdown 代码块输出到正文。")
-                    .append("每次工具返回后必须继续分析结果；如果任务还没完成，继续调用合适工具执行下一步。");
+            builder.append("Tool calls are provided by the current model protocol's native tools/function calling mechanism. When you need to read, write, search, generate images, or list directories, you must use native tool calls; do not output tool call JSON, XML, <tool_calls>, or Markdown code blocks in the response text.")
+                    .append("After each tool returns, you must continue analyzing the result; if the task is not yet complete, continue calling appropriate tools for the next step.");
         } else {
-            builder.append("工具调用格式已锁定：需要调用工具时，只能输出 <tool_calls><tool_call name=\"工具名\"><argument name=\"参数名\">参数值</argument></tool_calls>。")
-                    .append("不要输出 OpenAI tool_calls JSON、Markdown 代码块或自然语言包装。每次工具返回后必须继续分析结果；如果任务还没完成，继续调用合适工具执行下一步。");
+            builder.append("Tool call format is locked: when you need to call a tool, you must output <tool_calls><tool_call name=\"tool_name\"><argument name=\"param_name\">value</argument></tool_calls>.")
+                    .append("Do not output OpenAI tool_calls JSON, Markdown code blocks, or natural language wrappers. After each tool returns, you must continue analyzing the result; if the task is not yet complete, continue calling appropriate tools for the next step.");
         }
         return builder.toString().trim();
     }
@@ -96,21 +96,21 @@ public class ToolPromptRenderer {
     ) {
         boolean isSsh = ToolSettingsStore.EXECUTION_SSH.equals(executionMode);
         StringBuilder builder = new StringBuilder();
-        builder.append("## 可用工具\n");
+        builder.append("## Available Tools\n");
         if (isSsh) {
-            builder.append("当前执行目标是 SSH Shell。本地文件读写和文件搜索已禁用。\n")
-                    .append("Agent、Agent Pipeline、任务清单仍可用，子 Agent 只能通过 shell_execute 在 SSH 环境内完成文件操作。\n")
-                    .append("图片理解会通过 SFTP 读取 SSH 工作区图片；网页搜索、图片生成和应用侧自定义 HTTP MCP 可用时仍会作为工具提供。\n")
-                    .append("当会话模式为 Control 时，手机控制工具（phone_screenshot、phone_click 等）仍然可用。\n")
-                    .append("不要引用应用私有 home 工作目录；如果系统提示提供了 SSH 项目目录，必须在该目录内操作。\n")
-                    .append("如需读取、写入、列目录或搜索文件，请通过 shell 命令在 SSH 环境内完成。\n\n");
+            builder.append("The current execution target is SSH Shell. Local file read/write and file search are disabled.\n")
+                    .append("Agent, Agent Pipeline, and todo list remain available; sub-agents can only perform file operations via shell_execute within the SSH environment.\n")
+                    .append("Image understanding reads SSH workspace images via SFTP; web search, image generation, and app-side custom HTTP MCPs remain available as tools when enabled.\n")
+                    .append("When the session mode is Control, phone control tools (phone_screenshot, phone_click, etc.) remain available.\n")
+                    .append("Do not reference the app's private home working directory; if the system prompt provides an SSH project directory, you must operate within that directory.\n")
+                    .append("To read, write, list directories, or search files, use shell commands within the SSH environment.\n\n");
         } else {
-            builder.append("当前执行目标是终端提供者（Terminal Provider）。本地文件读写和文件搜索已禁用。\n")
-                    .append("Agent、Agent Pipeline、任务清单仍可用，子 Agent 只能通过 shell_execute 在终端提供者环境内完成文件操作。\n")
-                    .append("图片理解会通过 IPC 读取终端提供者环境的图片；网页搜索、图片生成和应用侧自定义 HTTP MCP 可用时仍会作为工具提供。\n")
-                    .append("当会话模式为 Control 时，手机控制工具（phone_screenshot、phone_click 等）仍然可用。\n")
-                    .append("不要引用应用私有 home 工作目录；如果系统提示提供了终端提供者工作目录，必须在该目录内操作。\n")
-                    .append("如需读取、写入、列目录或搜索文件，请通过 shell 命令在终端提供者环境内完成。\n\n");
+            builder.append("The current execution target is Terminal Provider. Local file read/write and file search are disabled.\n")
+                    .append("Agent, Agent Pipeline, and todo list remain available; sub-agents can only perform file operations via shell_execute within the terminal provider environment.\n")
+                    .append("Image understanding reads terminal provider environment images via IPC; web search, image generation, and app-side custom HTTP MCPs remain available as tools when enabled.\n")
+                    .append("When the session mode is Control, phone control tools (phone_screenshot, phone_click, etc.) remain available.\n")
+                    .append("Do not reference the app's private home working directory; if the system prompt provides a terminal provider working directory, you must operate within that directory.\n")
+                    .append("To read, write, list directories, or search files, use shell commands within the terminal provider environment.\n\n");
         }
         List<McpToolConfig> promptConfigs = configs == null ? new ArrayList<>() : configs;
         HashSet<String> renderedTools = new HashSet<>();
@@ -132,13 +132,13 @@ public class ToolPromptRenderer {
                 if (tool != null) {
                     builder.append(" [").append(categoryLabel(tool.getCategory()));
                     if (tool.needsConfirmation()) {
-                        builder.append(", 需要确认");
+                        builder.append(", needs confirmation");
                     }
-                    builder.append("]：").append(tool.getDescription()).append('\n');
+                    builder.append("]: ").append(tool.getDescription()).append('\n');
                     try {
-                        builder.append("    参数: ").append(tool.getParameters().toString()).append('\n');
+                        builder.append("    Parameters: ").append(tool.getParameters().toString()).append('\n');
                     } catch (Exception ignored) {
-                        builder.append("    参数: {}\n");
+                        builder.append("    Parameters: {}\n");
                     }
                 } else {
                     builder.append('\n');
@@ -151,13 +151,13 @@ public class ToolPromptRenderer {
             builder.append('\n');
         }
         appendExtensionTools(builder, enabled, renderedTools, toolByName);
-        builder.append("每次工具返回后必须继续分析输出；如果任务还没完成，继续调用合适工具执行下一步。")
-                .append("不要因为刚执行过一次或两次 shell 命令就结束；只有确认任务完成、受阻或需要用户决定时才回复用户。\n");
+        builder.append("After each tool returns, you must continue analyzing the output; if the task is not yet complete, continue calling appropriate tools for the next step.")
+                .append("Do not stop after just one or two shell command executions; only respond to the user when you confirm the task is complete, blocked, or requires a user decision.\n");
         if (nativeToolProtocol) {
-            builder.append("工具调用由当前模型协议的原生 tools/function calling 机制提供。不要把工具调用 JSON、XML、<tool_calls> 或 Markdown 代码块输出到正文。");
+            builder.append("Tool calls are provided by the current model protocol's native tools/function calling mechanism. Do not output tool call JSON, XML, <tool_calls>, or Markdown code blocks in the response text.");
         } else {
-            builder.append("工具调用格式已锁定：需要调用工具时，只能输出 <tool_calls><tool_call name=\"工具名\"><argument name=\"参数名\">参数值</argument></tool_calls>。")
-                    .append("不要输出 OpenAI tool_calls JSON、Markdown 代码块或自然语言包装。");
+            builder.append("Tool call format is locked: when you need to call a tool, you must output <tool_calls><tool_call name=\"tool_name\"><argument name=\"param_name\">value</argument></tool_calls>.")
+                    .append("Do not output OpenAI tool_calls JSON, Markdown code blocks, or natural language wrappers.");
         }
         return builder.toString().trim();
     }
@@ -178,17 +178,17 @@ public class ToolPromptRenderer {
         if (extensionTools.isEmpty()) {
             return;
         }
-        builder.append("### 扩展\n");
+        builder.append("### Extensions\n");
         for (String toolName : extensionTools) {
             ToolInfo tool = toolByName == null ? null : toolByName.get(toolName);
             builder.append("  - ").append(toolName);
             if (tool != null) {
-                builder.append(" [").append(categoryLabel(tool.getCategory())).append("]：")
+                builder.append(" [").append(categoryLabel(tool.getCategory())).append("]: ")
                         .append(tool.getDescription()).append('\n');
                 try {
-                    builder.append("    参数: ").append(tool.getParameters().toString()).append('\n');
+                    builder.append("    Parameters: ").append(tool.getParameters().toString()).append('\n');
                 } catch (Exception ignored) {
-                    builder.append("    参数: {}\n");
+                    builder.append("    Parameters: {}\n");
                 }
             } else {
                 builder.append('\n');

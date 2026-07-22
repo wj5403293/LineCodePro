@@ -94,11 +94,11 @@ public final class LineCodeArchiveService {
 
     public LineCodeArchiveService(Context context) {
         this.context = context.getApplicationContext();
-        modelRepository = new ModelRepository(this.context);
-        conversationRepository = new ConversationRepository(this.context);
-        settingsRepository = new SettingsRepository(this.context);
-        workspacePaths = new WorkspacePaths(this.context);
         database = LineCodeDatabase.getInstance(this.context);
+        modelRepository = new ModelRepository(database, this.context.getSharedPreferences("linecode_models", Context.MODE_PRIVATE));
+        conversationRepository = new ConversationRepository(database);
+        settingsRepository = new SettingsRepository(database);
+        workspacePaths = new WorkspacePaths(this.context);
         importService = new LineCodeImportService(this.context);
     }
 

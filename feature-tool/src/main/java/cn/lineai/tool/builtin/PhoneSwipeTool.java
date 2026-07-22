@@ -1,9 +1,9 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -13,12 +13,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.)
- * and LineCodeAccessibilityService in :app. See PhoneClickTool for full barrier notes.
- * No direct dependency on cn.lineai.ui.* classes.
+ * Phone control tool: swipe between screen coordinates.
  */
 public final class PhoneSwipeTool extends BaseTool {
     public static final String NAME = "phone_swipe";
+    private static final String SWIPE_DESC = "Swipe from the start coordinates to the end coordinates. x1/y1 are the start point, x2/y2 are the end point, duration_ms is optional and defaults to 300.";
     private final Context context;
 
     public PhoneSwipeTool(Context context) {
@@ -32,7 +31,7 @@ public final class PhoneSwipeTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return context == null ? "Swipe between screen coordinates." : context.getString(R.string.phone_tool_swipe_description);
+        return context == null ? SWIPE_DESC : SWIPE_DESC;
     }
 
     @Override
@@ -43,6 +42,11 @@ public final class PhoneSwipeTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
     }
 
     @Override
@@ -62,17 +66,17 @@ public final class PhoneSwipeTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("x1", new JSONObject().put("type", "number").put("description", "起点 X 坐标"))
-                        .put("y1", new JSONObject().put("type", "number").put("description", "起点 Y 坐标"))
-                        .put("x2", new JSONObject().put("type", "number").put("description", "终点 X 坐标"))
-                        .put("y2", new JSONObject().put("type", "number").put("description", "终点 Y 坐标"))
-                        .put("duration_ms", new JSONObject().put("type", "number").put("description", "滑动时长（毫秒），默认 300")))
+                        .put("x1", new JSONObject().put("type", "number").put("description", "Start X coordinate"))
+                        .put("y1", new JSONObject().put("type", "number").put("description", "Start Y coordinate"))
+                        .put("x2", new JSONObject().put("type", "number").put("description", "End X coordinate"))
+                        .put("y2", new JSONObject().put("type", "number").put("description", "End Y coordinate"))
+                        .put("duration_ms", new JSONObject().put("type", "number").put("description", "Swipe duration in milliseconds, default 300")))
                 .put("required", new JSONArray().put("x1").put("y1").put("x2").put("y2"));
     }
 
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
+        PhoneControlService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, this.context);
         }

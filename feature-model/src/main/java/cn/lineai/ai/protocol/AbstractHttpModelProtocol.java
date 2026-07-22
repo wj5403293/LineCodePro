@@ -83,10 +83,10 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
                 return "";
             }
             logHttpError("http_io", url, headers, body, code, response, e);
-            throw new ModelCompletionException("模型通信失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Model communication failed: " + e.getMessage(), e);
         } catch (Exception e) {
             logHttpError("http_error", url, headers, body, code, response, e);
-            throw new ModelCompletionException("模型通信失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Model communication failed: " + e.getMessage(), e);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -131,11 +131,11 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
             }
             response = sseLog.toString();
             logHttpError("sse_io", url, headers, body, code, response, e);
-            throw new ModelCompletionException("模型流式通信失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Model stream communication failed: " + e.getMessage(), e);
         } catch (Exception e) {
             response = sseLog.toString();
             logHttpError("sse_error", url, headers, body, code, response, e);
-            throw new ModelCompletionException("模型流式通信失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Model stream communication failed: " + e.getMessage(), e);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -156,7 +156,7 @@ abstract class AbstractHttpModelProtocol implements ModelProtocol {
 
     private HttpURLConnection openJsonPost(String url, JSONObject body, Map<String, String> headers, String accept) throws Exception {
         HttpURLConnection connection = (HttpURLConnection) new URL(
-                UrlPolicy.requireHttpOrLocalCleartextUrl(url, "模型 API 地址")
+                UrlPolicy.requireHttpOrLocalCleartextUrl(url, "Model API URL")
         ).openConnection();
         connection.setRequestMethod("POST");
         connection.setConnectTimeout(20000);

@@ -19,14 +19,14 @@ public final class ShareHelper {
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.setClipData(ClipData.newRawUri("", uri));
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        context.startActivity(Intent.createChooser(intent, "分享文件"));
+        context.startActivity(Intent.createChooser(intent, "Share file"));
     }
 
     public static void shareText(Context context, String text) {
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("text/plain");
         intent.putExtra(Intent.EXTRA_TEXT, text);
-        context.startActivity(Intent.createChooser(intent, "分享文本"));
+        context.startActivity(Intent.createChooser(intent, "Share text"));
     }
 
     public static void copy(Context context, String text) {

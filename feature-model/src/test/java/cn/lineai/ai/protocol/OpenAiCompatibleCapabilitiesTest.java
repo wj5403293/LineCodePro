@@ -10,15 +10,14 @@ import org.junit.Test;
 public final class OpenAiCompatibleCapabilitiesTest {
     @Test
     public void nvidiaGatewayDisablesNativeToolsAndReasoningParameters() {
-        ModelConfig config = new ModelConfig(
+        ModelConfig config = ModelConfig.builder(
                 "nvidia",
                 "NVIDIA DeepSeek",
                 ModelProtocolType.OPENAI_COMPATIBLE,
                 "NVIDIA",
                 "https://integrate.api.nvidia.com/v1",
                 "sk-test",
-                "deepseek-ai/deepseek-v4-pro"
-        );
+                "deepseek-ai/deepseek-v4-pro").build();
 
         assertFalse(OpenAiCompatibleCapabilities.supportsNativeTools(config));
         assertFalse(OpenAiCompatibleCapabilities.supportsReasoningRequestParameters(config));
@@ -26,15 +25,14 @@ public final class OpenAiCompatibleCapabilitiesTest {
 
     @Test
     public void regularOpenAiCompatibleProviderKeepsNativeToolsAndReasoningParameters() {
-        ModelConfig config = new ModelConfig(
+        ModelConfig config = ModelConfig.builder(
                 "qwen",
                 "Qwen",
                 ModelProtocolType.OPENAI_COMPATIBLE,
                 "Qwen",
                 "https://dashscope.aliyuncs.com/compatible-mode/v1",
                 "sk-test",
-                "qwen/qwen3-coder"
-        );
+                "qwen/qwen3-coder").build();
 
         assertTrue(OpenAiCompatibleCapabilities.supportsNativeTools(config));
         assertTrue(OpenAiCompatibleCapabilities.supportsReasoningRequestParameters(config));

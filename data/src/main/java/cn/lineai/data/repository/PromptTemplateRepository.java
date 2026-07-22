@@ -1,9 +1,9 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.data.R;
 import cn.lineai.model.ChatMode;
 import cn.lineai.model.PromptTemplateItem;
+import cn.lineai.resource.ResourceProvider;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -39,12 +39,12 @@ public final class PromptTemplateRepository {
     private static final String KEY_PREFIX = "@linecode_prompt_template_";
     private static final List<Definition> DEFINITIONS = buildDefinitions();
 
-    private final Context context;
+    private final ResourceProvider resourceProvider;
     private final SettingsRepository settingsRepository;
 
-    public PromptTemplateRepository(Context context) {
-        this.context = context.getApplicationContext();
-        this.settingsRepository = new SettingsRepository(this.context);
+    public PromptTemplateRepository(ResourceProvider resourceProvider, SettingsRepository settingsRepository) {
+        this.resourceProvider = resourceProvider;
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized List<PromptTemplateItem> getTemplates() {
@@ -54,8 +54,8 @@ public final class PromptTemplateRepository {
             String currentText = settingsRepository.getString(key(definition.id), defaultText);
             items.add(new PromptTemplateItem(
                     definition.id,
-                    context.getString(definition.titleResId),
-                    context.getString(definition.descriptionResId),
+                    resourceProvider.getString(definition.titleResId),
+                    resourceProvider.getString(definition.descriptionResId),
                     resolveSourceLabel(definition),
                     definition.variables,
                     defaultText,
@@ -96,7 +96,7 @@ public final class PromptTemplateRepository {
 
     private String resolveSourceLabel(Definition definition) {
         if (definition.sourceLabelResId != 0) {
-            return context.getString(definition.sourceLabelResId);
+            return resourceProvider.getString(definition.sourceLabelResId);
         }
         return definition.sourceLabel;
     }
@@ -108,7 +108,7 @@ public final class PromptTemplateRepository {
                 return definition;
             }
         }
-        throw new IllegalArgumentException(context.getString(R.string.prompt_template_error_unknown, safeId));
+        throw new IllegalArgumentException(resourceProvider.getString(R.string.prompt_template_error_unknown, safeId));
     }
 
     private String key(String id) {
@@ -117,7 +117,7 @@ public final class PromptTemplateRepository {
 
     private String readAsset(String path) {
         try {
-            InputStream input = context.getAssets().open(path);
+            InputStream input = resourceProvider.openAsset(path);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096];
             int read;
@@ -127,7 +127,7 @@ public final class PromptTemplateRepository {
             input.close();
             return output.toString(StandardCharsets.UTF_8.name());
         } catch (Exception e) {
-            throw new IllegalStateException(context.getString(R.string.prompt_template_error_read_failed, path), e);
+            throw new IllegalStateException(resourceProvider.getString(R.string.prompt_template_error_read_failed, path), e);
         }
     }
 

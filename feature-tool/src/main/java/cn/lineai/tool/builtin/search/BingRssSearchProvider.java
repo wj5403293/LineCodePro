@@ -9,16 +9,18 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
  * Bing 公开 RSS 端点的内置 provider。
  *
- * 端点：https://www.bing.com/search?format=rss&q=<URL编码>&count=10&mkt=zh-CN&safe=strict
+ * 端点：https://www.bing.com/search?format=rss&q=<URL编码>&count=10&mkt=<系统语言>&safe=strict
  * - 返回标准 RSS 2.0 XML，10 条结果
  * - 每个 {@code <item>} 含 title、link、description、pubDate
  * - 无反爬，无需 Cookie 或 API Key
+ * - mkt 根据系统语言动态拼接（Locale.getDefault() 的 language tag，如 zh-CN、en-US）
  *
  * 用 Android 内置 {@link android.util.Xml} 解析，无需第三方依赖。
  */
@@ -38,7 +40,7 @@ public class BingRssSearchProvider implements WebSearchProvider {
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         params.put(config.getQueryParam(), query);
         params.put("count", String.valueOf(Math.max(1, Math.min(limit, 10))));
-        params.put("mkt", "zh-CN");
+        params.put("mkt", resolveMarket());
         params.put("safe", "strict");
         String baseUrl = config.getBaseUrl().length() == 0 ? RSS_BASE_URL : config.getBaseUrl();
         String url = SearchRequest.appendQuery(baseUrl, params);
@@ -46,6 +48,16 @@ public class BingRssSearchProvider implements WebSearchProvider {
         request.headers.put("Accept", "application/rss+xml, application/xml, text/xml, */*");
         request.headers.put("User-Agent", USER_AGENT);
         return request;
+    }
+
+    /**
+     * 根据系统语言解析 Bing market 参数（如 zh-CN、en-US）。
+     * 使用 Locale.getDefault() 的 language tag；缺失时回退 en-US。
+     */
+    private static String resolveMarket() {
+        Locale locale = Locale.getDefault();
+        String tag = locale.toLanguageTag();
+        return (tag == null || tag.trim().length() == 0) ? "en-US" : tag.trim();
     }
 
     @Override

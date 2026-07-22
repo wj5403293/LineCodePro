@@ -95,6 +95,56 @@ The chat list renders Markdown through `:markdown` (`cn.lineai.ui.markdown.*`), 
 - Never hardcode user-visible Chinese or English strings in Java — add them to `app/src/main/res/values/strings.xml` and `app/src/main/res/values-zh/strings.xml` and load via `R.string.*` (or `cn.lineai.ui.theme.R`/`cn.lineai.ui.markdown.R` for resources owned by those modules). Watch for `\uXXXX`-escaped Chinese that bypasses greps.
 - `问题.txt` is a scratch issue list and is gitignored; do not edit it as part of normal changes.
 
+## Architecture Principles
+
+### Open-Closed Principle (OCP)
+- 新增工具只需覆写 BaseTool 的 getDisplayCategory()/getActionName()/getActionIcon() 虚方法，无需修改 ToolDisplayResolver/ToolCallReadView/ToolCallBlockView 等已有代码
+- 新增协议通过 ModelProtocolFactory.register() 和 ModelCatalogClient.register(ModelProtocolType, CatalogFetcher) 扩展，无需修改工厂或客户端
+- 协议能力判断（supportsDedicatedCompression 等）由 ModelProtocolType 枚举属性承载，不在 ModelConfig 中硬编码
+- ArchiveSecretRedactor 敏感字段和命名模式通过 registerSensitiveFields()/registerSensitiveNameKeyword() 实例方法扩展
+- UrlPolicy 白名单主机和网段通过 addCleartextHost()/addPrivateNetworkPredicate() 实例方法扩展
+- Agent 类型→模板映射通过 AgentPromptBuilder.registerRoleTemplate() 静态方法扩展
+- Agent 工具白名单通过 ToolSettingsStore.getAgentExcludedToolNames()/getAgentAllowedCategories() 配置
+
+### Single Responsibility Principle (SRP)
+- Repository 仅负责数据存取：ToolSettingsRepository 仅存取配置，权限判断在 ToolPermissionService，提示词渲染在 ToolPromptService
+- LearningContextRepository 仅存取数据，业务编排（buildLearningContext/getOverview）在 LearningContextService
+- DiffRepository 仅管理 DB 记录，文件恢复在 FileRestorer，DB 标记在 DiffRepository.markReverted()
+- ChatModeRepository.applyMode() 仅存储模式，权限同步由调用方通过 applyPermissionForMode() 处理
+- ToolExecutor 仅做执行编排，Diff 记录在 DiffRecorder
+- Protocol 实现仅做组合编排：OpenAiMessageSerializer 负责消息序列化，CodexRequestBuilder 负责请求构建，CodexOutputMerger 负责输出合并
+
+### Dependency Inversion Principle (DIP)
+- Repository 不依赖 UI 层 (cn.lineai.ui.*)、AI 层 (cn.lineai.ai.prompt.*)、Service 层 (cn.lineai.service.*) 的具体实现
+- 解耦接口定义在 :core-api：ToolCategoryResolver、ToolPromptRenderer、AccessibilityStateProvider、SkillPromptProvider、PromptTemplateProvider
+- Repository 不持有 Android Context：LineCodeDatabase/SettingsRepository/SharedPreferences 通过构造函数注入
+- 资源访问通过 ResourceProvider 接口（openAsset/getString），系统配置通过 SystemConfigProvider 接口（isDarkModeEnabled/getSdkInt/getFilesDirPath）
+- feature-model 对 data 层的依赖通过 PromptTemplateProvider 接口解耦
+
+### OOP Principles
+- View 层仅负责渲染：不包含数据解析、业务验证、ModelConfig 构建、后台线程启动、网络请求等逻辑
+- BaseTool 通过虚方法提供显示信息（getDisplayCategory/getActionName/getActionIcon），UI 层不硬编码 if-else 分派
+- PhoneControlService 接口解耦 Phone 工具与 LineCodeAccessibilityService
+
+### KISS Principle
+- 不创建仅被单一调用方使用的抽象层
+- 不引入项目中没有其他消费者的设计模式
+- Protocol 中 SSE 解析逻辑保留在 Protocol 内（与流处理紧耦合，强行提取增加间接层但不增加可测试性）
+- ToolExecutor 中权限检查保留（仅2行条件判断，提取反而增加间接层）
+
+### Do One Thing
+- 每个方法只做一件事：ChatModeRepository.applyMode() 不执行跨 Repository 副作用
+- DiffRepository.revertDiff() 不写文件，文件恢复由调用方通过 FileRestorer 处理
+- render() 方法不执行状态变更副作用
+
+### Internationalization (i18n)
+- 所有用户可见字符串必须使用 R.string.* 资源，禁止在 Java 代码中硬编码中文或英文字符串
+- 英文资源在 values/strings.xml，中文资源在 values-zh/strings.xml，俄文资源在 values-ru/strings.xml
+- 警惕 \uXXXX 转义的中文字符，这些绕过 grep 搜索但不违反规则
+- AI 提示词中的中文关键词（如 MemoryExtractionService 的记忆匹配词、SkillFileManager 的 Skill 模板）不属于用户可见字符串，不需要 i18n
+- Repository 层通过 ResourceProvider.getString() 获取字符串资源，不直接使用 Context
+- Agent 提示词 fallback 通过 Context.getString() 读取资源，无 Context 时回退到硬编码英文
+
 ## Compliance gates before shipping a release
 
 `docs/android-compliance-audit.md` is the source of truth. Before tagging, the following must pass: `:app:testDebugUnitTest`, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`. Debug signing must never sign release artifacts — the `validateReleaseSigning` task enforces this.

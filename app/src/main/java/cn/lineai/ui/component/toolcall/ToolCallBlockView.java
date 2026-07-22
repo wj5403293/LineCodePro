@@ -6,8 +6,6 @@ import android.widget.LinearLayout;
 import cn.lineai.tool.ToolCall;
 import cn.lineai.tool.ToolDisplayCategory;
 import cn.lineai.tool.ToolResult;
-import cn.lineai.tool.builtin.AgentPipelineTool;
-import cn.lineai.tool.builtin.AgentTool;
 
 public final class ToolCallBlockView extends LinearLayout {
     private final ToolCallViewFactoryRegistry registry;
@@ -58,12 +56,6 @@ public final class ToolCallBlockView extends LinearLayout {
     }
 
     private ToolDisplayCategory resolveDisplayCategory(String name) {
-        if (AgentTool.NAME.equals(name)) {
-            return ToolDisplayCategory.AGENT;
-        }
-        if (AgentPipelineTool.NAME.equals(name)) {
-            return ToolDisplayCategory.AGENT_PIPELINE;
-        }
         return ToolCallUtils.getDisplayCategory(name);
     }
 

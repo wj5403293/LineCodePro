@@ -11,7 +11,7 @@ import java.util.List;
 
 public final class ChatImageFormat implements ExportFormat {
     @Override
-    public String displayName() { return "对话截图(图片)"; }
+    public String displayName() { return "Chat screenshot (image)"; }
 
     @Override
     public ExportResult execute(Context context, List<ChatMessage> messages) {

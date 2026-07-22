@@ -1,9 +1,9 @@
 package cn.lineai.tool.builtin;
 
 import android.content.Context;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -14,18 +14,10 @@ import org.json.JSONObject;
 
 /**
  * Phone control tool: click at screen coordinates.
- *
- * <p>Module split barrier: this tool depends on the tool framework
- * ({@link BaseTool}, {@link ToolCategory}, {@link ToolContext}, {@link ToolResult},
- * {@link ToolDisplayCategory}) and {@link LineCodeAccessibilityService}, all of which
- * reside in the :app module. To extract into :feature-phone, the tool framework
- * interfaces must first be extracted into a shared :tool-framework module, and
- * {@link ToolRegistry} registration must support external module contributions
- * (e.g. via ServiceLoader or a registry callback). No direct dependency on
- * {@code cn.lineai.ui.*} classes.
  */
 public final class PhoneClickTool extends BaseTool {
     public static final String NAME = "phone_click";
+    private static final String CLICK_DESC = "Tap the specified screen coordinates. x and y are screen pixel coordinates.";
     private final Context context;
 
     public PhoneClickTool(Context context) {
@@ -39,7 +31,7 @@ public final class PhoneClickTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return context == null ? "Tap the specified screen coordinates." : context.getString(R.string.phone_tool_click_description);
+        return context == null ? CLICK_DESC : CLICK_DESC;
     }
 
     @Override
@@ -50,6 +42,11 @@ public final class PhoneClickTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
     }
 
     @Override
@@ -68,14 +65,14 @@ public final class PhoneClickTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("x", new JSONObject().put("type", "number").put("description", "屏幕 X 坐标"))
-                        .put("y", new JSONObject().put("type", "number").put("description", "屏幕 Y 坐标")))
+                        .put("x", new JSONObject().put("type", "number").put("description", "Screen X coordinate"))
+                        .put("y", new JSONObject().put("type", "number").put("description", "Screen Y coordinate")))
                 .put("required", new JSONArray().put("x").put("y"));
     }
 
     @Override
     public ToolResult execute(JSONObject input, ToolContext context) {
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
+        PhoneControlService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, this.context);
         }

@@ -31,7 +31,7 @@ public final class UrlPolicyTest {
             UrlPolicy.requireHttpOrLocalCleartextUrl("http://example.com", "URL");
             Assert.fail("Expected remote HTTP URL to be rejected.");
         } catch (IllegalArgumentException expected) {
-            Assert.assertTrue(expected.getMessage().contains("HTTP 明文"));
+            Assert.assertTrue(expected.getMessage().contains("HTTP cleartext"));
         }
     }
 

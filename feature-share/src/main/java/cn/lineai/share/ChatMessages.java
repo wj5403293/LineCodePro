@@ -7,8 +7,8 @@ import java.util.List;
 public final class ChatMessages {
     private ChatMessages() {}
 
-    public static final String FOOTER_MD = "*—— 来自 LineCode Pro*";
-    public static final String FOOTER_PLAIN = "—— 来自 LineCode Pro";
+    public static final String FOOTER_MD = "*—— From LineCode Pro*";
+    public static final String FOOTER_PLAIN = "—— From LineCode Pro";
 
     public static String toMarkdown(List<ChatMessage> messages) {
         StringBuilder sb = new StringBuilder();
@@ -68,6 +68,6 @@ public final class ChatMessages {
     }
 
     private static String label(ChatMessage msg) {
-        return msg.getRole() == ChatMessage.Role.USER ? "我" : "AI";
+        return msg.getRole() == ChatMessage.Role.USER ? "Me" : "AI";
     }
 }

@@ -17,8 +17,8 @@ public final class ToolRunControllerTest {
         ToolCall first = new ToolCall("read_1", "file_read", "{}");
         ToolCall second = new ToolCall("glob_1", "glob", "{}");
         HashMap<String, ToolResult> resultById = new HashMap<>();
-        resultById.put("glob_1", new ToolResult("glob_1", "glob", "b", false));
-        resultById.put("read_1", new ToolResult("read_1", "file_read", "a", false));
+        resultById.put("glob_1", ToolResult.withReview("glob_1", "glob", "b", false, "", "", ""));
+        resultById.put("read_1", ToolResult.withReview("read_1", "file_read", "a", false, "", "", ""));
 
         List<ToolResult> ordered = controller.orderedResults(Arrays.asList(first, second), resultById);
 

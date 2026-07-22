@@ -2,9 +2,9 @@ package cn.lineai.tool.builtin;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import cn.lineai.R;
-import cn.lineai.service.LineCodeAccessibilityService;
+import cn.lineai.tool.R;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.PhoneControlService;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -17,13 +17,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Module split barrier: depends on tool framework (BaseTool, ToolCategory, etc.),
- * LineCodeAccessibilityService, and PhoneScreenshotCache in :app.
- * See PhoneClickTool for full barrier notes.
- * No direct dependency on cn.lineai.ui.* classes.
+ * Phone control tool: capture screenshot and return saved image path.
  */
 public final class PhoneScreenshotTool extends BaseTool {
     public static final String NAME = "phone_screenshot";
+    private static final String SCREENSHOT_DESC = "Capture the current screen, save it to the app cache directory, and return the image file path. Accessibility must be enabled.";
     private final Context context;
 
     public PhoneScreenshotTool(Context context) {
@@ -37,7 +35,7 @@ public final class PhoneScreenshotTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return context == null ? "Capture the current screen and return the saved image path." : context.getString(R.string.phone_tool_screenshot_description);
+        return context == null ? SCREENSHOT_DESC : SCREENSHOT_DESC;
     }
 
     @Override
@@ -48,6 +46,11 @@ public final class PhoneScreenshotTool extends BaseTool {
     @Override
     public ToolDisplayCategory getDisplayCategory() {
         return ToolDisplayCategory.PHONE_CONTROL;
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SMARTPHONE;
     }
 
     @Override
@@ -73,7 +76,7 @@ public final class PhoneScreenshotTool extends BaseTool {
         if (this.context == null) {
             return error("Screenshot tool is missing app context");
         }
-        LineCodeAccessibilityService service = PhoneControlToolSupport.service(this.context);
+        PhoneControlService service = PhoneControlToolSupport.service(this.context);
         if (service == null) {
             return PhoneControlToolSupport.unavailable(this, this.context);
         }

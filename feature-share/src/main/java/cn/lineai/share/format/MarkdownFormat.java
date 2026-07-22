@@ -13,7 +13,7 @@ import java.util.List;
 
 public final class MarkdownFormat implements ExportFormat {
     @Override
-    public String displayName() { return "Markdown 文件(.md)"; }
+    public String displayName() { return "Markdown file(.md)"; }
 
     @Override
     public ExportResult execute(Context context, List<ChatMessage> messages) {

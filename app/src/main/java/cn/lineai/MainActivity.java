@@ -71,7 +71,7 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
             });
         }).start();
 
-        UserAgreementRepository agreement = new UserAgreementRepository(this);
+        UserAgreementRepository agreement = new UserAgreementRepository(new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this)));
         if (agreement.shouldShow()) {
             UserAgreementDialog.show(this, () -> {
                 agreement.setAccepted(true);
@@ -94,8 +94,10 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onStop() {
         super.onStop();
-        // 退出 App 时清理生成状态：取消网络请求、关闭流式连接、隐藏进度圈
-        if (presenter != null) {
+        // Only finish/destroy should cancel generation. Home / multi-task must keep
+        // the stream + pending tool reviews alive (KeepAliveService covers process priority).
+        if (presenter != null
+                && cn.lineai.mvp.ActivityGenerationLifecyclePolicy.shouldStopGenerationOnStop(isFinishing())) {
             presenter.resetGenerationState();
         }
     }
@@ -103,8 +105,9 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onStart() {
         super.onStart();
-        // 进入 App 时清理残留状态：避免上次退出时未完成的进度圈、孤立 streaming 标志残留
-        if (presenter != null) {
+        // Never cancel on resume: process-death orphans are cleaned by ConversationResumeSanitizer.
+        if (presenter != null
+                && cn.lineai.mvp.ActivityGenerationLifecyclePolicy.shouldStopGenerationOnStart()) {
             presenter.resetGenerationState();
         }
     }
@@ -112,7 +115,10 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     @Override
     protected void onDestroy() {
         unregisterBackCallback();
-        presenter.destroy();
+        // destroy() always cancels generation + keep-alive (explicit teardown).
+        if (presenter != null) {
+            presenter.destroy();
+        }
         super.onDestroy();
     }
 
@@ -200,7 +206,24 @@ public final class MainActivity extends Activity implements MainChatView.Workspa
     }
 
     private void configureWindow() {
-        LineTheme.apply(new ThemeSettingsRepository(this).resolveCurrentPalette());
+        LineTheme.apply(new ThemeSettingsRepository(new cn.lineai.resource.SystemConfigProvider() {
+            @Override
+            public boolean isDarkModeEnabled() {
+                int nightMode = getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+                return nightMode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+            }
+            @Override
+            public int getSdkInt() { return android.os.Build.VERSION.SDK_INT; }
+            @Override
+            public String getFilesDirPath() { return getFilesDir().getAbsolutePath(); }
+            @Override
+            public String getDatabasePath(String name) { return MainActivity.this.getDatabasePath(name).getAbsolutePath(); }
+            @Override
+            public String getExternalFilesDirPath() {
+                java.io.File dir = getExternalFilesDir(null);
+                return dir != null ? dir.getAbsolutePath() : "";
+            }
+        }, new cn.lineai.data.repository.SettingsRepository(cn.lineai.data.db.LineCodeDatabase.getInstance(this))).resolveCurrentPalette());
         Window window = getWindow();
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         window.setStatusBarColor(LineTheme.BG);

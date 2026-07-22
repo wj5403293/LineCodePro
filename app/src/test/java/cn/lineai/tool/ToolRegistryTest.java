@@ -33,4 +33,12 @@ public final class ToolRegistryTest {
         Assert.assertNotNull(registry.get("agent"));
         Assert.assertNotNull(registry.get("agent_pipeline"));
     }
+
+    @Test
+    public void registersMemoryUpdateTool() {
+        ToolRegistry registry = new ToolRegistry();
+
+        Assert.assertNotNull(registry.get("memory_update"));
+        Assert.assertEquals(ToolDisplayCategory.READ, registry.getCachedDisplayCategory("memory_update"));
+    }
 }

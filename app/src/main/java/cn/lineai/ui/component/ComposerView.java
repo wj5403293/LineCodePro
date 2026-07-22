@@ -958,8 +958,12 @@ public final class ComposerView extends LinearLayout implements QuoteController.
 
     private SlashState modelIdState(String query) {
         List<String> ids = new ArrayList<>();
+        String needle = query == null ? "" : query.trim().toLowerCase();
         for (ModelConfig model : availableModels) {
             if (model != null) {
+                if (needle.length() > 0 && !modelMatchesQuery(model, needle)) {
+                    continue;
+                }
                 ids.add(model.getId());
             }
         }
@@ -996,8 +1000,8 @@ public final class ComposerView extends LinearLayout implements QuoteController.
             }
         } else if (state.kind == SlashState.Kind.MODEL_ID) {
             for (String id : state.modelIds) {
-                String label = id;
-                String description = modelDescription(id);
+                String label = modelDisplayName(id);
+                String description = modelDisplayDetail(id);
                 Runnable action = () -> applyModelIdSelection(id);
                 rows.add(new SlashCommandPopup.Row(label, description, action));
             }
@@ -1011,17 +1015,42 @@ public final class ComposerView extends LinearLayout implements QuoteController.
         return rows;
     }
 
-    private String modelDescription(String id) {
+    private ModelConfig findModel(String id) {
         for (ModelConfig model : availableModels) {
             if (model != null && model.getId().equals(id)) {
-                String name = model.getName();
-                if (name.length() > 0 && !name.equals(id)) {
-                    return name;
-                }
-                return model.getProviderLabel();
+                return model;
             }
         }
-        return "";
+        return null;
+    }
+
+    private String modelDisplayName(String id) {
+        ModelConfig model = findModel(id);
+        if (model == null) return id;
+        String name = model.getName();
+        if (name.length() > 0 && !name.equals(id)) return name;
+        String apiId = model.getModelId();
+        if (apiId.length() > 0) return apiId;
+        return model.getProviderLabel();
+    }
+
+    private String modelDisplayDetail(String id) {
+        ModelConfig model = findModel(id);
+        if (model == null) return "";
+        String label = model.getProviderLabel();
+        String apiId = model.getModelId();
+        if (apiId.length() > 0 && !apiId.equals(modelDisplayName(id))) {
+            return label + " · " + apiId;
+        }
+        return label;
+    }
+
+    private static boolean modelMatchesQuery(ModelConfig model, String needle) {
+        if (model.getName().toLowerCase().contains(needle)) return true;
+        if (model.getModelId().toLowerCase().contains(needle)) return true;
+        if (model.getId().toLowerCase().contains(needle)) return true;
+        if (model.getProviderLabel().toLowerCase().contains(needle)) return true;
+        return false;
     }
 
     private String mainDescription(String token) {

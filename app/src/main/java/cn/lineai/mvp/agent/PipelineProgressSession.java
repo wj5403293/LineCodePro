@@ -16,6 +16,7 @@ public final class PipelineProgressSession {
         void publish(String toolCallId, String toolName, String payload, boolean error);
     }
 
+    private final Object lock = new Object();
     private final ToolContext parentContext;
     private final String toolCallId;
     private final ProgressPublisher publisher;
@@ -40,77 +41,103 @@ public final class PipelineProgressSession {
     }
 
     public void setStatus(String nextStatus, boolean nextError) {
-        this.status = nextStatus == null ? "running" : nextStatus;
-        this.error = nextError;
+        synchronized (lock) {
+            this.status = nextStatus == null ? "running" : nextStatus;
+            this.error = nextError;
+        }
     }
 
     public void setFinalSummary(String summary) {
-        this.finalSummary = summary == null ? "" : summary;
+        synchronized (lock) {
+            this.finalSummary = summary == null ? "" : summary;
+        }
     }
 
     public String getFinalSummary() {
-        return finalSummary;
+        synchronized (lock) {
+            return finalSummary;
+        }
     }
 
     public void beginAgent(PipelineAgent agent) {
-        PipelineAgentState state = stateById.get(agent.getId());
-        if (state != null) {
-            state.setStatus("running");
+        synchronized (lock) {
+            PipelineAgentState state = stateById.get(agent.getId());
+            if (state != null) {
+                state.setStatus("running");
+            }
+            publishLocked(false);
         }
-        publish(false);
     }
 
     public void updateAgent(PipelineAgent agent, String agentProgressPayload, boolean agentError) {
-        PipelineAgentState state = stateById.get(agent.getId());
-        if (state == null) {
-            return;
-        }
-        try {
-            JSONObject object = new JSONObject(agentProgressPayload);
-            state.setStatus(object.optString("status", state.getStatus()));
-            state.setOutput(object.optString("output", state.getOutput()));
-            state.setThinking(object.optString("thinking", state.getThinking()));
-            state.setToolCallCount(object.optInt("tool_call_count", state.getToolCallCount()));
-            JSONArray toolCalls = object.optJSONArray("tool_calls");
-            if (toolCalls != null) {
-                state.setToolCalls(new JSONArray(toolCalls.toString()));
+        synchronized (lock) {
+            PipelineAgentState state = stateById.get(agent.getId());
+            if (state == null) {
+                return;
             }
-            state.setError(agentError || object.optBoolean("error", false) || "error".equals(state.getStatus()));
-        } catch (Exception ignored) {
-            state.setOutput(agentProgressPayload == null ? state.getOutput() : agentProgressPayload);
-            state.setError(agentError);
+            try {
+                JSONObject object = new JSONObject(agentProgressPayload);
+                state.setStatus(object.optString("status", state.getStatus()));
+                state.setOutput(object.optString("output", state.getOutput()));
+                state.setThinking(object.optString("thinking", state.getThinking()));
+                state.setToolCallCount(object.optInt("tool_call_count", state.getToolCallCount()));
+                JSONArray toolCalls = object.optJSONArray("tool_calls");
+                if (toolCalls != null) {
+                    state.setToolCalls(new JSONArray(toolCalls.toString()));
+                }
+                state.setError(agentError || object.optBoolean("error", false) || "error".equals(state.getStatus()));
+            } catch (Exception ignored) {
+                state.setOutput(agentProgressPayload == null ? state.getOutput() : agentProgressPayload);
+                state.setError(agentError);
+            }
+            error = error || state.isError();
+            publishLocked(error);
         }
-        error = error || state.isError();
-        publish(error);
     }
 
     public void finishAgent(PipelineAgent agent, AgentRunResult result) {
-        PipelineAgentState state = stateById.get(agent.getId());
-        if (state != null) {
-            state.setStatus(result.isError() ? "error" : "done");
-            state.setOutput(result.getOutput());
-            state.setToolCallCount(result.getToolCallCount());
-            state.setError(result.isError());
+        synchronized (lock) {
+            PipelineAgentState state = stateById.get(agent.getId());
+            if (state != null) {
+                state.setStatus(result.isError() ? "error" : "done");
+                state.setOutput(result.getOutput());
+                state.setToolCallCount(result.getToolCallCount());
+                state.setError(result.isError());
+            }
+            error = error || result.isError();
+            publishLocked(error);
         }
-        error = error || result.isError();
-        publish(error);
     }
 
     public void terminate() {
-        status = "error";
-        error = true;
-        for (PipelineAgentState state : stateById.values()) {
-            if ("running".equals(state.getStatus()) || "waiting".equals(state.getStatus())) {
-                state.setStatus("error");
-                state.setError(true);
-                state.setOutput(AGENT_TERMINATED_MESSAGE);
+        synchronized (lock) {
+            status = "error";
+            error = true;
+            for (PipelineAgentState state : stateById.values()) {
+                if ("running".equals(state.getStatus()) || "waiting".equals(state.getStatus())) {
+                    state.setStatus("error");
+                    state.setError(true);
+                    state.setOutput(AGENT_TERMINATED_MESSAGE);
+                }
             }
+            publishLocked(true);
         }
-        publish(true);
     }
 
     public void publish(boolean nextError) {
-        String payload = buildPayload();
+        synchronized (lock) {
+            publishLocked(nextError);
+        }
+    }
+
+    public String payload() {
+        synchronized (lock) {
+            return buildPayloadLocked();
+        }
+    }
+
+    private void publishLocked(boolean nextError) {
+        String payload = buildPayloadLocked();
         if (publisher != null && toolCallId.length() > 0) {
             publisher.publish(toolCallId, AgentPipelineTool.NAME, payload, nextError);
             return;
@@ -121,20 +148,16 @@ public final class PipelineProgressSession {
         parentContext.reportToolProgress(AgentPipelineTool.NAME, payload, nextError);
     }
 
-    public String payload() {
-        return buildPayload();
-    }
-
-    private String buildPayload() {
+    private String buildPayloadLocked() {
         try {
             JSONObject object = new JSONObject();
             object.put("linecode_agent_pipeline_progress", true);
             object.put("kind", AgentPipelineTool.NAME);
             object.put("status", status);
             object.put("total", agents.size());
-            object.put("completed", countStatus("done"));
-            object.put("running", countStatus("running"));
-            object.put("failed", countFailed());
+            object.put("completed", countStatusLocked("done"));
+            object.put("running", countStatusLocked("running"));
+            object.put("failed", countFailedLocked());
             object.put("error", error);
             if (finalSummary.length() > 0) {
                 object.put("summary", finalSummary);
@@ -150,7 +173,7 @@ public final class PipelineProgressSession {
         }
     }
 
-    private int countStatus(String value) {
+    private int countStatusLocked(String value) {
         int count = 0;
         for (PipelineAgentState state : stateById.values()) {
             if (value.equals(state.getStatus())) {
@@ -160,7 +183,7 @@ public final class PipelineProgressSession {
         return count;
     }
 
-    private int countFailed() {
+    private int countFailedLocked() {
         int count = 0;
         for (PipelineAgentState state : stateById.values()) {
             if (state.isError() || "error".equals(state.getStatus())) {

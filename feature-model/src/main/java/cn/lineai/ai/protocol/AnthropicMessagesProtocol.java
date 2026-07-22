@@ -49,7 +49,7 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
             throw e;
         } catch (Exception e) {
             logParseError("parse_anthropic_complete", raw, e);
-            throw new ModelCompletionException("Anthropic Messages 协议解析失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Anthropic Messages protocol parse failed: " + e.getMessage(), e);
         }
     }
 
@@ -81,7 +81,7 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
         } catch (ModelCompletionException e) {
             throw e;
         } catch (Exception e) {
-            throw new ModelCompletionException("Anthropic Messages 协议流式解析失败: " + e.getMessage(), e);
+            throw new ModelCompletionException("Anthropic Messages protocol stream parse failed: " + e.getMessage(), e);
         }
     }
 
@@ -126,7 +126,7 @@ public final class AnthropicMessagesProtocol extends AbstractHttpModelProtocol {
         }
         JSONObject event = new JSONObject(data);
         if (event.has("error")) {
-            throw new ModelCompletionException("Anthropic 流式错误: " + event.opt("error"));
+            throw new ModelCompletionException("Anthropic stream error: " + event.opt("error"));
         }
         String type = event.optString("type");
 

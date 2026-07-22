@@ -1,5 +1,7 @@
 package cn.lineai.mvp;
 
+import android.content.Context;
+import cn.lineai.R;
 import cn.lineai.ai.ModelClient;
 import cn.lineai.ai.ModelCompletionResponse;
 import cn.lineai.ai.message.ModelMessage;
@@ -32,6 +34,7 @@ final class ExtensionDraftController {
     private final ToolRegistry toolRegistry;
     private final ToolSettingsStore toolSettingsRepository;
     private final ExtensionStore extensionRepository;
+    private Context context;
 
     ExtensionDraftController(
             ModelStore modelRepository,
@@ -45,6 +48,14 @@ final class ExtensionDraftController {
         this.toolRegistry = toolRegistry;
         this.toolSettingsRepository = toolSettingsRepository;
         this.extensionRepository = extensionRepository;
+    }
+
+    void setContext(Context context) {
+        this.context = context;
+    }
+
+    private String string(int resId, String fallback) {
+        return context != null ? context.getString(resId) : fallback;
     }
 
     ExtensionAgentConfig generateAgentDraft(String description) throws Exception {
@@ -88,7 +99,7 @@ final class ExtensionDraftController {
         String prompt = draft.optString("prompt").trim();
         String trigger = draft.optString("trigger").trim();
         if (name.length() == 0 || slug.length() == 0 || prompt.length() == 0) {
-            throw new IllegalStateException("AI 返回的配置缺少 name、slug 或 prompt。");
+            throw new IllegalStateException(string(R.string.extension_draft_missing_fields, "AI returned config missing name, slug, or prompt."));
         }
         List<String> selectedTools = filteredStringArray(draft.optJSONArray("toolNames"), allowedTools);
         if (selectedTools.isEmpty()) {
@@ -165,7 +176,7 @@ final class ExtensionDraftController {
         int start = source.indexOf('{');
         int end = source.lastIndexOf('}');
         if (start < 0 || end <= start) {
-            throw new IllegalStateException("AI 没有返回有效 JSON。");
+            throw new IllegalStateException(string(R.string.extension_draft_invalid_json, "AI did not return valid JSON."));
         }
         return new JSONObject(source.substring(start, end + 1));
     }

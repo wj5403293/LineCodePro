@@ -23,4 +23,6 @@ public interface AiBehaviorSettingsController {
     void onMemorySaved(String id, String scope, String content);
 
     void onMemoryDeleted(String id);
+
+    void onMemoriesDeleted(java.util.List<String> ids);
 }

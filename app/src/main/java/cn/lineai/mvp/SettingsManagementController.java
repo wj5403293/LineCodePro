@@ -3,6 +3,7 @@ package cn.lineai.mvp;
 import cn.lineai.data.repository.AiBehaviorSettingsRepository;
 import cn.lineai.data.repository.InputSettingsRepository;
 import cn.lineai.data.repository.LearningContextStore;
+import cn.lineai.service.LearningContextService;
 import cn.lineai.data.repository.OutputSettingsRepository;
 import cn.lineai.data.repository.PromptTemplateRepository;
 import cn.lineai.data.repository.ThemeSettingsRepository;
@@ -65,6 +66,8 @@ public final class SettingsManagementController {
 
         void deleteMemory(String id);
 
+        void deleteMemories(List<String> ids);
+
         OutputSettings getOutputSettings();
 
         void setCodeWrapEnabled(boolean enabled);
@@ -107,6 +110,7 @@ public final class SettingsManagementController {
         private final InputSettingsRepository inputSettingsRepository;
         private final PromptTemplateRepository promptTemplateRepository;
         private final LearningContextStore learningContextRepository;
+        private final LearningContextService learningContextService;
         private final OutputSettingsRepository outputSettingsRepository;
         private final ThemeSettingsRepository themeSettingsRepository;
         private final ToolSettingsStore toolSettingsRepository;
@@ -116,6 +120,7 @@ public final class SettingsManagementController {
                 InputSettingsRepository inputSettingsRepository,
                 PromptTemplateRepository promptTemplateRepository,
                 LearningContextStore learningContextRepository,
+                LearningContextService learningContextService,
                 OutputSettingsRepository outputSettingsRepository,
                 ThemeSettingsRepository themeSettingsRepository,
                 ToolSettingsStore toolSettingsRepository
@@ -124,6 +129,7 @@ public final class SettingsManagementController {
             this.inputSettingsRepository = inputSettingsRepository;
             this.promptTemplateRepository = promptTemplateRepository;
             this.learningContextRepository = learningContextRepository;
+            this.learningContextService = learningContextService;
             this.outputSettingsRepository = outputSettingsRepository;
             this.themeSettingsRepository = themeSettingsRepository;
             this.toolSettingsRepository = toolSettingsRepository;
@@ -191,7 +197,7 @@ public final class SettingsManagementController {
 
         @Override
         public MemoryOverviewState getMemoryOverview(String projectPath) {
-            return learningContextRepository.getOverview(projectPath);
+            return learningContextService.getOverview(projectPath);
         }
 
         @Override
@@ -202,6 +208,11 @@ public final class SettingsManagementController {
         @Override
         public void deleteMemory(String id) {
             learningContextRepository.deleteMemory(id);
+        }
+
+        @Override
+        public void deleteMemories(List<String> ids) {
+            learningContextRepository.deleteMemories(ids);
         }
 
         @Override
@@ -303,6 +314,7 @@ public final class SettingsManagementController {
             InputSettingsRepository inputSettingsRepository,
             PromptTemplateRepository promptTemplateRepository,
             LearningContextStore learningContextRepository,
+            LearningContextService learningContextService,
             OutputSettingsRepository outputSettingsRepository,
             ThemeSettingsRepository themeSettingsRepository,
             ToolSettingsStore toolSettingsRepository,
@@ -314,6 +326,7 @@ public final class SettingsManagementController {
                         inputSettingsRepository,
                         promptTemplateRepository,
                         learningContextRepository,
+                        learningContextService,
                         outputSettingsRepository,
                         themeSettingsRepository,
                         toolSettingsRepository
@@ -388,6 +401,10 @@ public final class SettingsManagementController {
 
     public void deleteMemory(String id) {
         settingsStore.deleteMemory(id);
+    }
+
+    public void deleteMemories(List<String> ids) {
+        settingsStore.deleteMemories(ids);
     }
 
     public OutputSettings getOutputSettings() {

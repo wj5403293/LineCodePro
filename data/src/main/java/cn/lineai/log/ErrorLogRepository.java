@@ -1,6 +1,5 @@
 package cn.lineai.log;
 
-import android.content.Context;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
@@ -18,14 +17,14 @@ public final class ErrorLogRepository {
     private static final String DIR_NAME = "error_logs";
     private static final SimpleDateFormat FILE_TIME_FORMAT = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT);
     private static final SimpleDateFormat DISPLAY_TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-    private final Context context;
+    private final String errorLogDirPath;
 
-    public ErrorLogRepository(Context context) {
-        this.context = context.getApplicationContext();
+    public ErrorLogRepository(String errorLogDirPath) {
+        this.errorLogDirPath = errorLogDirPath;
     }
 
     public File directory() {
-        File dir = new File(context.getFilesDir(), DIR_NAME);
+        File dir = new File(errorLogDirPath, DIR_NAME);
         if (!dir.exists()) {
             dir.mkdirs();
         }

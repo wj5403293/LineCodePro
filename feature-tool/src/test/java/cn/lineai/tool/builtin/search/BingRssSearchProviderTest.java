@@ -21,7 +21,7 @@ public final class BingRssSearchProviderTest {
         Assert.assertTrue("URL 应使用 https://www.bing.com/search?format=rss",
                 request.url.startsWith("https://www.bing.com/search?format=rss"));
         Assert.assertTrue("URL 应包含 count=7", request.url.contains("count=7"));
-        Assert.assertTrue("URL 应包含 mkt=zh-CN", request.url.contains("mkt=zh-CN"));
+        Assert.assertTrue("URL 应包含动态拼接的 mkt 参数（按系统语言）", request.url.matches(".*[?&]mkt=[A-Za-z-]+(&.*)?"));
         Assert.assertTrue("URL 应包含 safe=strict", request.url.contains("safe=strict"));
         Assert.assertTrue("URL 应对查询参数进行 URL 编码", request.url.contains("q=LineAI"));
         Assert.assertEquals("GET", request.method);

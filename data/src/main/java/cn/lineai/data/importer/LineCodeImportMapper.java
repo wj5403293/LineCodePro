@@ -150,7 +150,7 @@ public final class LineCodeImportMapper {
         }
         return new ConversationRecord(
                 conversationId,
-                conversation.optString("title", "新对话"),
+                conversation.optString("title", "New conversation"),
                 "",
                 createdAt,
                 updatedAt,
@@ -172,7 +172,7 @@ public final class LineCodeImportMapper {
             for (int i = 0; i < chunks; i++) {
                 String chunk = entries.get(KEY_CONVERSATION_CHUNK_PREFIX + id + "_" + i);
                 if (chunk == null) {
-                    throw new IllegalStateException("LineCode 聊天分片缺失: " + id + "_" + i);
+                    throw new IllegalStateException("LineCode chat chunk missing: " + id + "_" + i);
                 }
                 builder.append(chunk);
             }
@@ -180,7 +180,7 @@ public final class LineCodeImportMapper {
         }
         if ("file".equals(stored.optString("storage"))) {
             if (payloadDir == null) {
-                throw new IllegalStateException("LineCode 聊天文件需要 payloadDir: " + id);
+                throw new IllegalStateException("LineCode chat file requires payloadDir: " + id);
             }
             String fileName = stored.optString("fileName", safeConversationFileName(id));
             File target = new File(new File(payloadDir, CONVERSATION_FILES_DIR), fileName);

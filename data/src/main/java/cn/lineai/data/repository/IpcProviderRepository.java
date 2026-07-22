@@ -1,7 +1,6 @@
 package cn.lineai.data.repository;
 
 import android.content.ContentValues;
-import android.content.Context;
 import android.database.Cursor;
 import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.ipc.IpcProviderConfig;
@@ -11,8 +10,8 @@ import java.util.UUID;
 
 public final class IpcProviderRepository extends BaseRepository implements IpcProviderStore {
 
-    public IpcProviderRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context.getApplicationContext()));
+    public IpcProviderRepository(LineCodeDatabase database) {
+        super(database);
     }
 
     @Override

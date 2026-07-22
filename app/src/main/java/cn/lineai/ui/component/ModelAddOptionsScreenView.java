@@ -10,6 +10,7 @@ import cn.lineai.R;
 import cn.lineai.model.ModelProviderPreset;
 import cn.lineai.model.ModelProviderPresets;
 import cn.lineai.ui.theme.LineTheme;
+import cn.lineai.ui.util.ModelProviderPresetStrings;
 
 public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
     public interface Listener {
@@ -100,7 +101,7 @@ public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
 
     private void addProvider(LinearLayout content, ModelProviderPreset preset, Listener listener) {
         Context context = content.getContext();
-        String name = preset.getLabel();
+        String name = ModelProviderPresetStrings.getLabel(context, preset.getId());
         LinearLayout row = new LinearLayout(context);
         row.setOrientation(HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -123,7 +124,7 @@ public final class ModelAddOptionsScreenView extends ScreenScaffoldView {
         TextView title = LineTheme.text(context, name, LineTheme.FONT_MD, LineTheme.TEXT, Typeface.BOLD);
         title.setSingleLine(true);
         text.addView(title, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        TextView sub = LineTheme.text(context, preset.getDesc() + " · " + protocolLabel(preset), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
+        TextView sub = LineTheme.text(context, ModelProviderPresetStrings.getDesc(context, preset.getId()) + " · " + protocolLabel(preset), LineTheme.FONT_XS, LineTheme.TEXT_TERTIARY, Typeface.NORMAL);
         sub.setSingleLine(true);
         LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         subParams.topMargin = LineTheme.dp(context, 3);

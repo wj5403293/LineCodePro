@@ -2,32 +2,67 @@ package cn.lineai.data.importer;
 
 import cn.lineai.model.ModelConfig;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-final class ArchiveSecretRedactor {
+class ArchiveSecretRedactor {
     private static final String REDACTED = "";
-    private static final Map<String, String[]> SENSITIVE_FIELDS = new HashMap<>();
 
-    static {
-        register("@lineai_ssh_config", new String[]{"password", "privateKey", "passphrase"});
-        register("@lineai_web_search_config", new String[]{"apiKey"});
+    private static final ArchiveSecretRedactor DEFAULT = new ArchiveSecretRedactor();
+
+    private final Map<String, String[]> sensitiveFields;
+    private final Set<String> sensitiveNameKeywords;
+
+    ArchiveSecretRedactor() {
+        sensitiveFields = new HashMap<>();
+        sensitiveNameKeywords = new HashSet<>(Arrays.asList(
+                "apikey", "api_key", "api-key",
+                "authorization",
+                "password", "passwd", "passphrase",
+                "privatekey", "private_key", "private-key",
+                "secret",
+                "token",
+                "cookie"
+        ));
+        registerDefaultSensitiveFields();
     }
 
-    private ArchiveSecretRedactor() {
+    private void registerDefaultSensitiveFields() {
+        registerSensitiveFields("@lineai_ssh_config", new String[]{"password", "privateKey", "passphrase"});
+        registerSensitiveFields("@lineai_web_search_config", new String[]{"apiKey"});
     }
 
-    static void register(String settingsKey, String[] fields) {
+    void registerSensitiveFields(String settingsKey, String[] fields) {
         if (settingsKey == null || fields == null) {
             return;
         }
-        SENSITIVE_FIELDS.put(settingsKey, fields);
+        sensitiveFields.put(settingsKey, fields);
     }
 
-    static ImportedLineCodeData redactData(ImportedLineCodeData data) {
+    void registerSensitiveNameKeyword(String keyword) {
+        if (keyword != null && keyword.length() > 0) {
+            sensitiveNameKeywords.add(keyword.toLowerCase(Locale.ROOT));
+        }
+    }
+
+    boolean isSensitiveName(String name) {
+        String value = name == null ? "" : name.toLowerCase(Locale.ROOT);
+        for (String keyword : sensitiveNameKeywords) {
+            if (value.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    ImportedLineCodeData performRedactData(ImportedLineCodeData data) {
         ImportedLineCodeData safeData = data == null
                 ? new ImportedLineCodeData(null, "", null, "", null)
                 : data;
@@ -40,11 +75,11 @@ final class ArchiveSecretRedactor {
                 safeData.getSelectedModelId(),
                 safeData.getConversations(),
                 safeData.getCurrentConversationId(),
-                redactSettings(safeData.getSettings())
+                performRedactSettings(safeData.getSettings())
         );
     }
 
-    static JSONObject redactDatabaseSnapshot(JSONObject snapshot) {
+    JSONObject performRedactDatabaseSnapshot(JSONObject snapshot) {
         if (snapshot == null) {
             return null;
         }
@@ -64,7 +99,7 @@ final class ArchiveSecretRedactor {
         return redacted;
     }
 
-    static Map<String, String> redactSettings(Map<String, String> settings) {
+    Map<String, String> performRedactSettings(Map<String, String> settings) {
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
         if (settings == null) {
             return values;
@@ -79,9 +114,9 @@ final class ArchiveSecretRedactor {
         return values;
     }
 
-    private static ModelConfig redactModel(ModelConfig model) {
+    private ModelConfig redactModel(ModelConfig model) {
         if (model == null) {
-            return new ModelConfig("", "", null, "", "", "", "");
+            return ModelConfig.builder("", "", null, "", "", "", "").build();
         }
         return new ModelConfig(
                 model.getId(),
@@ -99,7 +134,7 @@ final class ArchiveSecretRedactor {
         );
     }
 
-    private static void redactSettingsTable(JSONObject table) {
+    private void redactSettingsTable(JSONObject table) {
         JSONArray rows = rows(table);
         if (rows == null) {
             return;
@@ -115,7 +150,7 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static void redactModelTable(JSONObject table) {
+    private void redactModelTable(JSONObject table) {
         JSONArray rows = rows(table);
         if (rows == null) {
             return;
@@ -130,7 +165,7 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static void redactMcpTable(JSONObject table) {
+    private void redactMcpTable(JSONObject table) {
         JSONArray rows = rows(table);
         if (rows == null) {
             return;
@@ -145,9 +180,9 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static String redactSettingValue(String key, String value) {
+    private String redactSettingValue(String key, String value) {
         String safeKey = key == null ? "" : key;
-        String[] fields = SENSITIVE_FIELDS.get(safeKey);
+        String[] fields = sensitiveFields.get(safeKey);
         if (fields != null) {
             return redactJsonFields(value, fields);
         }
@@ -157,11 +192,11 @@ final class ArchiveSecretRedactor {
         return value == null ? "" : value;
     }
 
-    private static String redactModelJson(String raw) {
+    private String redactModelJson(String raw) {
         return redactJsonFields(raw, "apiKey", "api_key");
     }
 
-    private static String redactHeaderArray(String raw) {
+    private String redactHeaderArray(String raw) {
         if (raw == null || raw.trim().length() == 0) {
             return "[]";
         }
@@ -182,7 +217,7 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static String redactRecursiveJson(String raw) {
+    private String redactRecursiveJson(String raw) {
         if (raw == null || raw.trim().length() == 0) {
             return "";
         }
@@ -195,7 +230,7 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static String redactJsonFields(String raw, String... fields) {
+    private String redactJsonFields(String raw, String... fields) {
         if (raw == null || raw.trim().length() == 0) {
             return "";
         }
@@ -212,7 +247,7 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static void redactRecursive(Object value) throws Exception {
+    private void redactRecursive(Object value) throws Exception {
         if (value instanceof JSONObject) {
             JSONObject object = (JSONObject) value;
             JSONArray names = object.names();
@@ -236,33 +271,16 @@ final class ArchiveSecretRedactor {
         }
     }
 
-    private static boolean isSensitiveName(String name) {
-        String value = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
-        return value.contains("apikey")
-                || value.contains("api_key")
-                || value.contains("api-key")
-                || value.contains("authorization")
-                || value.contains("password")
-                || value.contains("passwd")
-                || value.contains("passphrase")
-                || value.contains("privatekey")
-                || value.contains("private_key")
-                || value.contains("private-key")
-                || value.contains("secret")
-                || value.contains("token")
-                || value.contains("cookie");
-    }
-
-    private static JSONArray rows(JSONObject table) {
+    private JSONArray rows(JSONObject table) {
         return table == null ? null : table.optJSONArray("rows");
     }
 
-    private static String cellString(JSONObject row, String column) {
+    private String cellString(JSONObject row, String column) {
         JSONObject cell = row.optJSONObject(column);
         return cell == null ? "" : cell.optString("value", "");
     }
 
-    private static void setStringCell(JSONObject row, String column, String value) {
+    private void setStringCell(JSONObject row, String column, String value) {
         JSONObject cell = row.optJSONObject(column);
         if (cell == null || !"string".equals(cell.optString("type", "string"))) {
             return;
@@ -271,5 +289,23 @@ final class ArchiveSecretRedactor {
             cell.put("value", value == null ? "" : value);
         } catch (Exception ignored) {
         }
+    }
+
+    // ---- Static convenience API ----
+
+    static void register(String settingsKey, String[] fields) {
+        DEFAULT.registerSensitiveFields(settingsKey, fields);
+    }
+
+    static ImportedLineCodeData redactData(ImportedLineCodeData data) {
+        return DEFAULT.performRedactData(data);
+    }
+
+    static JSONObject redactDatabaseSnapshot(JSONObject snapshot) {
+        return DEFAULT.performRedactDatabaseSnapshot(snapshot);
+    }
+
+    static Map<String, String> redactSettings(Map<String, String> settings) {
+        return DEFAULT.performRedactSettings(settings);
     }
 }

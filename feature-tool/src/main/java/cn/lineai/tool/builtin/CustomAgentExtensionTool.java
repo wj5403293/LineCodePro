@@ -2,6 +2,7 @@ package cn.lineai.tool.builtin;
 
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
 import cn.lineai.tool.ToolDisplayCategory;
@@ -26,11 +27,11 @@ public final class CustomAgentExtensionTool extends BaseTool {
     @Override
     public String getDescription() {
         StringBuilder builder = new StringBuilder();
-        builder.append("调用自定义 Agent「").append(agent.getName()).append("」。");
+        builder.append("Invoke the custom Agent \"").append(agent.getName()).append("\".");
         if (agent.getTrigger().length() > 0) {
-            builder.append("\n触发条件: ").append(agent.getTrigger());
+            builder.append("\nTrigger: ").append(agent.getTrigger());
         }
-        builder.append("\n能力说明: ").append(agent.getPrompt().length() > 900
+        builder.append("\nCapabilities: ").append(agent.getPrompt().length() > 900
                 ? agent.getPrompt().substring(0, 900)
                 : agent.getPrompt());
         return builder.toString();
@@ -51,16 +52,16 @@ public final class CustomAgentExtensionTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("task", new JSONObject().put("type", "string").put("description", "交给此自定义 Agent 完成的具体任务"))
-                        .put("context", new JSONObject().put("type", "string").put("description", "可选补充上下文、文件路径、限制或验收方式"))
+                        .put("task", new JSONObject().put("type", "string").put("description", "The specific task to hand to this custom Agent"))
+                        .put("context", new JSONObject().put("type", "string").put("description", "Optional supplementary context, file paths, constraints, or acceptance criteria"))
                         .put("read_scope", new JSONObject()
                                 .put("type", "array")
                                 .put("items", new JSONObject().put("type", "string"))
-                                .put("description", "允许读取的文件或目录路径列表"))
+                                .put("description", "List of files or directories allowed to read"))
                         .put("write_scope", new JSONObject()
                                 .put("type", "array")
                                 .put("items", new JSONObject().put("type", "string"))
-                                .put("description", "允许写入的唯一文件或目录路径列表。没有写入范围时自定义 Agent 不能写文件")))
+                                .put("description", "List of unique files or directories allowed to write. Without a write scope, the custom Agent cannot write files")))
                 .put("required", new JSONArray().put("task"));
     }
 
@@ -68,10 +69,10 @@ public final class CustomAgentExtensionTool extends BaseTool {
     public ToolResult execute(JSONObject input, ToolContext context) {
         String task = input == null ? "" : input.optString("task").trim();
         if (task.length() == 0) {
-            return error("自定义 Agent 任务不能为空。");
+            return error(context != null ? context.getString(R.string.tool_custom_agent_task_empty) : "Custom Agent task cannot be empty.");
         }
         if (context == null || context.getAgentRunner() == null) {
-            return error("Agent 执行器未接入，无法运行自定义 Agent。");
+            return error(context != null ? context.getString(R.string.tool_custom_agent_runner_not_available) : "Agent runner not available, cannot run custom Agent.");
         }
         try {
             String prompt = buildPrompt(task, input.optString("context"));
@@ -95,26 +96,26 @@ public final class CustomAgentExtensionTool extends BaseTool {
             }
             return context.getAgentRunner().runAgent(delegated, context);
         } catch (Exception e) {
-            return error("自定义 Agent 执行失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_custom_agent_failed, e.getMessage()));
         }
     }
 
     private String buildPrompt(String task, String extraContext) {
         StringBuilder builder = new StringBuilder();
-        builder.append("你是自定义 Agent「").append(agent.getName()).append("」（").append(agent.getSlug()).append("）。\n\n");
-        builder.append("## Agent 定义\n").append(agent.getPrompt()).append("\n\n");
+        builder.append("You are the custom Agent \"").append(agent.getName()).append("\" (").append(agent.getSlug()).append(").\n\n");
+        builder.append("## Agent Definition\n").append(agent.getPrompt()).append("\n\n");
         if (agent.getTrigger().length() > 0) {
-            builder.append("## 触发条件\n").append(agent.getTrigger()).append("\n\n");
+            builder.append("## Trigger\n").append(agent.getTrigger()).append("\n\n");
         }
         if (!agent.getToolNames().isEmpty()) {
-            builder.append("## 期望工具范围\n").append(agent.getToolNames()).append("\n\n");
+            builder.append("## Expected Tool Scope\n").append(agent.getToolNames()).append("\n\n");
         }
         if (!agent.getMcpIds().isEmpty()) {
-            builder.append("## 期望 MCP 范围\n").append(agent.getMcpIds()).append("\n\n");
+            builder.append("## Expected MCP Scope\n").append(agent.getMcpIds()).append("\n\n");
         }
-        builder.append("## 当前任务\n").append(task);
+        builder.append("## Current Task\n").append(task);
         if (extraContext != null && extraContext.trim().length() > 0) {
-            builder.append("\n\n## 补充上下文\n").append(extraContext.trim());
+            builder.append("\n\n## Supplementary Context\n").append(extraContext.trim());
         }
         return builder.toString();
     }

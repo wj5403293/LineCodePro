@@ -1,6 +1,7 @@
 package cn.lineai.data.importer;
 
 import android.content.Context;
+import cn.lineai.data.db.LineCodeDatabase;
 import cn.lineai.data.repository.ConversationRecord;
 import cn.lineai.data.repository.ConversationRepository;
 import cn.lineai.data.repository.SettingsRepository;
@@ -21,9 +22,11 @@ public final class LineCodeImportService {
     private final SettingsRepository settingsRepository;
 
     public LineCodeImportService(Context context) {
-        modelRepository = new ModelRepository(context);
-        conversationRepository = new ConversationRepository(context);
-        settingsRepository = new SettingsRepository(context);
+        Context appContext = context.getApplicationContext();
+        cn.lineai.data.db.LineCodeDatabase database = LineCodeDatabase.getInstance(appContext);
+        modelRepository = new ModelRepository(database, appContext.getSharedPreferences("linecode_models", Context.MODE_PRIVATE));
+        conversationRepository = new ConversationRepository(database);
+        settingsRepository = new SettingsRepository(database);
     }
 
     public ImportedLineCodeData importPayload(File payloadDir, Mode mode) throws Exception {

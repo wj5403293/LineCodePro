@@ -1,6 +1,5 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
 import cn.lineai.model.SshConfig;
 
 public final class SshConfigRepository {
@@ -8,8 +7,8 @@ public final class SshConfigRepository {
 
     private final SettingsRepository settingsRepository;
 
-    public SshConfigRepository(Context context) {
-        settingsRepository = new SettingsRepository(context);
+    public SshConfigRepository(SettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
     }
 
     public synchronized SshConfig get() {

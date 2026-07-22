@@ -345,7 +345,7 @@ public final class KeepAliveService extends Service {
     }
 
     public static void startGeneration(Context context) {
-        boolean fakeAudio = new KeepAliveRepository(context).isFakeAudioEnabled();
+        boolean fakeAudio = new KeepAliveRepository(context.getSharedPreferences("linecode_keep_alive", Context.MODE_PRIVATE)).isFakeAudioEnabled();
         Intent intent = new Intent(context, KeepAliveService.class);
         intent.setAction(ACTION_START_GENERATION);
         intent.putExtra(EXTRA_STATUS_TEXT, context.getString(R.string.notification_keep_alive_text));

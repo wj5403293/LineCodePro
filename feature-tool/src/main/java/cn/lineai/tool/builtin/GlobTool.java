@@ -1,6 +1,8 @@
 package cn.lineai.tool.builtin;
 
+import android.content.Context;
 import cn.lineai.tool.BaseTool;
+import cn.lineai.tool.R;
 import cn.lineai.tool.ToolArgs;
 import cn.lineai.tool.ToolCategory;
 import cn.lineai.tool.ToolContext;
@@ -23,7 +25,7 @@ public final class GlobTool extends BaseTool {
 
     @Override
     public String getDescription() {
-        return "搜索匹配的文件。支持 * ** ? 通配符。";
+        return "Search for matching files. Supports * ** ? wildcards.";
     }
 
     @Override
@@ -37,6 +39,16 @@ public final class GlobTool extends BaseTool {
     }
 
     @Override
+    public String getActionName(Context context) {
+        return context.getString(R.string.tool_call_action_match);
+    }
+
+    @Override
+    public int getActionIcon() {
+        return ICON_SEARCH;
+    }
+
+    @Override
     public boolean isConcurrencySafe() {
         return true;
     }
@@ -46,8 +58,8 @@ public final class GlobTool extends BaseTool {
         return new JSONObject()
                 .put("type", "object")
                 .put("properties", new JSONObject()
-                        .put("pattern", new JSONObject().put("type", "string").put("description", "文件匹配模式，如 *.java, app/src/**/*.java"))
-                        .put("path", new JSONObject().put("type", "string").put("description", "搜索根目录，可选，默认为 home 目录")))
+                        .put("pattern", new JSONObject().put("type", "string").put("description", "File match pattern, e.g. *.java, app/src/**/*.java"))
+                        .put("path", new JSONObject().put("type", "string").put("description", "Search root directory, optional, defaults to the home directory")))
                 .put("required", new org.json.JSONArray().put("pattern"));
     }
 
@@ -58,26 +70,26 @@ public final class GlobTool extends BaseTool {
             ToolArgs.requireNonEmpty(pattern, "pattern");
             File root = FileToolPathPolicy.resolve(context, input.optString("path"));
             if (!root.exists() || !root.isDirectory()) {
-                return error("搜索根目录不存在或不是目录: " + input.optString("path", "."));
+                return error(context.getString(R.string.tool_glob_root_not_found, input.optString("path", ".")));
             }
             ArrayList<String> results = new ArrayList<>();
             Pattern compiled = Pattern.compile(globToRegex(pattern));
             search(root, "", pattern, compiled, results);
             String displayRoot = FileToolPathPolicy.displayPath(context.getHomePath(), root);
             if (results.isEmpty()) {
-                return ok("在 " + displayRoot + " 目录下未找到匹配 \"" + pattern + "\" 的文件。");
+                return ok(context.getString(R.string.tool_glob_no_match, pattern, displayRoot));
             }
             StringBuilder builder = new StringBuilder();
-            builder.append("在 ").append(displayRoot).append(" 目录下找到 ").append(results.size()).append(" 个匹配文件:\n");
+            builder.append(context.getString(R.string.tool_glob_found, results.size(), displayRoot));
             for (String result : results) {
                 builder.append(result).append('\n');
             }
             if (results.size() >= MAX_RESULTS) {
-                builder.append("... (结果过多，已截断)\n");
+                builder.append(context.getString(R.string.tool_glob_truncated));
             }
             return ok(builder.toString().trim());
         } catch (Exception e) {
-            return error("搜索失败: " + e.getMessage());
+            return error(context.getString(R.string.tool_glob_failed, e.getMessage()));
         }
     }
 

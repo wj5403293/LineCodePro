@@ -1,13 +1,15 @@
 package cn.lineai.data.repository;
 
-import android.content.Context;
+import cn.lineai.ai.SkillPromptProvider;
 import cn.lineai.data.db.LineCodeDatabase;
+import cn.lineai.data.service.SkillFileManager;
 import cn.lineai.model.ExtensionAgentConfig;
 import cn.lineai.model.ExtensionMcpConfig;
 import cn.lineai.model.ExtensionOverviewState;
 import cn.lineai.model.McpRequestHeader;
 import cn.lineai.model.McpToolSummary;
 import cn.lineai.model.SkillRecord;
+import cn.lineai.resource.ResourceProvider;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,12 +22,11 @@ public final class ExtensionRepository extends BaseRepository implements Extensi
     private final McpExtensionRepository mcpRepository;
     private final SkillRepository skillRepository;
 
-    public ExtensionRepository(Context context) {
-        super(LineCodeDatabase.getInstance(context.getApplicationContext()));
-        LineCodeDatabase database = LineCodeDatabase.getInstance(context.getApplicationContext());
+    public ExtensionRepository(LineCodeDatabase database, ResourceProvider resourceProvider, SkillFileManager fileManager, SkillPromptProvider promptProvider) {
+        super(database);
         this.agentRepository = new AgentExtensionRepository(database);
         this.mcpRepository = new McpExtensionRepository(database);
-        this.skillRepository = new SkillRepository(context, this.agentRepository, this.mcpRepository);
+        this.skillRepository = new SkillRepository(database, resourceProvider, fileManager, this.agentRepository, this.mcpRepository, promptProvider);
     }
 
     @Override
